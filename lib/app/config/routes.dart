@@ -6,13 +6,13 @@ import 'package:you_too_art/app/config/router_refresh_notifier.dart';
 import 'package:you_too_art/core/widgets/main_wrapper.dart';
 import 'package:you_too_art/features/auth/presentation/login_screen.dart';
 import 'package:you_too_art/features/auth/presentation/signup_screen.dart';
+import 'package:you_too_art/features/auth/presentation/verify_otp_screen.dart';
 import 'package:you_too_art/features/auth/providers/auth_provider.dart';
 import 'package:you_too_art/features/account/presentation/account_screen.dart';
 import 'package:you_too_art/features/casting/presentation/casting_screen.dart';
 import 'package:you_too_art/features/chats/presentation/chats_screen.dart';
 import 'package:you_too_art/features/home/presentation/home_screen.dart';
 import 'package:you_too_art/features/network/presentation/network_screen.dart';
-import 'package:you_too_art/features/onboarding/presentation/onboarding_screen.dart';
 import 'package:you_too_art/features/splash/presentation/splash_screen.dart';
 import 'package:you_too_art/features/talent/presentation/talent_screen.dart';
 
@@ -22,7 +22,6 @@ class AppRoutes {
 
   // ─── Route Paths ──────────────────────────────────
   static const String splash = '/splash';
-  static const String onboarding = '/onboarding';
   static const String login = '/login';
   static const String signup = '/signup';
   static const String home = '/home';
@@ -31,13 +30,14 @@ class AppRoutes {
   static const String chats = '/chats';
   static const String casting = '/casting';
   static const String account = '/account';
+  static const String verifyOtp = '/verify-otp';
 
   // ─── Navigator Key ────────────────────────────────
   static final GlobalKey<NavigatorState> rootNavigatorKey =
       GlobalKey<NavigatorState>(debugLabel: 'root');
 
   // ─── Auth Screens (no redirect for these) ─────────
-  static const Set<String> _authPaths = {splash, onboarding, login, signup};
+  static const Set<String> _authPaths = {splash, login, signup, verifyOtp};
 
   // ─── Build Router ─────────────────────────────────
 
@@ -52,22 +52,18 @@ class AppRoutes {
         final auth = ref.read(authProvider);
         final currentPath = state.uri.path;
 
-        // First time → onboarding
-        if (auth.isFirstTime && currentPath != onboarding) {
-          return onboarding;
-        }
+        // Never redirect away from splash — splash decides where to go.
+        if (currentPath == AppRoutes.splash) return null;
 
-        // Not logged in → login (unless on an auth screen already)
-        if (!auth.isFirstTime && !auth.isLoggedIn) {
-          if (!_authPaths.contains(currentPath)) {
-            return login;
-          }
+        // Not logged in → login (unless already on an auth screen)
+        if (!auth.isLoggedIn) {
+          if (!_authPaths.contains(currentPath)) return AppRoutes.login;
           return null;
         }
 
         // Logged in but on an auth screen → home
         if (auth.isLoggedIn && _authPaths.contains(currentPath)) {
-          return home;
+          return AppRoutes.home;
         }
 
         return null;
@@ -78,17 +74,17 @@ class AppRoutes {
           path: splash,
           builder: (context, state) => const SplashScreen(),
         ),
-        GoRoute(
-          path: onboarding,
-          builder: (context, state) => const OnboardingScreen(),
-        ),
-        GoRoute(
-          path: login,
-          builder: (context, state) => const LoginScreen(),
-        ),
+        GoRoute(path: login, builder: (context, state) => const LoginScreen()),
         GoRoute(
           path: signup,
           builder: (context, state) => const SignupScreen(),
+        ),
+        GoRoute(
+          path: verifyOtp,
+          builder: (context, state) {
+            final email = state.extra as String? ?? '';
+            return VerifyOtpScreen(email: email);
+          },
         ),
 
         // ─── Main Shell with Bottom Navigation ───────

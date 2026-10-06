@@ -29,8 +29,7 @@ class AuthRepository {
   bool get isLoggedIn => _auth.currentUser != null;
 
   /// Whether the current user's email has been verified.
-  bool get isEmailVerified =>
-      _auth.currentUser?.emailConfirmedAt != null;
+  bool get isEmailVerified => _auth.currentUser?.emailConfirmedAt != null;
 
   // ─── Auth Methods ─────────────────────────────────
 
@@ -46,10 +45,7 @@ class AuthRepository {
       return await _auth.signUp(
         email: email,
         password: password,
-        data: {
-          'name': name,
-          'role': role,
-        },
+        data: {'name': name, 'role': role},
       );
     } catch (e) {
       if (kDebugMode) debugPrint('AuthRepository.signUp: $e');
@@ -63,10 +59,7 @@ class AuthRepository {
     required String password,
   }) async {
     try {
-      return await _auth.signInWithPassword(
-        email: email,
-        password: password,
-      );
+      return await _auth.signInWithPassword(email: email, password: password);
     } catch (e) {
       if (kDebugMode) debugPrint('AuthRepository.login: $e');
       rethrow;
@@ -101,6 +94,35 @@ class AuthRepository {
       await _auth.resend(type: OtpType.signup, email: email);
     } catch (e) {
       if (kDebugMode) debugPrint('AuthRepository.resendVerificationEmail: $e');
+      rethrow;
+    }
+  }
+
+  /// Send a one-time passcode to [email].
+  /// Creates the user if they don't exist yet (Supabase default).
+  Future<void> sendEmailOtp({required String email}) async {
+    try {
+      await _auth.signInWithOtp(email: email);
+    } catch (e) {
+      if (kDebugMode) debugPrint('AuthRepository.sendEmailOtp: $e');
+      rethrow;
+    }
+  }
+
+  /// Verify the 6-digit OTP the user received.
+  /// On success Supabase creates a session — the user is logged in.
+  Future<AuthResponse> verifyEmailOtp({
+    required String email,
+    required String token,
+  }) async {
+    try {
+      return await _auth.verifyOTP(
+        email: email,
+        token: token,
+        type: OtpType.email,
+      );
+    } catch (e) {
+      if (kDebugMode) debugPrint('AuthRepository.verifyEmailOtp: $e');
       rethrow;
     }
   }

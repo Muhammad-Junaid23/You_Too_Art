@@ -40,8 +40,7 @@ final userRepositoryProvider = Provider<UserRepository>((ref) {
 // ─── Auth Streams ───────────────────────────────────
 
 /// Stream of Supabase auth state changes.
-final authStateChangesProvider =
-    StreamProvider<supabase.AuthState>((ref) {
+final authStateChangesProvider = StreamProvider<supabase.AuthState>((ref) {
   final repo = ref.watch(authRepositoryProvider);
   return repo.authStateChanges();
 });
@@ -63,13 +62,11 @@ final emailVerifiedProvider = StreamProvider<bool>((ref) {
 /// Immutable state for the auth layer.
 /// Named [AppAuthState] to avoid conflict with Supabase's AuthState.
 class AppAuthState {
-  final bool isFirstTime;
   final bool isLoggedIn;
   final bool isLoading;
   final String? errorMessage;
 
   const AppAuthState({
-    this.isFirstTime = true,
     this.isLoggedIn = false,
     this.isLoading = false,
     this.errorMessage,
@@ -82,7 +79,6 @@ class AppAuthState {
     String? errorMessage,
   }) {
     return AppAuthState(
-      isFirstTime: isFirstTime ?? this.isFirstTime,
       isLoggedIn: isLoggedIn ?? this.isLoggedIn,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: errorMessage,
@@ -95,24 +91,13 @@ class AppAuthState {
 class AuthNotifier extends Notifier<AppAuthState> {
   late final AuthRepository _authRepo;
   late final UserRepository _userRepo;
-  late final StorageService _storage;
 
   @override
   AppAuthState build() {
     _authRepo = ref.watch(authRepositoryProvider);
     _userRepo = ref.watch(userRepositoryProvider);
-    _storage = ref.watch(storageServiceProvider);
 
-    return AppAuthState(
-      isFirstTime: _storage.isFirstTime,
-      isLoggedIn: _authRepo.isLoggedIn,
-    );
-  }
-
-  /// Marks onboarding as completed.
-  Future<void> completeOnboarding() async {
-    await _storage.setFirstTimeCompleted();
-    state = state.copyWith(isFirstTime: false);
+    return AppAuthState(isLoggedIn: _authRepo.isLoggedIn);
   }
 
   /// Log in with email and password.
@@ -142,10 +127,7 @@ class AuthNotifier extends Notifier<AppAuthState> {
       return true;
     } catch (e) {
       if (kDebugMode) debugPrint('AuthNotifier.loginWithCredentials: $e');
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: friendlyError(e),
-      );
+      state = state.copyWith(isLoading: false, errorMessage: friendlyError(e));
       return false;
     }
   }
@@ -182,10 +164,7 @@ class AuthNotifier extends Notifier<AppAuthState> {
       return true;
     } catch (e) {
       if (kDebugMode) debugPrint('AuthNotifier.signUp: $e');
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: friendlyError(e),
-      );
+      state = state.copyWith(isLoading: false, errorMessage: friendlyError(e));
       return false;
     }
   }
@@ -199,10 +178,56 @@ class AuthNotifier extends Notifier<AppAuthState> {
       return true;
     } catch (e) {
       if (kDebugMode) debugPrint('AuthNotifier.loginWithGoogle: $e');
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: friendlyError(e),
+      state = state.copyWith(isLoading: false, errorMessage: friendlyError(e));
+      return false;
+    }
+  }
+
+  /// Send an email OTP to [email].
+  /// Returns true if Supabase accepted the request.
+  Future<bool> sendEmailOtp({required String email}) async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      await _authRepo.sendEmailOtp(email: email);
+      state = state.copyWith(isLoading: false);
+      return true;
+    } catch (e) {
+      if (kDebugMode) debugPrint('AuthNotifier.sendEmailOtp: $e');
+      state = state.copyWith(isLoading: false, errorMessage: friendlyError(e));
+      return false;
+    }
+  }
+
+  /// Verify the OTP. On success, creates the user profile row if missing
+  /// and flips [isLoggedIn] so the router redirects to home.
+  Future<bool> verifyEmailOtp({
+    required String email,
+    required String token,
+  }) async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      final response = await _authRepo.verifyEmailOtp(
+        email: email,
+        token: token,
       );
+
+      if (response.user != null) {
+        await _userRepo.createIfMissing(
+          UserModel(
+            id: response.user!.id,
+            name: response.user!.userMetadata?['name'] as String? ?? '',
+            email: response.user!.email ?? email,
+            role: 'actor', // default; user picks real category later
+            createdAt: DateTime.now(),
+          ),
+        );
+      }
+
+      state = state.copyWith(isLoggedIn: true, isLoading: false);
+      return true;
+    } catch (e) {
+      if (kDebugMode) debugPrint('AuthNotifier.verifyEmailOtp: $e');
+      state = state.copyWith(isLoading: false, errorMessage: friendlyError(e));
       return false;
     }
   }
@@ -215,10 +240,7 @@ class AuthNotifier extends Notifier<AppAuthState> {
       state = state.copyWith(isLoggedIn: false, isLoading: false);
     } catch (e) {
       if (kDebugMode) debugPrint('AuthNotifier.logout: $e');
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: friendlyError(e),
-      );
+      state = state.copyWith(isLoading: false, errorMessage: friendlyError(e));
     }
   }
 
@@ -231,10 +253,7 @@ class AuthNotifier extends Notifier<AppAuthState> {
       return true;
     } catch (e) {
       if (kDebugMode) debugPrint('AuthNotifier.sendPasswordReset: $e');
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: friendlyError(e),
-      );
+      state = state.copyWith(isLoading: false, errorMessage: friendlyError(e));
       return false;
     }
   }
