@@ -4,7 +4,7 @@ class AppAssets {
   AppAssets._();
 
   // ─── Images ────────────────────────────────────────
-  static const String logo = '';
+  static const String logo = 'assets/logo/app_logo.png';
   static const String logoWhite = '';
   static const String placeholder = '';
 

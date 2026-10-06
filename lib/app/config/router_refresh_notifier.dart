@@ -12,16 +12,13 @@ class RouterRefreshNotifier extends ChangeNotifier {
 
   RouterRefreshNotifier(Ref ref) {
     bool? previousIsLoggedIn;
-    bool? previousIsFirstTime;
 
     _subscription = ref.listen<AppAuthState>(authProvider, (previous, next) {
       // Only notify when navigation-relevant state actually changes.
       final loggedInChanged = previousIsLoggedIn != next.isLoggedIn;
-      final firstTimeChanged = previousIsFirstTime != next.isFirstTime;
 
-      if (loggedInChanged || firstTimeChanged) {
+      if (loggedInChanged) {
         previousIsLoggedIn = next.isLoggedIn;
-        previousIsFirstTime = next.isFirstTime;
         notifyListeners();
       }
     });
