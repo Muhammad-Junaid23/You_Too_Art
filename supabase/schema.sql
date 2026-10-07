@@ -13,16 +13,16 @@ create extension if not exists "pgcrypto";
 -- ─── Users Table ────────────────────────────────────────────────────────────
 create table if not exists public.users (
   id uuid primary key references auth.users(id) on delete cascade,
-  name text not null,
+  name text not null default '',
   email text not null,
+  role text not null default 'actor',
+  bio text default '',
   profile_image_path text,
-  bio text,
-  role text not null default 'actor' check (role in ('actor', 'artist', 'productionHouse', 'admin')),
   location text,
   is_admin boolean not null default false,
   fcm_token text,
-  created_at timestamptz not null default timezone('utc'::text, now()),
-  updated_at timestamptz not null default timezone('utc'::text, now())
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 
 -- ─── Posts Table ────────────────────────────────────────────────────────────

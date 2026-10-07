@@ -17,8 +17,6 @@ void main() async {
     publishableKey: 'sb_publishable_1KCWaVcKpBTNyhZOU2LhLw_vaVFLKDV',
   );
 
-  // re_h8RwwUSc_KSE6p1goFFZEJLg8X9TbBcuA
-
   final sharedPreferences = await SharedPreferences.getInstance();
 
   runApp(
