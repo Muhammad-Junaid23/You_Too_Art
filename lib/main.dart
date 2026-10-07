@@ -13,9 +13,11 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Supabase.initialize(
-    url: 'TODO_SUPABASE_URL',
-    publishableKey: 'TODO_SUPABASE_ANON_KEY',
+    url: 'https://nvymirbsyzcnsphprbkc.supabase.co',
+    publishableKey: 'sb_publishable_1KCWaVcKpBTNyhZOU2LhLw_vaVFLKDV',
   );
+
+  // re_h8RwwUSc_KSE6p1goFFZEJLg8X9TbBcuA
 
   final sharedPreferences = await SharedPreferences.getInstance();
 
