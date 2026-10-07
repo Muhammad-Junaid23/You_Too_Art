@@ -192,7 +192,6 @@ class _OtpBoxes extends StatelessWidget {
     return Stack(
       alignment: Alignment.center,
       children: [
-        // The real, invisible input
         Opacity(
           opacity: 0,
           child: TextField(
@@ -202,7 +201,16 @@ class _OtpBoxes extends StatelessWidget {
             keyboardType: TextInputType.number,
             maxLength: length,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            onChanged: (_) => (context as Element).markNeedsBuild(),
+            decoration: const InputDecoration(
+              counterText: '',
+              border: InputBorder.none,
+              contentPadding: EdgeInsets.zero,
+            ),
+            onChanged: (text) {
+              if (text.length == length) {
+                onCompleted();
+              }
+            },
             onSubmitted: (_) => onCompleted(),
           ),
         ),
