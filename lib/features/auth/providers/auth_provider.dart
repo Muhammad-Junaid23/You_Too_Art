@@ -219,6 +219,7 @@ class AuthNotifier extends Notifier<AppAuthState> {
             email: response.user!.email ?? email,
             role: 'actor', // default; user picks real category later
             createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
           ),
         );
       }

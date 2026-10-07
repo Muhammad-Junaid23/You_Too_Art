@@ -40,7 +40,11 @@ class UserRepository {
       final existing = await getById(user.id);
       if (existing != null) return existing;
 
-      final data = await _db.insert(user.toJson()).select().single();
+      final json = user.toJson();
+      // Let Postgres fill in updated_at if not provided
+      if (json['updated_at'] == null) json.remove('updated_at');
+
+      final data = await _db.insert(json).select().single();
       return UserModel.fromJson(data);
     } catch (e) {
       if (kDebugMode) debugPrint('UserRepository.createIfMissing: $e');
@@ -55,8 +59,7 @@ class UserRepository {
   }) async {
     try {
       updates['updated_at'] = DateTime.now().toUtc().toIso8601String();
-      final data =
-          await _db.update(updates).eq('id', uid).select().single();
+      final data = await _db.update(updates).eq('id', uid).select().single();
       return UserModel.fromJson(data);
     } catch (e) {
       if (kDebugMode) debugPrint('UserRepository.updateProfile: $e');

@@ -25,17 +25,33 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _onSendOtp() async {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
+    debugPrint('SEND_OTP: start');
+    if (!(_formKey.currentState?.validate() ?? false)) {
+      debugPrint('SEND_OTP: validation failed');
+      return;
+    }
 
     final email = _emailController.text.trim();
+    debugPrint('SEND_OTP: calling provider with $email');
+
     final ok = await ref.read(authProvider.notifier).sendEmailOtp(email: email);
+    debugPrint('SEND_OTP: provider returned ok=$ok, mounted=$mounted');
+
     if (!mounted) return;
 
     if (ok) {
-      context.push(AppRoutes.verifyOtp, extra: email);
+      debugPrint('SEND_OTP: pushing /verify-otp');
+      try {
+        context.push(AppRoutes.verifyOtp, extra: email);
+        debugPrint('SEND_OTP: push returned');
+      } catch (e, st) {
+        debugPrint('SEND_OTP: push threw: $e');
+        debugPrint('$st');
+      }
     } else {
       final msg =
           ref.read(authProvider).errorMessage ?? 'Something went wrong.';
+      debugPrint('SEND_OTP: error path, msg=$msg');
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     }
   }

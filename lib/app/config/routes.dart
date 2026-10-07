@@ -15,6 +15,9 @@ import 'package:you_too_art/features/home/presentation/home_screen.dart';
 import 'package:you_too_art/features/network/presentation/network_screen.dart';
 import 'package:you_too_art/features/splash/presentation/splash_screen.dart';
 import 'package:you_too_art/features/talent/presentation/talent_screen.dart';
+import 'package:you_too_art/features/auth/presentation/choose_category_screen.dart';
+import 'package:you_too_art/features/profile/presentation/complete_profile_individual_screen.dart';
+import 'package:you_too_art/features/profile/presentation/complete_profile_production_screen.dart';
 
 /// Centralized route configuration for the app.
 class AppRoutes {
@@ -31,13 +34,26 @@ class AppRoutes {
   static const String casting = '/casting';
   static const String account = '/account';
   static const String verifyOtp = '/verify-otp';
+  static const String chooseCategory = '/choose-category';
+  static const String completeProfileIndividual =
+      '/complete-profile/individual';
+  static const String completeProfileProduction =
+      '/complete-profile/production';
 
   // ─── Navigator Key ────────────────────────────────
   static final GlobalKey<NavigatorState> rootNavigatorKey =
       GlobalKey<NavigatorState>(debugLabel: 'root');
 
-  // ─── Auth Screens (no redirect for these) ─────────
-  static const Set<String> _authPaths = {splash, login, signup, verifyOtp};
+  // Screens to bounce a logged-in user away from (true auth entry screens)
+
+  static const Set<String> _publicOnly = {splash, login, signup};
+
+  static const Set<String> _noAuthRequired = {
+    verifyOtp,
+    chooseCategory,
+    completeProfileIndividual,
+    completeProfileProduction,
+  };
 
   // ─── Build Router ─────────────────────────────────
 
@@ -52,19 +68,19 @@ class AppRoutes {
         final auth = ref.read(authProvider);
         final currentPath = state.uri.path;
 
-        // Never redirect away from splash — splash decides where to go.
+        // Splash handles its own navigation.
         if (currentPath == AppRoutes.splash) return null;
 
-        // Not logged in → login (unless already on an auth screen)
-        if (!auth.isLoggedIn) {
-          if (!_authPaths.contains(currentPath)) return AppRoutes.login;
-          return null;
+        // Public-only screens: bounce logged-in users to home.
+        if (_publicOnly.contains(currentPath)) {
+          return auth.isLoggedIn ? AppRoutes.home : null;
         }
 
-        // Logged in but on an auth screen → home
-        if (auth.isLoggedIn && _authPaths.contains(currentPath)) {
-          return AppRoutes.home;
-        }
+        // Auth-flow screens: always allowed (logged in or not).
+        if (_noAuthRequired.contains(currentPath)) return null;
+
+        // Everything else: requires login.
+        if (!auth.isLoggedIn) return AppRoutes.login;
 
         return null;
       },
@@ -85,6 +101,18 @@ class AppRoutes {
             final email = state.extra as String? ?? '';
             return VerifyOtpScreen(email: email);
           },
+        ),
+        GoRoute(
+          path: chooseCategory,
+          builder: (context, state) => const ChooseCategoryScreen(),
+        ),
+        GoRoute(
+          path: completeProfileIndividual,
+          builder: (context, state) => const CompleteProfileIndividualScreen(),
+        ),
+        GoRoute(
+          path: completeProfileProduction,
+          builder: (context, state) => const CompleteProfileProductionScreen(),
         ),
 
         // ─── Main Shell with Bottom Navigation ───────
