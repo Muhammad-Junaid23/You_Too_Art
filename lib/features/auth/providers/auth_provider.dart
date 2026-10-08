@@ -208,9 +208,8 @@ class AuthNotifier extends Notifier<AppAuthState> {
     }
   }
 
-  /// Verify the OTP. On success, creates the user profile row if missing
-  /// and flips [isLoggedIn] so the router redirects to home.
-  Future<bool> verifyEmailOtp({
+  // Verifies the OTP, returns the user row, but does NOT set isLoggedIn yet.
+  Future<UserModel?> verifyEmailOtpOnly({
     required String email,
     required String token,
   }) async {
@@ -220,28 +219,29 @@ class AuthNotifier extends Notifier<AppAuthState> {
         email: email,
         token: token,
       );
+      if (response.user == null) throw StateError('No user in response');
 
-      if (response.user != null) {
-        await _userRepo.createIfMissing(
-          UserModel(
-            id: response.user!.id,
-            firstName: '',
-            lastName: '',
-            email: response.user!.email ?? email,
-            role: 'unset',
-            createdAt: DateTime.now(),
-            updatedAt: DateTime.now(),
-          ),
-        );
-      }
-
-      state = state.copyWith(isLoggedIn: true, isLoading: false);
-      return true;
+      final user = await _userRepo.createIfMissing(
+        UserModel(
+          id: response.user!.id,
+          email: response.user!.email ?? email,
+          role: 'unset',
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ),
+      );
+      state = state.copyWith(isLoading: false);
+      return user;
     } catch (e) {
-      if (kDebugMode) debugPrint('AuthNotifier.verifyEmailOtp: $e');
+      if (kDebugMode) debugPrint('AuthNotifier.verifyEmailOtpOnly: $e');
       state = state.copyWith(isLoading: false, errorMessage: friendlyError(e));
-      return false;
+      return null;
     }
+  }
+
+  // Called AFTER routing is decided.
+  void markLoggedIn() {
+    state = state.copyWith(isLoggedIn: true);
   }
 
   /// Log out the current user.

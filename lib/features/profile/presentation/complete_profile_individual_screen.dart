@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-
 import 'package:you_too_art/app/config/routes.dart';
 import 'package:you_too_art/app/constants/app_colors.dart';
 import 'package:you_too_art/core/providers/geo_providers.dart';
@@ -10,6 +9,7 @@ import 'package:you_too_art/features/auth/providers/auth_provider.dart';
 import 'package:you_too_art/features/profile/providers/complete_profile_provider.dart';
 import 'package:you_too_art/features/profile/widgets/add_media_sheet.dart';
 import 'package:you_too_art/features/profile/widgets/profile_avatar_picker.dart';
+import 'package:you_too_art/features/profile/widgets/profile_complete_sheet.dart';
 
 class CompleteProfileIndividualScreen extends ConsumerStatefulWidget {
   const CompleteProfileIndividualScreen({super.key});
@@ -53,7 +53,7 @@ class _CompleteProfileIndividualScreenState
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _ProfileCompleteSheet(
+      builder: (_) => ProfileCompleteSheet(
         firstName: name,
         onProceed: () {
           Navigator.of(context).pop();
@@ -574,113 +574,6 @@ class _MediaSectionHeader extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _ProfileCompleteSheet extends StatelessWidget {
-  final String firstName;
-  final VoidCallback onProceed;
-
-  const _ProfileCompleteSheet({
-    required this.firstName,
-    required this.onProceed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = AppColors.of(context);
-    final text = Theme.of(context).textTheme;
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Three concentric circles with checkmark
-          SizedBox(
-            width: 176,
-            height: 176,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Container(
-                  width: 176,
-                  height: 176,
-                  decoration: BoxDecoration(
-                    color: colors.successSurface.withValues(alpha: 0.35),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                Container(
-                  width: 140,
-                  height: 140,
-                  decoration: BoxDecoration(
-                    color: colors.successSurface.withValues(alpha: 0.6),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                Container(
-                  width: 96,
-                  height: 96,
-                  decoration: BoxDecoration(
-                    color: colors.success,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.check, color: Colors.white, size: 44),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-          Text(
-            'Profile Complete',
-            style: text.titleLarge?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: colors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text.rich(
-            TextSpan(
-              style: text.bodyMedium?.copyWith(color: colors.textSecondary),
-              children: [
-                const TextSpan(text: 'Thanks '),
-                TextSpan(
-                  text: firstName,
-                  style: TextStyle(
-                    color: colors.textPrimary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const TextSpan(text: ' for completing your profile.'),
-              ],
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: ElevatedButton(
-              onPressed: onProceed,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: colors.primary,
-                foregroundColor: colors.surface,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(55),
-                ),
-              ),
-              child: const Text('Proceed to Home'),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
