@@ -1,11 +1,10 @@
 import 'package:you_too_art/core/utils/json_utils.dart';
 
 /// Represents a user in the You Too Art platform.
-///
-/// Roles: actor, artist, productionHouse.
 class UserModel {
   final String id;
-  final String name;
+  final String firstName;
+  final String lastName;
   final String email;
   final String? profileImagePath;
   final String? bio;
@@ -17,7 +16,8 @@ class UserModel {
 
   const UserModel({
     required this.id,
-    required this.name,
+    this.firstName = '',
+    this.lastName = '',
     required this.email,
     this.profileImagePath,
     this.bio,
@@ -28,14 +28,18 @@ class UserModel {
     this.updatedAt,
   });
 
-  /// Creates a [UserModel] from a Supabase JSON row.
-  /// Supports standard Postgres snake_case column names with camelCase fallbacks.
+  /// Computed full name. Kept as a getter so existing code that reads
+  /// `.name` keeps working. Also persisted to the `name` column on write.
+  String get name => '$firstName $lastName'.trim();
+
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
       id: parseString(json['id']),
-      name: parseString(json['name']),
+      firstName: parseString(json['first_name']),
+      lastName: parseString(json['last_name']),
       email: parseString(json['email']),
-      profileImagePath: (json['profile_image_path'] ?? json['profileImagePath']) as String?,
+      profileImagePath:
+          (json['profile_image_path'] ?? json['profileImagePath']) as String?,
       bio: json['bio'] as String?,
       role: parseString(json['role'], defaultValue: 'actor'),
       location: json['location'] as String?,
@@ -45,11 +49,12 @@ class UserModel {
     );
   }
 
-  /// Converts this model to a JSON map for Supabase insert/update.
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'name': name,
+      'first_name': firstName,
+      'last_name': lastName,
+      'name': name, // mirrored for backward compatibility
       'email': email,
       'profile_image_path': profileImagePath,
       'bio': bio,
@@ -61,10 +66,10 @@ class UserModel {
     };
   }
 
-  /// Returns a copy of this model with the given fields replaced.
   UserModel copyWith({
     String? id,
-    String? name,
+    String? firstName,
+    String? lastName,
     String? email,
     String? profileImagePath,
     String? bio,
@@ -76,7 +81,8 @@ class UserModel {
   }) {
     return UserModel(
       id: id ?? this.id,
-      name: name ?? this.name,
+      firstName: firstName ?? this.firstName,
+      lastName: lastName ?? this.lastName,
       email: email ?? this.email,
       profileImagePath: profileImagePath ?? this.profileImagePath,
       bio: bio ?? this.bio,
@@ -89,7 +95,8 @@ class UserModel {
   }
 
   @override
-  String toString() => 'UserModel(id: $id, name: $name, role: $role)';
+  String toString() =>
+      'UserModel(id: $id, name: $name, role: $role)';
 
   @override
   bool operator ==(Object other) =>

@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
-
 import 'package:you_too_art/core/providers/supabase_providers.dart';
 import 'package:you_too_art/core/repositories/auth_repository.dart';
 import 'package:you_too_art/core/repositories/user_repository.dart';
@@ -65,6 +64,7 @@ class AppAuthState {
   final bool isLoggedIn;
   final bool isLoading;
   final String? errorMessage;
+  String? get role => null;
 
   const AppAuthState({
     this.isLoggedIn = false,
@@ -91,6 +91,7 @@ class AppAuthState {
 class AuthNotifier extends Notifier<AppAuthState> {
   late final AuthRepository _authRepo;
   late final UserRepository _userRepo;
+  String? get currentUid => _authRepo.currentUid;
 
   @override
   AppAuthState build() {
@@ -115,10 +116,17 @@ class AuthNotifier extends Notifier<AppAuthState> {
         await _userRepo.createIfMissing(
           UserModel(
             id: user.id,
-            name: user.userMetadata?['name'] as String? ?? '',
+            firstName: (user.userMetadata?['name'] as String? ?? '')
+                .split(' ')
+                .first,
+            lastName: (user.userMetadata?['name'] as String? ?? '')
+                .split(' ')
+                .skip(1)
+                .join(' '),
             email: user.email ?? '',
             role: user.userMetadata?['role'] as String? ?? 'actor',
             createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
           ),
         );
       }
@@ -152,10 +160,12 @@ class AuthNotifier extends Notifier<AppAuthState> {
         await _userRepo.createIfMissing(
           UserModel(
             id: response.user!.id,
-            name: name,
+            firstName: name.split(' ').first,
+            lastName: name.split(' ').skip(1).join(' '),
             email: email,
             role: role,
             createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
           ),
         );
       }
@@ -215,9 +225,10 @@ class AuthNotifier extends Notifier<AppAuthState> {
         await _userRepo.createIfMissing(
           UserModel(
             id: response.user!.id,
-            name: response.user!.userMetadata?['name'] as String? ?? '',
+            firstName: '',
+            lastName: '',
             email: response.user!.email ?? email,
-            role: 'actor', // default; user picks real category later
+            role: 'unset',
             createdAt: DateTime.now(),
             updatedAt: DateTime.now(),
           ),

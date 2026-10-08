@@ -26,6 +26,11 @@ class AppColors {
   // ─── Borders ───────────────────────────────────────
   final Color border;
 
+  // ─── avatar ───────────────────────────────────────
+  final Color required;
+  final Color successSurface;
+  final Color avatarBg;
+
   // ─── Status ────────────────────────────────────────
   final Color success;
   final Color warning;
@@ -48,6 +53,9 @@ class AppColors {
     required this.scaffold,
     required this.surface,
     required this.border,
+    required this.required,
+    required this.successSurface,
+    required this.avatarBg,
     required this.success,
     required this.warning,
     required this.error,
@@ -73,6 +81,9 @@ class AppColors {
     scaffold: Color(0xFFFFFFFF),
     surface: Color(0xFFFFFFFF),
     border: Color(0xFFE6E7E8),
+    required: Color(0xFFFF4D4D),
+    successSurface: Color(0xFFB3FCE2),
+    avatarBg: Color(0xFFD5EBFF),
     success: Color(0xFF2ECC71),
     warning: Color(0xFFF39C12),
     error: Color(0xFFE74C3C),
@@ -93,6 +104,9 @@ class AppColors {
     scaffold: Color(0xFF121218),
     surface: Color(0xFF1E1E2C),
     border: Color(0xFF2C2C3E),
+    required: Color(0xFFFF4D4D),
+    successSurface: Color(0xFF2A6E5A),
+    avatarBg: Color(0xFF1E3A5F),
     success: Color(0xFF2ECC71),
     warning: Color(0xFFF39C12),
     error: Color(0xFFE74C3C),
