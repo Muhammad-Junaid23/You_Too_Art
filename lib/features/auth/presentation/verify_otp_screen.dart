@@ -43,14 +43,42 @@ class _VerifyOtpScreenState extends ConsumerState<VerifyOtpScreen> {
         .verifyEmailOtp(email: widget.email, token: code);
     if (!mounted) return;
 
-    if (ok) {
-      context.go(AppRoutes.chooseCategory);
-    } else {
+    if (!ok) {
       final msg =
           ref.read(authProvider).errorMessage ?? 'Invalid or expired code.';
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
       _controller.clear();
       _focusNode.requestFocus();
+      return;
+    }
+
+    // ─── Route based on profile state ─────────────────────
+    final uid = ref.read(authProvider.notifier).currentUid;
+    if (uid == null) {
+      if (!mounted) return;
+      context.go(AppRoutes.chooseCategory);
+      return;
+    }
+
+    final user = await ref.read(userRepositoryProvider).getById(uid);
+    if (!mounted) return;
+
+    final role = user?.role ?? 'unset';
+    final firstName = user?.firstName ?? '';
+
+    if (role == 'unset') {
+      // Never picked a category
+      context.go(AppRoutes.chooseCategory);
+    } else if (firstName.isEmpty) {
+      // Picked a category but hasn't completed profile
+      if (role == 'production_house') {
+        context.go(AppRoutes.completeProfileProduction);
+      } else {
+        context.go(AppRoutes.completeProfileIndividual);
+      }
+    } else {
+      // Fully set up
+      context.go(AppRoutes.home);
     }
   }
 
