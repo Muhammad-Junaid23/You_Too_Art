@@ -1,6 +1,5 @@
 import 'package:you_too_art/core/utils/json_utils.dart';
 
-/// Represents a user in the You Too Art platform.
 class UserModel {
   final String id;
   final String firstName;
@@ -11,6 +10,9 @@ class UserModel {
   final String role;
   final String? location;
   final bool isAdmin;
+  final String? incorporationNumber;
+  final int? establishedYear;
+  final String? address;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -21,15 +23,16 @@ class UserModel {
     required this.email,
     this.profileImagePath,
     this.bio,
-    this.role = 'actor',
+    this.role = 'unset',
     this.location,
     this.isAdmin = false,
+    this.incorporationNumber,
+    this.establishedYear,
+    this.address,
     this.createdAt,
     this.updatedAt,
   });
 
-  /// Computed full name. Kept as a getter so existing code that reads
-  /// `.name` keeps working. Also persisted to the `name` column on write.
   String get name => '$firstName $lastName'.trim();
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -41,9 +44,12 @@ class UserModel {
       profileImagePath:
           (json['profile_image_path'] ?? json['profileImagePath']) as String?,
       bio: json['bio'] as String?,
-      role: parseString(json['role'], defaultValue: 'actor'),
+      role: parseString(json['role'], defaultValue: 'unset'),
       location: json['location'] as String?,
       isAdmin: parseBool(json['is_admin'] ?? json['isAdmin']),
+      incorporationNumber: json['incorporation_number'] as String?,
+      establishedYear: json['established_year'] as int?,
+      address: json['address'] as String?,
       createdAt: parseDateTime(json['created_at'] ?? json['createdAt']),
       updatedAt: parseDateTime(json['updated_at'] ?? json['updatedAt']),
     );
@@ -54,13 +60,16 @@ class UserModel {
       'id': id,
       'first_name': firstName,
       'last_name': lastName,
-      'name': name, // mirrored for backward compatibility
+      'name': name,
       'email': email,
       'profile_image_path': profileImagePath,
       'bio': bio,
       'role': role,
       'location': location,
       'is_admin': isAdmin,
+      'incorporation_number': incorporationNumber,
+      'established_year': establishedYear,
+      'address': address,
       'created_at': serializeDateTime(createdAt),
       'updated_at': serializeDateTime(updatedAt),
     };
@@ -76,6 +85,9 @@ class UserModel {
     String? role,
     String? location,
     bool? isAdmin,
+    String? incorporationNumber,
+    int? establishedYear,
+    String? address,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -89,21 +101,21 @@ class UserModel {
       role: role ?? this.role,
       location: location ?? this.location,
       isAdmin: isAdmin ?? this.isAdmin,
+      incorporationNumber: incorporationNumber ?? this.incorporationNumber,
+      establishedYear: establishedYear ?? this.establishedYear,
+      address: address ?? this.address,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 
   @override
-  String toString() =>
-      'UserModel(id: $id, name: $name, role: $role)';
+  String toString() => 'UserModel(id: $id, name: $name, role: $role)';
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is UserModel &&
-          runtimeType == other.runtimeType &&
-          id == other.id;
+      other is UserModel && runtimeType == other.runtimeType && id == other.id;
 
   @override
   int get hashCode => id.hashCode;

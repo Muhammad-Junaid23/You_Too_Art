@@ -38,12 +38,13 @@ class _VerifyOtpScreenState extends ConsumerState<VerifyOtpScreen> {
       return;
     }
 
-    final ok = await ref
+    // 1. Verify — no state flip yet.
+    final user = await ref
         .read(authProvider.notifier)
-        .verifyEmailOtp(email: widget.email, token: code);
+        .verifyEmailOtpOnly(email: widget.email, token: code);
     if (!mounted) return;
 
-    if (!ok) {
+    if (user == null) {
       final msg =
           ref.read(authProvider).errorMessage ?? 'Invalid or expired code.';
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
@@ -52,34 +53,21 @@ class _VerifyOtpScreenState extends ConsumerState<VerifyOtpScreen> {
       return;
     }
 
-    // ─── Route based on profile state ─────────────────────
-    final uid = ref.read(authProvider.notifier).currentUid;
-    if (uid == null) {
-      if (!mounted) return;
-      context.go(AppRoutes.chooseCategory);
-      return;
-    }
-
-    final user = await ref.read(userRepositoryProvider).getById(uid);
-    if (!mounted) return;
-
-    final role = user?.role ?? 'unset';
-    final firstName = user?.firstName ?? '';
-
-    if (role == 'unset') {
-      // Never picked a category
-      context.go(AppRoutes.chooseCategory);
-    } else if (firstName.isEmpty) {
-      // Picked a category but hasn't completed profile
-      if (role == 'production_house') {
-        context.go(AppRoutes.completeProfileProduction);
-      } else {
-        context.go(AppRoutes.completeProfileIndividual);
-      }
+    // 2. Decide route based on profile state.
+    final String next;
+    if (user.role == 'unset') {
+      next = AppRoutes.chooseCategory;
+    } else if (user.firstName.isEmpty) {
+      next = user.role == 'production_house'
+          ? AppRoutes.completeProfileProduction
+          : AppRoutes.completeProfileIndividual;
     } else {
-      // Fully set up
-      context.go(AppRoutes.home);
+      next = AppRoutes.home;
     }
+
+    // 3. Flip state and navigate in the same tick.
+    ref.read(authProvider.notifier).markLoggedIn();
+    context.go(next);
   }
 
   @override

@@ -14,15 +14,33 @@ create extension if not exists "pgcrypto";
 create table if not exists public.users (
   id uuid primary key references auth.users(id) on delete cascade,
   name text not null default '',
+  first_name text default '',
+  last_name text default '',
   email text not null,
-  role text not null default 'actor',
+  role text not null default 'unset',
   bio text default '',
   profile_image_path text,
   location text,
+  incorporation_number text,
+  established_year int,
+  address text,
   is_admin boolean not null default false,
   fcm_token text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
+);
+
+-- ─── Countries Table ────────────────────────────────────────────────────────
+create table if not exists public.countries (
+  code text primary key,
+  name text not null
+);
+
+-- ─── Cities Table ───────────────────────────────────────────────────────────
+create table if not exists public.cities (
+  id uuid primary key default gen_random_uuid(),
+  country_code text not null references public.countries(code) on delete cascade,
+  name text not null
 );
 
 -- ─── Posts Table ────────────────────────────────────────────────────────────
