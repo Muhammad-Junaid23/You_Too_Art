@@ -26,6 +26,31 @@ class PostRepository {
         .limit(limit);
   }
 
+  /// Fetches latest feed posts joined with author profile and likes.
+  Future<List<Map<String, dynamic>>> fetchFeedWithAuthors({
+    int limit = 50,
+  }) async {
+    try {
+      final data = await _db
+          .select('''
+            id,
+            author_id,
+            caption,
+            media_url,
+            media_type,
+            created_at,
+            author:users(id, name, first_name, last_name, profile_image_path, role),
+            post_likes(user_id)
+          ''')
+          .order('created_at', ascending: false)
+          .limit(limit);
+      return List<Map<String, dynamic>>.from(data);
+    } catch (e) {
+      if (kDebugMode) debugPrint('PostRepository.fetchFeedWithAuthors: $e');
+      rethrow;
+    }
+  }
+
   /// Create a new post.
   Future<Map<String, dynamic>> createPost({
     required String authorId,
