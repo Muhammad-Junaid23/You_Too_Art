@@ -1,7 +1,9 @@
-import 'package:you_too_art/core/repositories/storage_repository.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import 'package:you_too_art/core/repositories/portfolio_repository.dart';
+import 'package:you_too_art/core/repositories/post_repository.dart';
+import 'package:you_too_art/core/repositories/storage_repository.dart';
 
 /// Provides the [SupabaseClient] singleton to the app via Riverpod.
 final supabaseClientProvider = Provider<SupabaseClient>((ref) {
@@ -11,6 +13,12 @@ final supabaseClientProvider = Provider<SupabaseClient>((ref) {
 final portfolioRepositoryProvider = Provider<PortfolioRepository>((ref) {
   final client = ref.watch(supabaseClientProvider);
   return PortfolioRepository(client);
+});
+
+/// Provides the [PostRepository] for social feed posts.
+final postRepositoryProvider = Provider<PostRepository>((ref) {
+  final client = ref.watch(supabaseClientProvider);
+  return PostRepository(client);
 });
 
 /// Provides the [StorageRepository] for Cloudinary uploads.

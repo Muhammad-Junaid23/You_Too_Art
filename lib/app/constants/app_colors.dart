@@ -22,6 +22,8 @@ class AppColors {
   // ─── Backgrounds ───────────────────────────────────
   final Color scaffold;
   final Color surface;
+  Color get card => surface;
+  Color get scaffoldBackground => scaffold;
 
   // ─── Borders ───────────────────────────────────────
   final Color border;
