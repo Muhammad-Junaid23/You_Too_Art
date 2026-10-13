@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 
 import 'package:you_too_art/app/constants/app_colors.dart';
 import 'package:you_too_art/core/providers/supabase_providers.dart';
+import 'package:you_too_art/core/widgets/app_avatar.dart';
 import 'package:you_too_art/features/auth/providers/auth_provider.dart';
 import 'package:you_too_art/features/home/providers/home_feed_provider.dart';
 
@@ -210,25 +211,10 @@ class _CreatePostSheetState extends ConsumerState<CreatePostSheet> {
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             child: Row(
               children: [
-                CircleAvatar(
+                AppAvatar(
+                  imageUrl: user?.profileImagePath,
+                  name: user?.name.isNotEmpty == true ? user!.name : 'User',
                   radius: 20,
-                  backgroundColor: colors.link.withValues(alpha: 0.1),
-                  backgroundImage: (user?.profileImagePath != null &&
-                          user!.profileImagePath!.isNotEmpty)
-                      ? NetworkImage(user.profileImagePath!)
-                      : null,
-                  child: (user?.profileImagePath == null ||
-                          user!.profileImagePath!.isEmpty)
-                      ? Text(
-                          user?.name.isNotEmpty == true
-                              ? user!.name[0].toUpperCase()
-                              : 'U',
-                          style: TextStyle(
-                            color: colors.link,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        )
-                      : null,
                 ),
                 const SizedBox(width: 12),
                 Column(

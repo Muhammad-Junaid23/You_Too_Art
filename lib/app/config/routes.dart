@@ -136,16 +136,7 @@ class AppRoutes {
           builder: (context, state, navigationShell) =>
               MainWrapper(navigationShell: navigationShell),
           branches: [
-            // 0 — Home
-            StatefulShellBranch(
-              routes: [
-                GoRoute(
-                  path: home,
-                  builder: (context, state) => const HomeScreen(),
-                ),
-              ],
-            ),
-            // 1 — Talent
+            // 0 — Talent
             StatefulShellBranch(
               routes: [
                 GoRoute(
@@ -154,7 +145,7 @@ class AppRoutes {
                 ),
               ],
             ),
-            // 2 — Network
+            // 1 — Network
             StatefulShellBranch(
               routes: [
                 GoRoute(
@@ -163,12 +154,21 @@ class AppRoutes {
                 ),
               ],
             ),
-            // 3 — Chats
+            // 2 — Chats
             StatefulShellBranch(
               routes: [
                 GoRoute(
                   path: chats,
                   builder: (context, state) => const ChatsScreen(),
+                ),
+              ],
+            ),
+            // 3 — Home
+            StatefulShellBranch(
+              routes: [
+                GoRoute(
+                  path: home,
+                  builder: (context, state) => const HomeScreen(),
                 ),
               ],
             ),

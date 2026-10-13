@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:you_too_art/core/widgets/app_avatar.dart';
 import 'package:you_too_art/features/home/models/post_item.dart';
 
 /// Modal bottom sheet showing users who liked a post, matching Figma Image 5.
@@ -171,10 +172,10 @@ class PostLikesSheet extends StatelessWidget {
                   ),
                   child: Row(
                     children: [
-                      CircleAvatar(
+                      AppAvatar(
+                        imageUrl: liker['avatar'],
+                        name: liker['name'] ?? 'User',
                         radius: 20,
-                        backgroundColor: const Color(0xFFE7F3FE),
-                        backgroundImage: NetworkImage(liker['avatar']!),
                       ),
                       const SizedBox(width: 14),
                       Expanded(

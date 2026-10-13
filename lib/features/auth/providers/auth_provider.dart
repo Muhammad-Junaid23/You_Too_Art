@@ -47,7 +47,9 @@ final authStateChangesProvider = StreamProvider<supabase.AuthState>((ref) {
 /// Provider that emits the current user's UID, watching auth state reactively.
 final currentUidProvider = Provider<String?>((ref) {
   final authState = ref.watch(authStateChangesProvider);
-  return authState.whenData((state) => state.session?.user.id).value;
+  final streamUid = authState.whenData((state) => state.session?.user.id).value;
+  if (streamUid != null) return streamUid;
+  return ref.watch(supabaseClientProvider).auth.currentUser?.id;
 });
 
 /// Stream of whether the current user's email has been verified.

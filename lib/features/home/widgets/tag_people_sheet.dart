@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:you_too_art/core/widgets/app_avatar.dart';
 
 /// Modal bottom sheet for tagging connections matching Figma Image 4.
 class TagPeopleSheet extends StatefulWidget {
@@ -249,10 +250,10 @@ class _TagPeopleSheetState extends State<TagPeopleSheet> {
                     ),
                     child: Row(
                       children: [
-                        CircleAvatar(
+                        AppAvatar(
+                          imageUrl: user['avatar'],
+                          name: name,
                           radius: 22,
-                          backgroundColor: const Color(0xFFE7F3FE),
-                          backgroundImage: NetworkImage(user['avatar']!),
                         ),
                         const SizedBox(width: 14),
                         Expanded(

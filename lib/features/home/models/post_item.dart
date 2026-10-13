@@ -13,8 +13,10 @@ class PostItem {
   final DateTime? createdAt;
   final int likeCount;
   final bool isLiked;
+  final bool isSaved;
   final int commentCount;
   final int shareCount;
+  final List<String> taggedUsers;
 
   const PostItem({
     required this.id,
@@ -28,13 +30,21 @@ class PostItem {
     this.createdAt,
     this.likeCount = 0,
     this.isLiked = false,
+    this.isSaved = false,
     this.commentCount = 0,
     this.shareCount = 0,
+    this.taggedUsers = const [],
   });
 
-  factory PostItem.fromJson(Map<String, dynamic> json, {String? currentUserId}) {
+  factory PostItem.fromJson(
+    Map<String, dynamic> json, {
+    String? currentUserId,
+    bool isSaved = false,
+  }) {
     final author = json['author'] as Map<String, dynamic>?;
     final likes = json['post_likes'] as List<dynamic>? ?? [];
+    final comments = json['post_comments'] as List<dynamic>? ?? [];
+    final rawTags = json['post_tags'] as List<dynamic>? ?? [];
 
     String name = 'User';
     String? avatar;
@@ -52,6 +62,17 @@ class PostItem {
     final isLiked = currentUserId != null &&
         likes.any((l) => l is Map && l['user_id'] == currentUserId);
 
+    final commentCount = comments.isNotEmpty
+        ? comments.length
+        : parseInt(json['comment_count'], defaultValue: 0);
+
+    final taggedUsers = rawTags
+        .map((t) => t is Map && t['user'] is Map
+            ? (t['user']['name']?.toString() ?? '')
+            : (t is String ? t : ''))
+        .where((s) => s.isNotEmpty)
+        .toList();
+
     return PostItem(
       id: parseString(json['id']),
       authorId: parseString(json['author_id']),
@@ -64,8 +85,10 @@ class PostItem {
       createdAt: parseDateTime(json['created_at']),
       likeCount: likes.length,
       isLiked: isLiked,
-      commentCount: parseInt(json['comment_count'], defaultValue: 0),
+      isSaved: isSaved,
+      commentCount: commentCount,
       shareCount: parseInt(json['share_count'], defaultValue: 0),
+      taggedUsers: taggedUsers,
     );
   }
 
@@ -77,12 +100,15 @@ class PostItem {
     String? authorRole,
     String? caption,
     String? mediaUrl,
+    bool clearMediaUrl = false,
     String? mediaType,
     DateTime? createdAt,
     int? likeCount,
     bool? isLiked,
+    bool? isSaved,
     int? commentCount,
     int? shareCount,
+    List<String>? taggedUsers,
   }) {
     return PostItem(
       id: id ?? this.id,
@@ -91,13 +117,15 @@ class PostItem {
       authorAvatar: authorAvatar ?? this.authorAvatar,
       authorRole: authorRole ?? this.authorRole,
       caption: caption ?? this.caption,
-      mediaUrl: mediaUrl ?? this.mediaUrl,
-      mediaType: mediaType ?? this.mediaType,
+      mediaUrl: clearMediaUrl ? null : (mediaUrl ?? this.mediaUrl),
+      mediaType: clearMediaUrl ? null : (mediaType ?? this.mediaType),
       createdAt: createdAt ?? this.createdAt,
       likeCount: likeCount ?? this.likeCount,
       isLiked: isLiked ?? this.isLiked,
+      isSaved: isSaved ?? this.isSaved,
       commentCount: commentCount ?? this.commentCount,
       shareCount: shareCount ?? this.shareCount,
+      taggedUsers: taggedUsers ?? this.taggedUsers,
     );
   }
 }
