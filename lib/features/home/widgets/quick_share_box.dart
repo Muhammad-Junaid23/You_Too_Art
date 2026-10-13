@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:you_too_art/core/widgets/app_avatar.dart';
 import 'package:you_too_art/features/home/providers/home_feed_provider.dart';
 
 /// "Have something to share?" quick creation section matching Figma Image 1.
@@ -36,26 +37,10 @@ class QuickShareBox extends ConsumerWidget {
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   child: Row(
                     children: [
-                      CircleAvatar(
+                      AppAvatar(
+                        imageUrl: user?.profileImagePath,
+                        name: user?.name.isNotEmpty == true ? user!.name : 'Wajahat',
                         radius: 20,
-                        backgroundColor: const Color(0xFFE7F3FE),
-                        backgroundImage: (user?.profileImagePath != null &&
-                                user!.profileImagePath!.isNotEmpty)
-                            ? NetworkImage(user.profileImagePath!)
-                            : null,
-                        child: (user?.profileImagePath == null ||
-                                user!.profileImagePath!.isEmpty)
-                            ? Text(
-                                user?.name.isNotEmpty == true
-                                    ? user!.name[0].toUpperCase()
-                                    : 'W',
-                                style: const TextStyle(
-                                  color: Color(0xFF3899F3),
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                              )
-                            : null,
                       ),
                       const SizedBox(width: 12),
                       const Text(

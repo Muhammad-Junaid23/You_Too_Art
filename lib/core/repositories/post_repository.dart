@@ -40,7 +40,8 @@ class PostRepository {
             media_type,
             created_at,
             author:users(id, name, first_name, last_name, profile_image_path, role),
-            post_likes(user_id)
+            post_likes(user_id),
+            post_comments(id)
           ''')
           .order('created_at', ascending: false)
           .limit(limit);
@@ -82,6 +83,29 @@ class PostRepository {
       await _db.delete().eq('id', postId);
     } catch (e) {
       if (kDebugMode) debugPrint('PostRepository.deletePost: $e');
+      rethrow;
+    }
+  }
+
+  /// Update caption and media of an existing post.
+  Future<void> updatePost({
+    required String postId,
+    required String caption,
+    String? mediaUrl,
+    bool clearMediaUrl = false,
+  }) async {
+    try {
+      final updates = <String, dynamic>{'caption': caption};
+      if (clearMediaUrl) {
+        updates['media_url'] = null;
+        updates['media_type'] = null;
+      } else if (mediaUrl != null) {
+        updates['media_url'] = mediaUrl;
+        updates['media_type'] = 'image';
+      }
+      await _db.update(updates).eq('id', postId);
+    } catch (e) {
+      if (kDebugMode) debugPrint('PostRepository.updatePost: $e');
       rethrow;
     }
   }
@@ -149,5 +173,26 @@ class PostRepository {
         .stream(primaryKey: ['id'])
         .eq('post_id', postId)
         .order('created_at');
+  }
+
+  /// Fetch comments for a post joined with author info.
+  Future<List<Map<String, dynamic>>> fetchCommentsWithAuthors(String postId) async {
+    try {
+      final data = await _comments
+          .select('''
+            id,
+            post_id,
+            author_id,
+            text,
+            created_at,
+            author:users(id, name, first_name, last_name, profile_image_path)
+          ''')
+          .eq('post_id', postId)
+          .order('created_at', ascending: false);
+      return List<Map<String, dynamic>>.from(data);
+    } catch (e) {
+      if (kDebugMode) debugPrint('PostRepository.fetchCommentsWithAuthors: $e');
+      return [];
+    }
   }
 }

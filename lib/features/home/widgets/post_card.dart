@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:you_too_art/core/widgets/app_avatar.dart';
 import 'package:you_too_art/features/auth/providers/auth_provider.dart';
 import 'package:you_too_art/features/home/models/post_item.dart';
+import 'package:you_too_art/features/home/presentation/create_post_screen.dart';
 import 'package:you_too_art/features/home/providers/home_feed_provider.dart';
 import 'package:you_too_art/features/home/widgets/post_comments_sheet.dart';
 import 'package:you_too_art/features/home/widgets/post_likes_sheet.dart';
@@ -75,6 +77,15 @@ class _PostCardState extends ConsumerState<PostCard>
     return '${(diff.inDays / 30).floor()} Months Ago';
   }
 
+  void _openEditScreen(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CreatePostScreen(postToEdit: widget.post),
+      ),
+    );
+  }
+
   void _showOptionsModal(BuildContext context) {
     final currentUid = ref.read(currentUidProvider);
     final isAuthor = currentUid != null && currentUid == widget.post.authorId;
@@ -115,16 +126,40 @@ class _PostCardState extends ConsumerState<PostCard>
                   },
                 ),
                 ListTile(
-                  leading: const Icon(Icons.bookmark_border_rounded),
-                  title: const Text('Save Post'),
-                  onTap: () {
+                  leading: Icon(
+                    widget.post.isSaved
+                        ? Icons.bookmark
+                        : Icons.bookmark_border_rounded,
+                    color: widget.post.isSaved
+                        ? const Color(0xFF3899F3)
+                        : const Color(0xFF000000),
+                  ),
+                  title: Text(widget.post.isSaved ? 'Unsave Post' : 'Save Post'),
+                  onTap: () async {
                     Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Post saved!')),
-                    );
+                    final nowSaved = await ref
+                        .read(homeFeedProvider.notifier)
+                        .toggleSavePost(widget.post.id);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            nowSaved ? 'Post saved!' : 'Post removed from saved posts',
+                          ),
+                        ),
+                      );
+                    }
                   },
                 ),
-                if (isAuthor)
+                if (isAuthor) ...[
+                  ListTile(
+                    leading: const Icon(Icons.edit_outlined),
+                    title: const Text('Edit Post'),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _openEditScreen(context);
+                    },
+                  ),
                   ListTile(
                     leading: const Icon(Icons.delete_outline_rounded,
                         color: Colors.red),
@@ -141,7 +176,8 @@ class _PostCardState extends ConsumerState<PostCard>
                         const SnackBar(content: Text('Post deleted')),
                       );
                     },
-                  )
+                  ),
+                ]
                 else
                   ListTile(
                     leading: const Icon(Icons.flag_outlined, color: Colors.red),
@@ -229,15 +265,10 @@ class _PostCardState extends ConsumerState<PostCard>
             padding: const EdgeInsets.only(left: 20, right: 20, top: 14, bottom: 10),
             child: Row(
               children: [
-                CircleAvatar(
+                AppAvatar(
+                  imageUrl: post.authorAvatar,
+                  name: post.authorName,
                   radius: 22,
-                  backgroundColor: const Color(0xFFE7F3FE),
-                  backgroundImage: (post.authorAvatar != null &&
-                          post.authorAvatar!.isNotEmpty)
-                      ? NetworkImage(post.authorAvatar!)
-                      : const NetworkImage(
-                          'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
-                        ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(

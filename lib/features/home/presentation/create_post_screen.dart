@@ -4,17 +4,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'package:you_too_art/core/providers/supabase_providers.dart';
+import 'package:you_too_art/core/widgets/app_avatar.dart';
 import 'package:you_too_art/features/auth/providers/auth_provider.dart';
+import 'package:you_too_art/features/home/models/post_item.dart';
 import 'package:you_too_art/features/home/providers/home_feed_provider.dart';
 import 'package:you_too_art/features/home/widgets/tag_people_sheet.dart';
 
-/// Full-screen Create Post page strictly matching Figma Images 2 & 3.
+/// Full-screen Create / Edit Post page strictly matching Figma Images 2 & 3.
 class CreatePostScreen extends ConsumerStatefulWidget {
   final bool initialWithPhoto;
+  final PostItem? postToEdit;
 
   const CreatePostScreen({
     super.key,
     this.initialWithPhoto = false,
+    this.postToEdit,
   });
 
   @override
@@ -22,18 +26,23 @@ class CreatePostScreen extends ConsumerStatefulWidget {
 }
 
 class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
-  final _captionController = TextEditingController();
+  final _captionController = HashtagTextEditingController();
   final _picker = ImagePicker();
 
   Uint8List? _selectedImageBytes;
   String? _selectedImageName;
+  String? _existingImageUrl;
   List<String> _taggedPeople = [];
   bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    if (widget.initialWithPhoto) {
+    if (widget.postToEdit != null) {
+      _captionController.text = widget.postToEdit!.caption;
+      _existingImageUrl = widget.postToEdit!.mediaUrl;
+      _taggedPeople = List<String>.from(widget.postToEdit!.taggedUsers);
+    } else if (widget.initialWithPhoto) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _pickImage();
       });
@@ -79,7 +88,9 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
 
   Future<void> _submitPost() async {
     final caption = _captionController.text.trim();
-    if (caption.isEmpty && _selectedImageBytes == null) {
+    if (caption.isEmpty &&
+        _selectedImageBytes == null &&
+        _existingImageUrl == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter some text or select a photo')),
       );
@@ -89,8 +100,9 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
     setState(() => _isLoading = true);
 
     try {
-      String? mediaUrl;
-      final currentUid = ref.read(currentUidProvider);
+      String? mediaUrl = _existingImageUrl;
+      final currentUid = ref.read(currentUidProvider) ??
+          ref.read(supabaseClientProvider).auth.currentUser?.id;
 
       if (_selectedImageBytes != null && currentUid != null) {
         final storage = ref.read(storageRepositoryProvider);
@@ -106,17 +118,35 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
         }
       }
 
-      await ref.read(homeFeedProvider.notifier).addNewPost(
-            caption: caption,
-            mediaUrl: mediaUrl,
-            mediaType: mediaUrl != null ? 'image' : null,
+      if (widget.postToEdit != null) {
+        final clearImage = _selectedImageBytes == null &&
+            (_existingImageUrl == null || _existingImageUrl!.isEmpty);
+        await ref.read(homeFeedProvider.notifier).updatePost(
+              postId: widget.postToEdit!.id,
+              caption: caption,
+              mediaUrl: mediaUrl,
+              clearMediaUrl: clearImage,
+              taggedUsers: _taggedPeople,
+            );
+        if (mounted) {
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Post updated successfully!')),
           );
-
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Post published successfully!')),
-        );
+        }
+      } else {
+        await ref.read(homeFeedProvider.notifier).addNewPost(
+              caption: caption,
+              mediaUrl: mediaUrl,
+              mediaType: mediaUrl != null ? 'image' : null,
+              taggedUsers: _taggedPeople,
+            );
+        if (mounted) {
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Post published successfully!')),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -143,6 +173,14 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
+        title: Text(
+          widget.postToEdit != null ? 'Edit Post' : 'Create Post',
+          style: const TextStyle(
+            color: Color(0xFF000000),
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Color(0xFF000000)),
           onPressed: () => Navigator.pop(context),
@@ -160,15 +198,10 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                     // Author Info Row
                     Row(
                       children: [
-                        CircleAvatar(
+                        AppAvatar(
+                          imageUrl: user?.profileImagePath,
+                          name: displayName,
                           radius: 24,
-                          backgroundColor: const Color(0xFFE7F3FE),
-                          backgroundImage: (user?.profileImagePath != null &&
-                                  user!.profileImagePath!.isNotEmpty)
-                              ? NetworkImage(user.profileImagePath!)
-                              : const NetworkImage(
-                                  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
-                                ),
                         ),
                         const SizedBox(width: 12),
                         Column(
@@ -274,6 +307,58 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                                 setState(() {
                                   _selectedImageBytes = null;
                                   _selectedImageName = null;
+                                });
+                              },
+                              child: Container(
+                                width: 32,
+                                height: 32,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.black.withValues(alpha: 0.45),
+                                ),
+                                child: const Icon(
+                                  Icons.close,
+                                  color: Colors.white,
+                                  size: 18,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                    else if (_existingImageUrl != null &&
+                        _existingImageUrl!.isNotEmpty)
+                      Stack(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Image.network(
+                              _existingImageUrl!,
+                              width: double.infinity,
+                              height: 240,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  height: 180,
+                                  color: const Color(0xFFF2F4F7),
+                                  child: const Center(
+                                    child: Icon(
+                                      Icons.broken_image_outlined,
+                                      color: Color(0xFF9B9B9B),
+                                      size: 32,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          Positioned(
+                            top: 12,
+                            right: 12,
+                            child: GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  _existingImageUrl = null;
                                 });
                               },
                               child: Container(
@@ -445,9 +530,11 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                                       color: Colors.white,
                                     ),
                                   )
-                                : const Text(
-                                    'Post Now',
-                                    style: TextStyle(
+                                : Text(
+                                    widget.postToEdit != null
+                                        ? 'Update Post'
+                                        : 'Post Now',
+                                    style: const TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w600,
                                     ),
@@ -464,5 +551,55 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
         ),
       ),
     );
+  }
+}
+
+/// Custom controller that renders hashtags in blue live as the user types,
+/// preserving 100% of whitespaces and spaces without dropping or skipping.
+class HashtagTextEditingController extends TextEditingController {
+  HashtagTextEditingController({super.text});
+
+  @override
+  TextSpan buildTextSpan({
+    required BuildContext context,
+    TextStyle? style,
+    required bool withComposing,
+  }) {
+    final text = this.text;
+    if (text.isEmpty) {
+      return TextSpan(style: style, text: '');
+    }
+
+    final children = <TextSpan>[];
+    final hashtagRegex = RegExp(r'#[a-zA-Z0-9_\u0600-\u06FF]+');
+
+    text.splitMapJoin(
+      hashtagRegex,
+      onMatch: (Match match) {
+        children.add(
+          TextSpan(
+            text: match[0],
+            style: (style ?? const TextStyle()).copyWith(
+              color: const Color(0xFF3899F3),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        );
+        return '';
+      },
+      onNonMatch: (String nonMatch) {
+        if (nonMatch.isNotEmpty) {
+          children.add(
+            TextSpan(
+              text: nonMatch,
+              style: style,
+            ),
+          );
+        }
+        return '';
+      },
+    );
+
+    return TextSpan(style: style, children: children);
   }
 }

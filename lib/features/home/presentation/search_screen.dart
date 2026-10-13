@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:you_too_art/core/widgets/app_avatar.dart';
 import 'package:you_too_art/features/home/models/post_item.dart';
 import 'package:you_too_art/features/home/providers/home_feed_provider.dart';
 import 'package:you_too_art/features/home/widgets/post_card.dart';
@@ -240,10 +241,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: Row(
               children: [
-                CircleAvatar(
+                AppAvatar(
+                  imageUrl: person['avatar'],
+                  name: person['name'] ?? 'User',
                   radius: 18,
-                  backgroundColor: const Color(0xFFE7F3FE),
-                  backgroundImage: NetworkImage(person['avatar']!),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
