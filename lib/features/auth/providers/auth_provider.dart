@@ -7,6 +7,7 @@ import 'package:you_too_art/core/repositories/auth_repository.dart';
 import 'package:you_too_art/core/repositories/user_repository.dart';
 import 'package:you_too_art/core/services/storage_service.dart';
 import 'package:you_too_art/core/utils/error_messages.dart';
+import 'package:you_too_art/core/providers/user_persona_provider.dart';
 import 'package:you_too_art/core/models/user_model.dart';
 
 // ─── Foundation Providers ───────────────────────────
@@ -44,12 +45,19 @@ final authStateChangesProvider = StreamProvider<supabase.AuthState>((ref) {
   return repo.authStateChanges();
 });
 
-/// Provider that emits the current user's UID, watching auth state reactively.
+/// Provider that emits the current user's UID, watching auth state reactively,
+/// while respecting active developer testing personas when selected.
 final currentUidProvider = Provider<String?>((ref) {
+  final activePersona = ref.watch(userPersonaProvider);
+  if (activePersona.id != UserPersonaNotifier.actorDefaultId) {
+    return activePersona.id;
+  }
+
   final authState = ref.watch(authStateChangesProvider);
   final streamUid = authState.whenData((state) => state.session?.user.id).value;
   if (streamUid != null) return streamUid;
-  return ref.watch(supabaseClientProvider).auth.currentUser?.id;
+  return ref.watch(supabaseClientProvider).auth.currentUser?.id ??
+      activePersona.id;
 });
 
 /// Stream of whether the current user's email has been verified.

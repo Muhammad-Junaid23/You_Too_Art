@@ -20,6 +20,8 @@ import 'package:you_too_art/features/profile/presentation/complete_profile_indiv
 import 'package:you_too_art/features/profile/presentation/complete_profile_production_screen.dart';
 import 'package:you_too_art/features/home/presentation/create_post_screen.dart';
 import 'package:you_too_art/features/home/presentation/search_screen.dart';
+import 'package:you_too_art/features/profile/presentation/user_profile_screen.dart';
+import 'package:you_too_art/features/talent/models/talent_model.dart';
 
 /// Centralized route configuration for the app.
 class AppRoutes {
@@ -43,6 +45,7 @@ class AppRoutes {
       '/complete-profile/production';
   static const String createPost = '/create-post';
   static const String search = '/search';
+  static const String profileDetail = '/profile-detail';
 
   // ─── Navigator Key ────────────────────────────────
   static final GlobalKey<NavigatorState> rootNavigatorKey =
@@ -129,6 +132,13 @@ class AppRoutes {
         GoRoute(
           path: search,
           builder: (context, state) => const SearchScreen(),
+        ),
+        GoRoute(
+          path: profileDetail,
+          builder: (context, state) {
+            final talent = state.extra as TalentModel;
+            return UserProfileScreen(initialTalent: talent);
+          },
         ),
 
         // ─── Main Shell with Bottom Navigation ───────

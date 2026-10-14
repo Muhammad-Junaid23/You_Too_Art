@@ -22,8 +22,9 @@ dependencies:
   # Backend — Supabase
   supabase_flutter: ^2.10.2
 
-  # Media
+  # Media & SVG
   image_picker: ^1.1.2
+  flutter_svg: ^2.0.17
 
   # Local storage
   shared_preferences: ^2.5.3
@@ -46,6 +47,4 @@ flutter:
   assets:
     - assets/logo/
     - assets/images/
-  # assets:
-  #   - assets/images/
-  #   - assets/icons/
+    - assets/icons/
