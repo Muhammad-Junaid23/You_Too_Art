@@ -25,7 +25,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   final List<Map<String, String>> _recentPeople = [
     {
-      'name': 'Muhammad Ali Nizami',
+      'name': 'Alexander Cole',
       'subtitle': 'Connection',
       'avatar': 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
     },

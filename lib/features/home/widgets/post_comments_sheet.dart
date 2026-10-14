@@ -34,7 +34,7 @@ class _PostCommentsSheetState extends ConsumerState<PostCommentsSheet> {
 
   static const List<Map<String, String>> _defaultSampleComments = [
     {
-      'name': 'Muhammad Ali Nizami',
+      'name': 'Alexander Cole',
       'avatar':
           'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
       'time': '2 Days Ago',

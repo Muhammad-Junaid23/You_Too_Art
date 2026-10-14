@@ -22,7 +22,7 @@ class PostLikesSheet extends StatelessWidget {
 
   static const List<Map<String, String>> _sampleLikers = [
     {
-      'name': 'Muhammad Ali Nizami',
+      'name': 'Alexander Cole',
       'subtitle': 'Connection',
       'avatar': 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
     },

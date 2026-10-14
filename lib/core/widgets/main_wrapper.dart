@@ -1,16 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 class _NavItem {
   final String label;
-  final IconData icon;
-  final IconData selectedIcon;
+  final String svgPath;
 
   const _NavItem({
     required this.label,
-    required this.icon,
-    required this.selectedIcon,
+    required this.svgPath,
   });
 }
 
@@ -23,33 +22,27 @@ class MainWrapper extends ConsumerWidget {
   static const _items = <_NavItem>[
     _NavItem(
       label: 'Talent',
-      icon: Icons.groups_outlined,
-      selectedIcon: Icons.groups_rounded,
+      svgPath: 'assets/icons/talent_svg.svg',
     ),
     _NavItem(
       label: 'Network',
-      icon: Icons.language_rounded,
-      selectedIcon: Icons.language_rounded,
+      svgPath: 'assets/icons/network_svg.svg',
     ),
     _NavItem(
       label: 'Chat',
-      icon: Icons.chat_bubble_outline_rounded,
-      selectedIcon: Icons.chat_bubble_rounded,
+      svgPath: 'assets/icons/chat_svg.svg',
     ),
     _NavItem(
       label: 'Home',
-      icon: Icons.home_outlined,
-      selectedIcon: Icons.home_rounded,
+      svgPath: 'assets/icons/home_svg.svg',
     ),
     _NavItem(
       label: 'Casting',
-      icon: Icons.auto_awesome_outlined,
-      selectedIcon: Icons.auto_awesome,
+      svgPath: 'assets/icons/casting_svg.svg',
     ),
     _NavItem(
       label: 'Account',
-      icon: Icons.person_outline_rounded,
-      selectedIcon: Icons.person_rounded,
+      svgPath: 'assets/icons/account_svg.svg',
     ),
   ];
 
@@ -110,12 +103,16 @@ class MainWrapper extends ConsumerWidget {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(
-                              isSelected ? item.selectedIcon : item.icon,
-                              size: isSelected ? 20 : 23,
-                              color: isSelected
-                                  ? const Color(0xFF3899F3)
-                                  : const Color(0xFF474B51),
+                            SvgPicture.asset(
+                              item.svgPath,
+                              width: isSelected ? 20 : 22,
+                              height: isSelected ? 20 : 22,
+                              colorFilter: ColorFilter.mode(
+                                isSelected
+                                    ? const Color(0xFF3899F3)
+                                    : const Color(0xFF474B51),
+                                BlendMode.srcIn,
+                              ),
                             ),
                             if (isSelected) ...[
                               const SizedBox(width: 6),

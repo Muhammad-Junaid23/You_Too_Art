@@ -33,7 +33,7 @@ class _TagPeopleSheetState extends State<TagPeopleSheet> {
 
   final List<Map<String, String>> _connections = [
     {
-      'name': 'Muhammad Ali Nizami',
+      'name': 'Alexander Cole',
       'subtitle': 'Connected, 2 Days Ago',
       'avatar': 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
     },
