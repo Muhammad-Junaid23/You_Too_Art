@@ -132,8 +132,10 @@ class TalentNotifier extends Notifier<TalentState> {
         ConnectionStatus status = ConnectionStatus.none;
         if (rel == 'accepted') {
           status = ConnectionStatus.connected;
-        } else if (rel == 'pending_outgoing' || rel == 'pending_incoming') {
-          status = ConnectionStatus.pending;
+        } else if (rel == 'pending_outgoing') {
+          status = ConnectionStatus.pendingOutgoing;
+        } else if (rel == 'pending_incoming') {
+          status = ConnectionStatus.pendingIncoming;
         }
 
         resolvedTalents.add(
@@ -165,7 +167,7 @@ class TalentNotifier extends Notifier<TalentState> {
 
   /// Send a connection request from active persona to target talent
   Future<void> sendConnectionRequest(String talentId) async {
-    _updateStatus(talentId, ConnectionStatus.pending);
+    _updateStatus(talentId, ConnectionStatus.pendingOutgoing);
     await _connectionRepo.sendConnectionRequest(
       userId: _activePersona.id,
       targetUserId: talentId,
@@ -194,8 +196,9 @@ class TalentNotifier extends Notifier<TalentState> {
   }
 
   /// Toggle connection status cleanly:
-  /// - none -> send request (status becomes pending "Request Sent")
-  /// - pending -> cancel request (status returns to none "Connect")
+  /// - none -> send request (status becomes pendingOutgoing "Request Sent")
+  /// - pendingIncoming -> accept request (status becomes connected "Connected")
+  /// - pendingOutgoing -> cancel request (status returns to none "Connect")
   /// - connected -> remove connection (status returns to none "Connect")
   Future<void> toggleConnection(String talentId) async {
     final talent = state.findById(talentId);
@@ -203,8 +206,11 @@ class TalentNotifier extends Notifier<TalentState> {
 
     if (talent.connectionStatus == ConnectionStatus.none) {
       await sendConnectionRequest(talentId);
-    } else if (talent.connectionStatus == ConnectionStatus.pending) {
-      // Withdrawing / cancelling the pending request
+    } else if (talent.connectionStatus == ConnectionStatus.pendingIncoming) {
+      // Accepting incoming request
+      await acceptConnection(talentId);
+    } else if (talent.connectionStatus == ConnectionStatus.pendingOutgoing) {
+      // Withdrawing / cancelling our pending request
       await removeConnection(talentId);
     } else {
       // Removing mutual connection

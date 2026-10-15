@@ -94,6 +94,7 @@ class _TalentScreenState extends ConsumerState<TalentScreen> {
                       isDense: true,
                       filled: true,
                       fillColor: Colors.white,
+                      hoverColor: Colors.transparent,
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 14,
                         vertical: 11,
@@ -267,12 +268,19 @@ class _TalentScreenState extends ConsumerState<TalentScreen> {
                                         .toggleConnection(talent.id);
 
                                     String msg;
+                                    Color snackColor;
                                     if (currentStatus == ConnectionStatus.none) {
                                       msg = 'Connection request sent to ${talent.name}!';
-                                    } else if (currentStatus == ConnectionStatus.pending) {
+                                      snackColor = const Color(0xFF3899F3);
+                                    } else if (currentStatus == ConnectionStatus.pendingIncoming) {
+                                      msg = 'Connected with ${talent.name}!';
+                                      snackColor = const Color(0xFF12B76A);
+                                    } else if (currentStatus == ConnectionStatus.pendingOutgoing) {
                                       msg = 'Cancelled connection request to ${talent.name}';
+                                      snackColor = const Color(0xFF474B51);
                                     } else {
                                       msg = 'Removed connection with ${talent.name}';
+                                      snackColor = const Color(0xFF474B51);
                                     }
 
                                     ScaffoldMessenger.of(context).hideCurrentSnackBar();
@@ -281,9 +289,7 @@ class _TalentScreenState extends ConsumerState<TalentScreen> {
                                         content: Text(msg),
                                         duration: const Duration(seconds: 2),
                                         behavior: SnackBarBehavior.floating,
-                                        backgroundColor: currentStatus == ConnectionStatus.none
-                                            ? const Color(0xFF3899F3)
-                                            : const Color(0xFF474B51),
+                                        backgroundColor: snackColor,
                                       ),
                                     );
                                   }

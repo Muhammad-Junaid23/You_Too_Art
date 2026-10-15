@@ -83,6 +83,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 isDense: true,
                 filled: true,
                 fillColor: Colors.white,
+                hoverColor: Colors.transparent,
                 prefixIcon: const Icon(
                   Icons.search,
                   color: Color(0xFF9B9B9B),

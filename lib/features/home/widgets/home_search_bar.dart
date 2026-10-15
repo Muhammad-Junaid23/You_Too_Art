@@ -40,6 +40,7 @@ class HomeSearchBar extends StatelessWidget {
             isDense: true,
             filled: true,
             fillColor: Colors.white,
+            hoverColor: Colors.transparent,
             hintText: hintText,
             hintStyle: const TextStyle(
               fontSize: 14,

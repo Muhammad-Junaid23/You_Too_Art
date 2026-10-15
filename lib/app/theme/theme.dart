@@ -93,6 +93,7 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: colors.surface,
+        hoverColor: Colors.transparent,
         hintStyle: textTheme.bodyMedium?.copyWith(color: colors.textHint),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,

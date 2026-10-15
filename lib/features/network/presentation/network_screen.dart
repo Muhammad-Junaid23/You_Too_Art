@@ -278,6 +278,7 @@ class _NetworkScreenState extends ConsumerState<NetworkScreen> {
               isDense: true,
               filled: true,
               fillColor: Colors.white,
+              hoverColor: Colors.transparent,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 14,
                 vertical: 11,
