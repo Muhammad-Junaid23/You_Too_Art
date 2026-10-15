@@ -45,11 +45,17 @@ class TalentCard extends StatelessWidget {
           buttonTextColor = Colors.white;
           buttonBorder = null;
           break;
-        case ConnectionStatus.pending:
+        case ConnectionStatus.pendingOutgoing:
           buttonText = 'Request Sent';
           buttonBg = const Color(0xFFE7F3FE);
           buttonTextColor = const Color(0xFF3899F3);
           buttonBorder = Border.all(color: const Color(0xFF3899F3), width: 1.2);
+          break;
+        case ConnectionStatus.pendingIncoming:
+          buttonText = 'Accept';
+          buttonBg = const Color(0xFF3899F3);
+          buttonTextColor = Colors.white;
+          buttonBorder = null;
           break;
         case ConnectionStatus.connected:
           buttonText = 'Connected';

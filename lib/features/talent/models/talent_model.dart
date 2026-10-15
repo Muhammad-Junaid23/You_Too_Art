@@ -3,7 +3,8 @@ import 'package:you_too_art/features/home/models/post_item.dart';
 
 enum ConnectionStatus {
   none,
-  pending,
+  pendingOutgoing,
+  pendingIncoming,
   connected,
 }
 
@@ -45,7 +46,13 @@ class TalentModel {
   });
 
   bool get isConnected => connectionStatus == ConnectionStatus.connected;
-  bool get isPending => connectionStatus == ConnectionStatus.pending;
+  bool get isPending =>
+      connectionStatus == ConnectionStatus.pendingOutgoing ||
+      connectionStatus == ConnectionStatus.pendingIncoming;
+  bool get isPendingOutgoing =>
+      connectionStatus == ConnectionStatus.pendingOutgoing;
+  bool get isPendingIncoming =>
+      connectionStatus == ConnectionStatus.pendingIncoming;
 
   factory TalentModel.fromUser(
     UserModel user, {

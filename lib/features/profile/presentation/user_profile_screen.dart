@@ -40,8 +40,10 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
     );
     if (!mounted) return;
     setState(() {
-      if (rel == 'pending_outgoing' || rel == 'pending_incoming') {
-        _currentStatus = ConnectionStatus.pending;
+      if (rel == 'pending_outgoing') {
+        _currentStatus = ConnectionStatus.pendingOutgoing;
+      } else if (rel == 'pending_incoming') {
+        _currentStatus = ConnectionStatus.pendingIncoming;
       } else if (rel == 'accepted') {
         _currentStatus = ConnectionStatus.connected;
       } else {
@@ -611,7 +613,8 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
             height: 42,
             child: ElevatedButton(
               onPressed: () {
-                setState(() => _currentStatus = ConnectionStatus.pending);
+                setState(
+                    () => _currentStatus = ConnectionStatus.pendingOutgoing);
                 ref
                     .read(talentListProvider.notifier)
                     .sendConnectionRequest(talent.id);
@@ -640,7 +643,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
             ),
           );
 
-        case ConnectionStatus.pending:
+        case ConnectionStatus.pendingOutgoing:
           return Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -682,6 +685,85 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                       const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(24),
+                  ),
+                ),
+              ),
+            ],
+          );
+
+        case ConnectionStatus.pendingIncoming:
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(
+                height: 42,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    setState(() => _currentStatus = ConnectionStatus.connected);
+                    ref
+                        .read(talentListProvider.notifier)
+                        .acceptConnection(talent.id);
+                    ref.read(networkProvider.notifier).refresh();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Connected with ${talent.name}!'),
+                        backgroundColor: const Color(0xFF12B76A),
+                        behavior: SnackBarBehavior.floating,
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.check_rounded, size: 18),
+                  label: const Text(
+                    'Accept Request',
+                    style:
+                        TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF3899F3),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              SizedBox(
+                height: 42,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    setState(() => _currentStatus = ConnectionStatus.none);
+                    ref
+                        .read(talentListProvider.notifier)
+                        .removeConnection(talent.id);
+                    ref.read(networkProvider.notifier).refresh();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Declined request from ${talent.name}'),
+                        backgroundColor: const Color(0xFF474B51),
+                        behavior: SnackBarBehavior.floating,
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.close_rounded,
+                      size: 16, color: Color(0xFF474B51)),
+                  label: const Text(
+                    'Decline',
+                    style:
+                        TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF474B51),
+                    side:
+                        const BorderSide(color: Color(0xFFD0D5DD), width: 1.2),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24),
+                    ),
                   ),
                 ),
               ),

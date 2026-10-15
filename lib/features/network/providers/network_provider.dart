@@ -128,7 +128,8 @@ class NetworkNotifier extends Notifier<NetworkState> {
         name: talent.name,
         roles: talent.roles,
         avatarUrl: talent.avatarUrl,
-        talentModel: talent.copyWith(connectionStatus: ConnectionStatus.pending),
+        talentModel:
+            talent.copyWith(connectionStatus: ConnectionStatus.pendingIncoming),
       );
     }).toList();
 
@@ -174,7 +175,7 @@ class NetworkNotifier extends Notifier<NetworkState> {
           isRequested: isReq,
           talentModel: talent.copyWith(
             connectionStatus: isReq
-                ? ConnectionStatus.pending
+                ? ConnectionStatus.pendingOutgoing
                 : (rel == 'accepted'
                     ? ConnectionStatus.connected
                     : ConnectionStatus.none),
@@ -206,7 +207,7 @@ class NetworkNotifier extends Notifier<NetworkState> {
           isRequested: isReq,
           talentModel: talent.copyWith(
             connectionStatus: isReq
-                ? ConnectionStatus.pending
+                ? ConnectionStatus.pendingOutgoing
                 : (rel == 'accepted'
                     ? ConnectionStatus.connected
                     : ConnectionStatus.none),
@@ -304,8 +305,9 @@ class NetworkNotifier extends Notifier<NetworkState> {
         return s.copyWith(
           isRequested: newStatus,
           talentModel: s.talentModel.copyWith(
-            connectionStatus:
-                newStatus ? ConnectionStatus.pending : ConnectionStatus.none,
+            connectionStatus: newStatus
+                ? ConnectionStatus.pendingOutgoing
+                : ConnectionStatus.none,
           ),
         );
       }
@@ -317,8 +319,9 @@ class NetworkNotifier extends Notifier<NetworkState> {
         return r.copyWith(
           isRequested: newStatus,
           talentModel: r.talentModel.copyWith(
-            connectionStatus:
-                newStatus ? ConnectionStatus.pending : ConnectionStatus.none,
+            connectionStatus: newStatus
+                ? ConnectionStatus.pendingOutgoing
+                : ConnectionStatus.none,
           ),
         );
       }
