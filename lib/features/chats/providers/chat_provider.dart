@@ -34,7 +34,17 @@ class ChatListState {
   }
 
   bool canMessageUser(String targetUserId) {
-    return connectedTalents.any((t) => t.id == targetUserId);
+    final actorPersona = UserPersonaNotifier.buildActorPersona();
+    final isTargetActor = targetUserId == UserPersonaNotifier.actorDefaultId ||
+        targetUserId == actorPersona.id;
+    return connectedTalents.any((t) {
+      if (t.id == targetUserId) return true;
+      if (isTargetActor &&
+          (t.id == UserPersonaNotifier.actorDefaultId || t.id == actorPersona.id)) {
+        return true;
+      }
+      return false;
+    });
   }
 
   ChatListState copyWith({
@@ -138,6 +148,14 @@ class ChatListNotifier extends Notifier<ChatListState> {
     );
   }
 
+  bool _isActorMatch(String a, String b) {
+    if (a == b) return true;
+    final actorPersona = UserPersonaNotifier.buildActorPersona();
+    final isA = a == UserPersonaNotifier.actorDefaultId || a == actorPersona.id;
+    final isB = b == UserPersonaNotifier.actorDefaultId || b == actorPersona.id;
+    return isA && isB;
+  }
+
   Future<void> _loadConnectedTalents(String activeUserId) async {
     try {
       final acceptedRows =
@@ -145,34 +163,69 @@ class ChatListNotifier extends Notifier<ChatListState> {
       final connectedList = <TalentModel>[];
 
       for (final row in acceptedRows) {
-        final partA = row['user_id'] as String;
-        final partB = row['connected_user_id'] as String;
-        final peerId = partA == activeUserId ? partB : partA;
-        final talent = TalentDirectory.findById(peerId) ??
-            TalentDirectory.allCuratedTalents
-                .where((t) => t.id == peerId)
-                .firstOrNull;
-        if (talent != null && !connectedList.any((t) => t.id == talent.id)) {
-          connectedList.add(talent.copyWith(connectionStatus: ConnectionStatus.connected));
+        final partA = row['user_id'] as String? ?? '';
+        final partB = row['connected_user_id'] as String? ?? '';
+        final peerId = (partA == activeUserId || _isActorMatch(partA, activeUserId))
+            ? partB
+            : partA;
+
+        if (peerId.isEmpty || peerId == activeUserId || _isActorMatch(peerId, activeUserId)) {
+          continue;
+        }
+
+        TalentModel? talent = TalentDirectory.findById(peerId);
+        if (talent == null) {
+          final personaMatch = UserPersonaNotifier.allPersonas
+              .where((p) => p.id == peerId || _isActorMatch(p.id, peerId))
+              .firstOrNull;
+          if (personaMatch != null) {
+            talent = TalentModel(
+              id: personaMatch.id,
+              name: personaMatch.name,
+              roles: personaMatch.role,
+              avatarUrl: personaMatch.avatarUrl,
+              isProductionHouse: personaMatch.isProductionHouse,
+              connectionStatus: ConnectionStatus.connected,
+            );
+          }
+        }
+
+        if (talent != null) {
+          final resolved = talent;
+          if (!connectedList.any((t) => t.id == resolved.id || _isActorMatch(t.id, resolved.id))) {
+            connectedList.add(resolved.copyWith(connectionStatus: ConnectionStatus.connected));
+          }
         }
       }
 
-      // Also ensure personas who are mutually connected by default are included
-      // e.g. Muhammad Ali, Jeremiah Green, Alexander Cole
-      for (final talent in [
-        TalentDirectory.muhammadAli,
-        TalentDirectory.ranveerSingh,
-        TalentDirectory.alexanderCole,
-        TalentDirectory.jeremiahGreen,
-      ]) {
-        if (talent.id != activeUserId &&
-            !connectedList.any((t) => t.id == talent.id)) {
-          connectedList.add(talent.copyWith(connectionStatus: ConnectionStatus.connected));
+      // Include followed production houses (artists can message production houses they follow)
+      final followingIds = await _connectionRepo.getFollowingIds(activeUserId);
+      for (final pid in followingIds) {
+        final prod = TalentDirectory.findById(pid);
+        if (prod != null && !connectedList.any((t) => t.id == prod.id)) {
+          connectedList.add(prod.copyWith(isFollowing: true));
+        }
+      }
+
+      // If active persona is a Production House (e.g. Filmfare), they can initiate casting messages with any talent
+      final currentPersona = ref.read(userPersonaProvider);
+      if (currentPersona.isProductionHouse) {
+        for (final talent in TalentDirectory.allCuratedTalents) {
+          if (!talent.isProductionHouse &&
+              talent.id != activeUserId &&
+              !connectedList.any((t) => t.id == talent.id)) {
+            connectedList.add(talent);
+          }
         }
       }
 
       state = state.copyWith(connectedTalents: connectedList);
     } catch (_) {}
+  }
+
+  Future<void> refreshConnections() async {
+    final activePersona = ref.read(userPersonaProvider);
+    await _loadConnectedTalents(activePersona.id);
   }
 
   void setSearchQuery(String query) {
@@ -186,13 +239,27 @@ class ChatListNotifier extends Notifier<ChatListState> {
       userA: activePersona.id,
       userB: peerTalent.id,
     );
-    return conv['id'] as String? ?? 'conv-${activePersona.id}-${peerTalent.id}';
+    final convId = conv['id'] as String? ?? ChatRepository.generateUuid();
+    return convId;
   }
 
-  /// Check whether [targetUserId] is connected with the active persona.
-  /// (Per business rule: only connected users can message each other)
+  /// Delete a conversation and remove from list
+  Future<void> deleteConversation(String conversationId) async {
+    await _chatRepo.deleteConversation(conversationId);
+    state = state.copyWith(
+      conversations: state.conversations
+          .where((c) => c.id != conversationId)
+          .toList(),
+    );
+  }
+
+  /// Check whether [targetUserId] is messageable with active persona.
   bool canMessageUser(String targetUserId) {
-    return state.connectedTalents.any((t) => t.id == targetUserId);
+    final activePersona = ref.read(userPersonaProvider);
+    if (activePersona.isProductionHouse) return true;
+    return state.connectedTalents.any(
+      (t) => t.id == targetUserId || _isActorMatch(t.id, targetUserId),
+    );
   }
 }
 
@@ -304,6 +371,18 @@ class ChatRoomNotifier extends Notifier<ChatRoomState> {
     } finally {
       state = state.copyWith(isSending: false);
     }
+  }
+
+  /// Clear all messages in this chat room
+  Future<void> clearChat() async {
+    await _chatRepo.clearConversationMessages(arg.conversationId);
+    state = state.copyWith(messages: []);
+  }
+
+  /// Delete the entire conversation and pop from room
+  Future<void> deleteChat() async {
+    await _chatRepo.deleteConversation(arg.conversationId);
+    ref.read(chatListProvider.notifier).deleteConversation(arg.conversationId);
   }
 }
 

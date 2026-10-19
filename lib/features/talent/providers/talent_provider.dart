@@ -6,6 +6,7 @@ import 'package:you_too_art/core/providers/supabase_providers.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
 import 'package:you_too_art/core/repositories/connection_repository.dart';
 import 'package:you_too_art/features/network/providers/network_provider.dart';
+import 'package:you_too_art/features/chats/providers/chat_provider.dart';
 import 'package:you_too_art/features/talent/models/talent_model.dart';
 
 class TalentState {
@@ -183,6 +184,7 @@ class TalentNotifier extends Notifier<TalentState> {
       senderUserId: talentId,
     );
     ref.read(networkProvider.notifier).refresh();
+    ref.read(chatListProvider.notifier).refreshConnections();
   }
 
   /// Cancel/withdraw request or remove existing connection (returns to none)
@@ -193,6 +195,7 @@ class TalentNotifier extends Notifier<TalentState> {
       connectedUserId: talentId,
     );
     ref.read(networkProvider.notifier).refresh();
+    ref.read(chatListProvider.notifier).refreshConnections();
   }
 
   /// Toggle connection status cleanly:

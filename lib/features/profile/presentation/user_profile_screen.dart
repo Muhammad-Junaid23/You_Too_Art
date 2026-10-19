@@ -127,10 +127,13 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
   }
 
   void _onMessageTapped(BuildContext context, TalentModel talent) async {
-    final isConnected = talent.connectionStatus == ConnectionStatus.connected ||
-        ref.read(chatListProvider.notifier).canMessageUser(talent.id);
+    final isProd = talent.isProductionHouse;
+    final isMessageable = isProd
+        ? talent.isFollowing
+        : (talent.connectionStatus == ConnectionStatus.connected ||
+            ref.read(chatListProvider.notifier).canMessageUser(talent.id));
 
-    if (isConnected) {
+    if (isMessageable) {
       final convId = await ref
           .read(chatListProvider.notifier)
           .startConversationWith(talent);
@@ -147,15 +150,23 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Connect with ${talent.name} first to start chatting!'),
+          content: Text(
+            isProd
+                ? 'Follow ${talent.name} first to start chatting!'
+                : 'Connect with ${talent.name} first to start chatting!',
+          ),
           behavior: SnackBarBehavior.floating,
           backgroundColor: const Color(0xFF1E293B),
           duration: const Duration(seconds: 2),
           action: SnackBarAction(
-            label: 'Connect',
+            label: isProd ? 'Follow' : 'Connect',
             textColor: const Color(0xFF3899F3),
             onPressed: () {
-              ref.read(talentListProvider.notifier).toggleConnection(talent.id);
+              if (isProd) {
+                ref.read(talentListProvider.notifier).toggleFollow(talent.id);
+              } else {
+                ref.read(talentListProvider.notifier).toggleConnection(talent.id);
+              }
             },
           ),
         ),

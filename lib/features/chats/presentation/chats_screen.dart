@@ -25,13 +25,28 @@ class _ChatsScreenState extends ConsumerState<ChatsScreen> {
     super.dispose();
   }
 
-  void _openNewChatModal() {
-    showModalBottomSheet(
+  Future<void> _openNewChatModal() async {
+    final selectedTalent = await showModalBottomSheet<TalentModel>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => const NewChatModal(),
     );
+
+    if (selectedTalent != null && mounted) {
+      final convId = await ref
+          .read(chatListProvider.notifier)
+          .startConversationWith(selectedTalent);
+      if (mounted) {
+        context.push(
+          AppRoutes.chatRoom,
+          extra: ChatRoomArgs(
+            conversationId: convId,
+            peerTalent: selectedTalent,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -198,24 +213,92 @@ class _ChatsScreenState extends ConsumerState<ChatsScreen> {
                           itemCount: conversations.length,
                           itemBuilder: (context, index) {
                             final conv = conversations[index];
-                            return ChatTile(
-                              conversation: conv,
-                              onTap: () {
-                                final peer = conv.peerTalent ??
-                                    TalentModel(
-                                      id: conv.peerId,
-                                      name: conv.peerName,
-                                      roles: conv.peerRole,
-                                      avatarUrl: conv.peerAvatarUrl,
-                                    );
-                                context.push(
-                                  AppRoutes.chatRoom,
-                                  extra: ChatRoomArgs(
-                                    conversationId: conv.id,
-                                    peerTalent: peer,
+                            return Dismissible(
+                              key: Key(conv.id),
+                              direction: DismissDirection.endToStart,
+                              background: Container(
+                                color: const Color(0xFFEF4444),
+                                alignment: Alignment.centerRight,
+                                padding: const EdgeInsets.only(right: 20),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.delete_outline, color: Colors.white, size: 22),
+                                    SizedBox(width: 6),
+                                    Text(
+                                      'Delete',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              confirmDismiss: (_) async {
+                                return await showDialog<bool>(
+                                  context: context,
+                                  builder: (ctx) => AlertDialog(
+                                    backgroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    title: const Text('Delete Conversation?'),
+                                    content: Text(
+                                      'Delete conversation with ${conv.peerName}? All messages will be permanently removed.',
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.of(ctx).pop(false),
+                                        child: const Text(
+                                          'Cancel',
+                                          style: TextStyle(color: Color(0xFF6B7280)),
+                                        ),
+                                      ),
+                                      TextButton(
+                                        onPressed: () => Navigator.of(ctx).pop(true),
+                                        child: const Text(
+                                          'Delete',
+                                          style: TextStyle(
+                                            color: Color(0xFFEF4444),
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ) ?? false;
+                              },
+                              onDismissed: (_) {
+                                ref.read(chatListProvider.notifier).deleteConversation(conv.id);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Conversation with ${conv.peerName} deleted'),
+                                    duration: const Duration(seconds: 2),
+                                    behavior: SnackBarBehavior.floating,
                                   ),
                                 );
                               },
+                              child: ChatTile(
+                                conversation: conv,
+                                onTap: () {
+                                  final peer = conv.peerTalent ??
+                                      TalentModel(
+                                        id: conv.peerId,
+                                        name: conv.peerName,
+                                        roles: conv.peerRole,
+                                        avatarUrl: conv.peerAvatarUrl,
+                                      );
+                                  context.push(
+                                    AppRoutes.chatRoom,
+                                    extra: ChatRoomArgs(
+                                      conversationId: conv.id,
+                                      peerTalent: peer,
+                                    ),
+                                  );
+                                },
+                              ),
                             );
                           },
                         ),
