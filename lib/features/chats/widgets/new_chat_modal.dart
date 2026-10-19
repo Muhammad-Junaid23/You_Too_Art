@@ -148,59 +148,50 @@ class _NewChatModalState extends ConsumerState<NewChatModal> {
                         ),
                         itemBuilder: (context, index) {
                           final talent = filtered[index];
-                          return ListTile(
-                            onTap: () async {
-                              Navigator.of(context).pop();
-                              final convId = await ref
-                                  .read(chatListProvider.notifier)
-                                  .startConversationWith(talent);
-                              if (context.mounted) {
-                                context.push(
-                                  AppRoutes.chatRoom,
-                                  extra: ChatRoomArgs(
-                                    conversationId: convId,
-                                    peerTalent: talent,
-                                  ),
-                                );
-                              }
-                            },
-                            leading: AppAvatar(
-                              imageUrl: talent.avatarUrl,
-                              name: talent.name,
-                              radius: 22,
-                            ),
-                            title: Text(
-                              talent.name,
-                              style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black,
+                          return Material(
+                            color: Colors.transparent,
+                            child: ListTile(
+                              onTap: () {
+                                Navigator.of(context).pop(talent);
+                              },
+                              leading: AppAvatar(
+                                imageUrl: talent.avatarUrl,
+                                name: talent.name,
+                                radius: 22,
                               ),
-                            ),
-                            subtitle: Text(
-                              talent.roles,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                color: Color(0xFF6B7280),
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            trailing: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFE7F3FE),
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: const Text(
-                                'Chat',
-                                style: TextStyle(
-                                  fontSize: 12,
+                              title: Text(
+                                talent.name,
+                                style: const TextStyle(
+                                  fontSize: 15,
                                   fontWeight: FontWeight.w600,
-                                  color: Color(0xFF3899F3),
+                                  color: Colors.black,
+                                ),
+                              ),
+                              subtitle: Text(
+                                talent.roles,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: Color(0xFF6B7280),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              trailing: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFE7F3FE),
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: const Text(
+                                  'Chat',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF3899F3),
+                                  ),
                                 ),
                               ),
                             ),

@@ -5,6 +5,7 @@ import 'package:you_too_art/core/providers/user_persona_provider.dart';
 import 'package:you_too_art/core/repositories/connection_repository.dart';
 import 'package:you_too_art/features/home/models/post_item.dart';
 import 'package:you_too_art/features/network/models/network_item.dart';
+import 'package:you_too_art/features/chats/providers/chat_provider.dart';
 import 'package:you_too_art/features/talent/models/talent_model.dart';
 import 'package:you_too_art/features/talent/providers/talent_provider.dart';
 
@@ -263,6 +264,7 @@ class NetworkNotifier extends Notifier<NetworkState> {
     );
 
     ref.read(talentListProvider.notifier).fetchTalents();
+    ref.read(chatListProvider.notifier).refreshConnections();
   }
 
   /// Decline an incoming connection request
@@ -277,6 +279,7 @@ class NetworkNotifier extends Notifier<NetworkState> {
     );
 
     ref.read(talentListProvider.notifier).fetchTalents();
+    ref.read(chatListProvider.notifier).refreshConnections();
   }
 
   /// Remove an existing connection
@@ -291,6 +294,7 @@ class NetworkNotifier extends Notifier<NetworkState> {
     );
 
     ref.read(talentListProvider.notifier).fetchTalents();
+    ref.read(chatListProvider.notifier).refreshConnections();
   }
 
   /// Toggle sending a connection request to a suggested user

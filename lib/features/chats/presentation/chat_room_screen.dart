@@ -8,7 +8,6 @@ import 'package:you_too_art/core/widgets/app_avatar.dart';
 import 'package:you_too_art/features/chats/models/chat_message_model.dart';
 import 'package:you_too_art/features/chats/providers/chat_provider.dart';
 import 'package:you_too_art/features/talent/models/talent_model.dart';
-import 'package:you_too_art/features/talent/providers/talent_provider.dart';
 
 /// 1-on-1 Chat Room screen strictly matching Figma Image 1.
 class ChatRoomScreen extends ConsumerStatefulWidget {
@@ -81,12 +80,7 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
   Widget build(BuildContext context) {
     final activePersona = ref.watch(userPersonaProvider);
     final roomState = ref.watch(chatRoomProvider(widget.args));
-    final chatListState = ref.watch(chatListProvider);
     final peer = widget.args.peerTalent;
-
-    // Business rule: Only connected users can message each other
-    final isConnected = chatListState.canMessageUser(peer.id) ||
-        peer.connectionStatus == ConnectionStatus.connected;
 
     // Auto scroll down when messages change
     ref.listen(chatRoomProvider(widget.args), (prev, next) {
@@ -178,13 +172,9 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                 if (val == 'view_profile') {
                   context.push(AppRoutes.profileDetail, extra: peer);
                 } else if (val == 'clear_chat') {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Chat cleared'),
-                      duration: Duration(seconds: 1),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
+                  _showClearChatDialog(context);
+                } else if (val == 'delete_chat') {
+                  _showDeleteChatDialog(context, peer);
                 }
               },
               itemBuilder: (context) => [
@@ -202,9 +192,26 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                   value: 'clear_chat',
                   child: Row(
                     children: [
-                      Icon(Icons.delete_outline, size: 18, color: Colors.black),
+                      Icon(Icons.cleaning_services_outlined, size: 18, color: Colors.black),
                       SizedBox(width: 10),
                       Text('Clear Chat', style: TextStyle(fontSize: 14)),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'delete_chat',
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete_outline, size: 18, color: Color(0xFFEF4444)),
+                      SizedBox(width: 10),
+                      Text(
+                        'Delete Chat',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFFEF4444),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -264,11 +271,8 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                         ),
             ),
 
-            // ─── Bottom Bar: Input Bar or Connection Notice ──────────────
-            if (isConnected)
-              _buildInputBar()
-            else
-              _buildNotConnectedBanner(context, peer),
+            // ─── Bottom Bar: Input Bar ──────────────────────────────────
+            _buildInputBar(),
           ],
         ),
       ),
@@ -414,55 +418,78 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
     );
   }
 
-  Widget _buildNotConnectedBanner(BuildContext context, TalentModel peer) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: const BoxDecoration(
-        color: Color(0xFFF9FAFB),
-        border: Border(
-          top: BorderSide(color: Color(0xFFE5E7EB), width: 1),
+  void _showClearChatDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Clear Chat?'),
+        content: const Text(
+          'All messages in this conversation will be permanently removed.',
         ),
-      ),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.lock_outline_rounded,
-            color: Color(0xFF6B7280),
-            size: 20,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF6B7280))),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              'Only connected artists can message each other.',
-              style: const TextStyle(
-                fontSize: 13,
-                color: Color(0xFF4B5563),
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          ElevatedButton(
-            onPressed: () {
-              ref.read(talentListProvider.notifier).toggleConnection(peer.id);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Connection request sent to ${peer.name}!'),
-                  backgroundColor: const Color(0xFF3899F3),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
+          TextButton(
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              await ref.read(chatRoomProvider(widget.args).notifier).clearChat();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Chat cleared'),
+                    duration: Duration(seconds: 1),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.black,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              minimumSize: Size.zero,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+            child: const Text(
+              'Clear',
+              style: TextStyle(
+                color: Color(0xFFEF4444),
+                fontWeight: FontWeight.bold,
               ),
             ),
-            child: const Text('Connect', style: TextStyle(fontSize: 12.5)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteChatDialog(BuildContext context, TalentModel peer) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Delete Conversation?'),
+        content: Text(
+          'Delete your conversation with ${peer.name}? This will remove it from your chat list.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF6B7280))),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              await ref.read(chatRoomProvider(widget.args).notifier).deleteChat();
+              if (context.mounted) {
+                context.pop();
+              }
+            },
+            child: const Text(
+              'Delete',
+              style: TextStyle(
+                color: Color(0xFFEF4444),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),

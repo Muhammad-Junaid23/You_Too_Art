@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:you_too_art/core/constants/supabase_tables.dart';
-import 'package:you_too_art/core/constants/talent_directory.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
 
 /// Centralized repository for managing user connections and follows.
@@ -16,7 +15,7 @@ class ConnectionRepository {
 
   SupabaseQueryBuilder get _db => _client.from(SupabaseTables.connections);
 
-  static const String _connectionsPrefKey = 'yt_connections_store_v3';
+  static const String _connectionsPrefKey = 'yt_connections_store_v5';
   static const String _followingPrefKeyPrefix = 'yt_following_set_';
 
   static bool? _isSupabaseTableAvailable;
@@ -61,74 +60,18 @@ class ConnectionRepository {
     }
   }
 
-  /// Ensure initial relations exist so Figma mocks render correctly on first load.
+  /// Ensure initial relations exist.
+  /// Seeds initial mutual connection for Jeremiah Green only for clean testing.
+  /// Zero default pending requests so Alexander Cole and other talents can be tested cleanly.
   Future<void> ensureDefaultMockConnections(String actorId) async {
     final prefs = await SharedPreferences.getInstance();
     if (prefs.containsKey(_connectionsPrefKey)) return;
 
     final initialList = <Map<String, dynamic>>[
-      // Alexander Cole requested to connect with Actor
+      // Mutual accepted connection with Jeremiah Green
       {
-        'id': 'conn-mock-req-1',
-        'user_id': UserPersonaNotifier.alexanderId,
-        'connected_user_id': actorId,
-        'status': 'pending',
-        'created_at': DateTime.now().subtract(const Duration(hours: 3)).toIso8601String(),
-      },
-      // Lucas Scott requested to connect with Actor
-      {
-        'id': 'conn-mock-req-2',
-        'user_id': TalentDirectory.lucasId,
-        'connected_user_id': actorId,
-        'status': 'pending',
-        'created_at': DateTime.now().subtract(const Duration(hours: 5)).toIso8601String(),
-      },
-      // Accepted connections for Actor strictly matching Figma Image 1
-      {
-        'id': 'conn-mock-1',
-        'user_id': TalentDirectory.jamesId,
-        'connected_user_id': actorId,
-        'status': 'accepted',
-        'created_at': DateTime.now().subtract(const Duration(days: 1)).toIso8601String(),
-      },
-      {
-        'id': 'conn-mock-2',
-        'user_id': TalentDirectory.barbaraId,
-        'connected_user_id': actorId,
-        'status': 'accepted',
-        'created_at': DateTime.now().subtract(const Duration(days: 1)).toIso8601String(),
-      },
-      {
-        'id': 'conn-mock-3',
-        'user_id': TalentDirectory.samuelId,
-        'connected_user_id': actorId,
-        'status': 'accepted',
-        'created_at': DateTime.now().subtract(const Duration(days: 1)).toIso8601String(),
-      },
-      {
-        'id': 'conn-mock-4',
-        'user_id': TalentDirectory.dianaId,
-        'connected_user_id': actorId,
-        'status': 'accepted',
-        'created_at': DateTime.now().subtract(const Duration(days: 1)).toIso8601String(),
-      },
-      {
-        'id': 'conn-mock-5',
-        'user_id': TalentDirectory.loisId,
-        'connected_user_id': actorId,
-        'status': 'accepted',
-        'created_at': DateTime.now().subtract(const Duration(days: 1)).toIso8601String(),
-      },
-      {
-        'id': 'conn-mock-6',
-        'user_id': TalentDirectory.kadenId,
-        'connected_user_id': actorId,
-        'status': 'accepted',
-        'created_at': DateTime.now().subtract(const Duration(days: 1)).toIso8601String(),
-      },
-      {
-        'id': 'conn-mock-7',
-        'user_id': TalentDirectory.wandaId,
+        'id': 'conn-mock-jeremiah',
+        'user_id': UserPersonaNotifier.jeremiahId,
         'connected_user_id': actorId,
         'status': 'accepted',
         'created_at': DateTime.now().subtract(const Duration(days: 1)).toIso8601String(),
@@ -489,6 +432,15 @@ class ConnectionRepository {
       }
     }
     return 'none';
+  }
+
+  /// Check whether [userA] and [userB] are mutually connected (status == 'accepted').
+  Future<bool> isMutuallyConnected({
+    required String userA,
+    required String userB,
+  }) async {
+    final status = await getRelationshipStatus(currentUserId: userA, targetUserId: userB);
+    return status == 'accepted';
   }
 
   /// Following set for production houses

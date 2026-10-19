@@ -1,8 +1,8 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:you_too_art/core/constants/supabase_tables.dart';
-import 'package:you_too_art/core/constants/talent_directory.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
 
 /// Repository for 1:1 chat conversations and messages.
@@ -12,6 +12,48 @@ class ChatRepository {
   final SupabaseClient _client;
 
   ChatRepository(this._client);
+
+  static bool? _isSupabaseTableAvailable;
+
+  static bool isValidUuid(String id) {
+    final uuidRegex = RegExp(
+      r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+    );
+    return uuidRegex.hasMatch(id);
+  }
+
+  /// Compliant RFC 4122 v4 UUID generator accepted by Postgres UUID columns
+  static String generateUuid() {
+    final rnd = math.Random();
+    final bytes = List<int>.generate(16, (_) => rnd.nextInt(256));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40; // RFC 4122 version 4
+    bytes[8] = (bytes[8] & 0x3f) | 0x80; // RFC 4122 variant
+    final hex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20, 32)}';
+  }
+
+  static void _recordSupabaseError(Object e) {
+    final str = e.toString().toLowerCase();
+    if (str.contains('pgrst205') ||
+        str.contains('not found') ||
+        str.contains('could not find the table') ||
+        str.contains('channelerror') ||
+        str.contains('relation') ||
+        str.contains('404')) {
+      _isSupabaseTableAvailable = false;
+      if (kDebugMode) {
+        debugPrint(
+            'ChatRepository: Supabase chat tables not available in schema cache. Operating on resilient local store.');
+      }
+    } else if (kDebugMode) {
+      debugPrint('ChatRepository Supabase error: $e');
+    }
+  }
+
+  /// Reset table availability so Supabase queries can be retried (e.g. after SQL migration)
+  static void resetSupabaseTableAvailability() {
+    _isSupabaseTableAvailable = null;
+  }
 
   SupabaseQueryBuilder get _conversations =>
       _client.from(SupabaseTables.conversations);
@@ -23,40 +65,46 @@ class ChatRepository {
     required String userA,
     required String userB,
   }) async {
-    try {
-      // 1. Try finding in Supabase
-      final existing = await _conversations
-          .select()
-          .or(
-            'and(participant_a.eq.$userA,participant_b.eq.$userB),and(participant_a.eq.$userB,participant_b.eq.$userA)',
-          )
-          .maybeSingle();
+    if (_isSupabaseTableAvailable != false &&
+        isValidUuid(userA) &&
+        isValidUuid(userB)) {
+      try {
+        // 1. Try finding in Supabase
+        final existing = await _conversations
+            .select()
+            .or(
+              'and(participant_a.eq.$userA,participant_b.eq.$userB),and(participant_a.eq.$userB,participant_b.eq.$userA)',
+            )
+            .maybeSingle();
 
-      if (existing != null) {
-        _LocalChatStore.instance.registerConversation(existing);
-        return existing;
+        if (existing != null) {
+          _isSupabaseTableAvailable = true;
+          _LocalChatStore.instance.registerConversation(existing);
+          return existing;
+        }
+
+        // 2. Insert into Supabase if not found
+        final now = DateTime.now().toUtc().toIso8601String();
+        final inserted = await _conversations
+            .insert({
+              'participant_a': userA,
+              'participant_b': userB,
+              'last_message': '',
+              'last_message_at': now,
+              'created_at': now,
+            })
+            .select()
+            .single();
+
+        _isSupabaseTableAvailable = true;
+        _LocalChatStore.instance.registerConversation(inserted);
+        return inserted;
+      } catch (e) {
+        _recordSupabaseError(e);
       }
-
-      // 2. Insert into Supabase if not found
-      final now = DateTime.now().toUtc().toIso8601String();
-      final inserted = await _conversations
-          .insert({
-            'participant_a': userA,
-            'participant_b': userB,
-            'last_message': '',
-            'last_message_at': now,
-            'created_at': now,
-          })
-          .select()
-          .single();
-
-      _LocalChatStore.instance.registerConversation(inserted);
-      return inserted;
-    } catch (e) {
-      if (kDebugMode) debugPrint('ChatRepository.getOrCreateConversation fallback: $e');
-      // Resilient local store fallback
-      return _LocalChatStore.instance.getOrCreate(userA: userA, userB: userB);
     }
+    // Resilient local store fallback
+    return _LocalChatStore.instance.getOrCreate(userA: userA, userB: userB);
   }
 
   /// Real-time stream of conversations for [uid].
@@ -96,40 +144,50 @@ class ChatRepository {
           emitMerged();
         });
 
-        // Listen to Supabase Realtime for participant_a
-        try {
-          subA = _conversations
-              .stream(primaryKey: ['id'])
-              .eq('participant_a', uid)
-              .listen(
-                (rows) {
-                  cacheA.clear();
-                  for (final row in rows) {
-                    cacheA[row['id'].toString()] = row;
-                  }
-                  emitMerged();
-                },
-                onError: (e) {
-                  if (kDebugMode) debugPrint('ChatRepository.watchConversations subA error: $e');
-                },
-              );
+        // Listen to Supabase Realtime only if table is available and uid is valid UUID
+        if (_isSupabaseTableAvailable != false && isValidUuid(uid)) {
+          try {
+            subA = _conversations
+                .stream(primaryKey: ['id'])
+                .eq('participant_a', uid)
+                .listen(
+                  (rows) {
+                    _isSupabaseTableAvailable = true;
+                    cacheA.clear();
+                    for (final row in rows) {
+                      cacheA[row['id'].toString()] = row;
+                    }
+                    emitMerged();
+                  },
+                  onError: (e) {
+                    _recordSupabaseError(e);
+                    subA?.cancel();
+                    subA = null;
+                  },
+                );
 
-          subB = _conversations
-              .stream(primaryKey: ['id'])
-              .eq('participant_b', uid)
-              .listen(
-                (rows) {
-                  cacheB.clear();
-                  for (final row in rows) {
-                    cacheB[row['id'].toString()] = row;
-                  }
-                  emitMerged();
-                },
-                onError: (e) {
-                  if (kDebugMode) debugPrint('ChatRepository.watchConversations subB error: $e');
-                },
-              );
-        } catch (_) {}
+            subB = _conversations
+                .stream(primaryKey: ['id'])
+                .eq('participant_b', uid)
+                .listen(
+                  (rows) {
+                    _isSupabaseTableAvailable = true;
+                    cacheB.clear();
+                    for (final row in rows) {
+                      cacheB[row['id'].toString()] = row;
+                    }
+                    emitMerged();
+                  },
+                  onError: (e) {
+                    _recordSupabaseError(e);
+                    subB?.cancel();
+                    subB = null;
+                  },
+                );
+          } catch (e) {
+            _recordSupabaseError(e);
+          }
+        }
       },
       onCancel: () {
         subA?.cancel();
@@ -159,24 +217,31 @@ class ChatRepository {
           }
         });
 
-        // Listen to Supabase realtime
-        try {
-          supabaseSub = _messages
-              .stream(primaryKey: ['id'])
-              .eq('conversation_id', conversationId)
-              .order('created_at')
-              .listen(
-                (rows) {
-                  if (!controller.isClosed && rows.isNotEmpty) {
-                    _LocalChatStore.instance.mergeSupabaseMessages(conversationId, rows);
-                    controller.add(_LocalChatStore.instance.getMessages(conversationId));
-                  }
-                },
-                onError: (e) {
-                  if (kDebugMode) debugPrint('ChatRepository.watchMessages error: $e');
-                },
-              );
-        } catch (_) {}
+        // Listen to Supabase realtime only if table is available and ID is valid UUID
+        if (_isSupabaseTableAvailable != false && isValidUuid(conversationId)) {
+          try {
+            supabaseSub = _messages
+                .stream(primaryKey: ['id'])
+                .eq('conversation_id', conversationId)
+                .order('created_at')
+                .listen(
+                  (rows) {
+                    if (!controller.isClosed && rows.isNotEmpty) {
+                      _isSupabaseTableAvailable = true;
+                      _LocalChatStore.instance.mergeSupabaseMessages(conversationId, rows);
+                      controller.add(_LocalChatStore.instance.getMessages(conversationId));
+                    }
+                  },
+                  onError: (e) {
+                    _recordSupabaseError(e);
+                    supabaseSub?.cancel();
+                    supabaseSub = null;
+                  },
+                );
+          } catch (e) {
+            _recordSupabaseError(e);
+          }
+        }
       },
       onCancel: () {
         supabaseSub?.cancel();
@@ -195,8 +260,9 @@ class ChatRepository {
     String? mediaUrl,
   }) async {
     final now = DateTime.now().toUtc().toIso8601String();
+    final messageId = generateUuid();
     final messageData = {
-      'id': 'msg-${DateTime.now().millisecondsSinceEpoch}-${senderId.substring(0, 4)}',
+      'id': messageId,
       'conversation_id': conversationId,
       'sender_id': senderId,
       'text': text,
@@ -208,31 +274,37 @@ class ChatRepository {
     // Store locally first for instantaneous UI update
     _LocalChatStore.instance.addMessage(messageData);
 
-    try {
-      final remote = await _messages
-          .insert({
-            'conversation_id': conversationId,
-            'sender_id': senderId,
-            'text': text,
-            'media_url': mediaUrl,
-            'created_at': now,
-          })
-          .select()
-          .single();
+    if (_isSupabaseTableAvailable != false &&
+        isValidUuid(conversationId) &&
+        isValidUuid(senderId)) {
+      try {
+        final remote = await _messages
+            .insert({
+              'id': messageId,
+              'conversation_id': conversationId,
+              'sender_id': senderId,
+              'text': text,
+              'media_url': mediaUrl,
+              'created_at': now,
+            })
+            .select()
+            .single();
 
-      await _conversations
-          .update({
-            'last_message': text,
-            'last_message_at': now,
-          })
-          .eq('id', conversationId);
+        await _conversations
+            .update({
+              'last_message': text,
+              'last_message_at': now,
+            })
+            .eq('id', conversationId);
 
-      _LocalChatStore.instance.addMessage(remote);
-      return remote;
-    } catch (e) {
-      if (kDebugMode) debugPrint('ChatRepository.sendMessage remote write fallback: $e');
-      return messageData;
+        _isSupabaseTableAvailable = true;
+        _LocalChatStore.instance.addMessage(remote);
+        return remote;
+      } catch (e) {
+        _recordSupabaseError(e);
+      }
     }
+    return messageData;
   }
 
   /// Mark all messages in a conversation as read for [userId].
@@ -241,19 +313,53 @@ class ChatRepository {
     required String userId,
   }) async {
     _LocalChatStore.instance.markRead(conversationId, userId);
-    try {
-      final now = DateTime.now().toUtc().toIso8601String();
-      await _messages
-          .update({'read_at': now})
-          .eq('conversation_id', conversationId)
-          .neq('sender_id', userId)
-          .isFilter('read_at', null);
-    } catch (_) {}
+    if (_isSupabaseTableAvailable != false &&
+        isValidUuid(conversationId) &&
+        isValidUuid(userId)) {
+      try {
+        final now = DateTime.now().toUtc().toIso8601String();
+        await _messages
+            .update({'read_at': now})
+            .eq('conversation_id', conversationId)
+            .neq('sender_id', userId)
+            .isFilter('read_at', null);
+      } catch (e) {
+        _recordSupabaseError(e);
+      }
+    }
+  }
+
+  /// Clear all messages in a conversation.
+  Future<void> clearConversationMessages(String conversationId) async {
+    _LocalChatStore.instance.clearMessages(conversationId);
+    if (_isSupabaseTableAvailable != false && isValidUuid(conversationId)) {
+      try {
+        await _messages.delete().eq('conversation_id', conversationId);
+        await _conversations.update({
+          'last_message': '',
+          'last_message_at': DateTime.now().toUtc().toIso8601String(),
+        }).eq('id', conversationId);
+      } catch (e) {
+        _recordSupabaseError(e);
+      }
+    }
+  }
+
+  /// Delete a conversation and all its messages permanently.
+  Future<void> deleteConversation(String conversationId) async {
+    _LocalChatStore.instance.deleteConversation(conversationId);
+    if (_isSupabaseTableAvailable != false && isValidUuid(conversationId)) {
+      try {
+        await _messages.delete().eq('conversation_id', conversationId);
+        await _conversations.delete().eq('id', conversationId);
+      } catch (e) {
+        _recordSupabaseError(e);
+      }
+    }
   }
 }
 
 /// In-memory & reactive resilient store providing instant messaging across personas
-/// and seeded with conversations matching Figma Image 1 & 2.
 class _LocalChatStore {
   _LocalChatStore._() {
     _seedDefaultData();
@@ -277,19 +383,51 @@ class _LocalChatStore {
     _convController.add(null);
   }
 
+  void clearMessages(String conversationId) {
+    _messages[conversationId] = [];
+    if (_conversations.containsKey(conversationId)) {
+      _conversations[conversationId] = {
+        ..._conversations[conversationId]!,
+        'last_message': '',
+        'last_message_at': DateTime.now().toUtc().toIso8601String(),
+      };
+    }
+    _msgController.add(null);
+    _convController.add(null);
+  }
+
+  void deleteConversation(String conversationId) {
+    _conversations.remove(conversationId);
+    _messages.remove(conversationId);
+    _convController.add(null);
+    _msgController.add(null);
+  }
+
+  bool _isActorMatch(String a, String b) {
+    if (a == b) return true;
+    final actorPersona = UserPersonaNotifier.buildActorPersona();
+    final isA = a == UserPersonaNotifier.actorDefaultId || a == actorPersona.id;
+    final isB = b == UserPersonaNotifier.actorDefaultId || b == actorPersona.id;
+    return isA && isB;
+  }
+
   Map<String, dynamic> getOrCreate({
     required String userA,
     required String userB,
   }) {
     for (final c in _conversations.values) {
-      final pa = c['participant_a'];
-      final pb = c['participant_b'];
-      if ((pa == userA && pb == userB) || (pa == userB && pb == userA)) {
+      final pa = c['participant_a'] as String? ?? '';
+      final pb = c['participant_b'] as String? ?? '';
+      final matchA = (pa == userA || _isActorMatch(pa, userA));
+      final matchB = (pb == userB || _isActorMatch(pb, userB));
+      final matchRevA = (pa == userB || _isActorMatch(pa, userB));
+      final matchRevB = (pb == userA || _isActorMatch(pb, userA));
+      if ((matchA && matchB) || (matchRevA && matchRevB)) {
         return c;
       }
     }
 
-    final id = 'conv-$userA-$userB';
+    final id = ChatRepository.generateUuid();
     final now = DateTime.now().toUtc().toIso8601String();
     final newConv = {
       'id': id,
@@ -308,7 +446,9 @@ class _LocalChatStore {
     final result = <String, Map<String, dynamic>>{};
     for (final entry in _conversations.entries) {
       final c = entry.value;
-      if (c['participant_a'] == uid || c['participant_b'] == uid) {
+      final pa = c['participant_a'] as String? ?? '';
+      final pb = c['participant_b'] as String? ?? '';
+      if (pa == uid || pb == uid || _isActorMatch(pa, uid) || _isActorMatch(pb, uid)) {
         result[entry.key] = c;
       }
     }
@@ -374,7 +514,9 @@ class _LocalChatStore {
     if (list != null) {
       final now = DateTime.now().toUtc().toIso8601String();
       for (var i = 0; i < list.length; i++) {
-        if (list[i]['sender_id'] != userId && list[i]['read_at'] == null) {
+        final sid = list[i]['sender_id'] as String? ?? '';
+        final isSender = sid == userId || _isActorMatch(sid, userId);
+        if (!isSender && list[i]['read_at'] == null) {
           list[i] = {...list[i], 'read_at': now};
         }
       }
@@ -384,155 +526,6 @@ class _LocalChatStore {
   }
 
   void _seedDefaultData() {
-    final actorId = UserPersonaNotifier.actorDefaultId;
-    final aliId = TalentDirectory.muhammadAliId;
-    final ranveerId = TalentDirectory.ranveerSinghId;
-    final alexanderId = UserPersonaNotifier.alexanderId;
-    final emersonId = TalentDirectory.jamesId; // Emerson Dias / James
-
-    final now = DateTime.now();
-
-    // 1. Conversation with Muhammad Ali (matching Figma Image 1 & 2)
-    final convAliId = 'conv-actor-muhammad-ali';
-    _conversations[convAliId] = {
-      'id': convAliId,
-      'participant_a': actorId,
-      'participant_b': aliId,
-      'last_message':
-          'Yes exactly, that’s what I wanted to discuss with you.',
-      'last_message_at':
-          now.subtract(const Duration(seconds: 40)).toUtc().toIso8601String(),
-      'created_at':
-          now.subtract(const Duration(hours: 4)).toUtc().toIso8601String(),
-    };
-
-    _messages[convAliId] = [
-      {
-        'id': 'msg-ali-1',
-        'conversation_id': convAliId,
-        'sender_id': aliId,
-        'text': 'Hi Wajahat! Hope you’re doing well.',
-        'created_at':
-            now.subtract(const Duration(hours: 4)).toUtc().toIso8601String(),
-        'read_at': now.subtract(const Duration(hours: 3)).toUtc().toIso8601String(),
-      },
-      {
-        'id': 'msg-ali-2',
-        'conversation_id': convAliId,
-        'sender_id': actorId,
-        'text': 'Hi Ali! I’m fine.',
-        'created_at':
-            now.subtract(const Duration(minutes: 1)).toUtc().toIso8601String(),
-        'read_at': now.subtract(const Duration(seconds: 50)).toUtc().toIso8601String(),
-      },
-      {
-        'id': 'msg-ali-3',
-        'conversation_id': convAliId,
-        'sender_id': actorId,
-        'text': 'What about you?',
-        'created_at':
-            now.subtract(const Duration(minutes: 1)).toUtc().toIso8601String(),
-        'read_at': now.subtract(const Duration(seconds: 50)).toUtc().toIso8601String(),
-      },
-      {
-        'id': 'msg-ali-4',
-        'conversation_id': convAliId,
-        'sender_id': actorId,
-        'text': 'Have you posted a Casting Call for your next project?',
-        'created_at':
-            now.subtract(const Duration(minutes: 1)).toUtc().toIso8601String(),
-        'read_at': now.subtract(const Duration(seconds: 50)).toUtc().toIso8601String(),
-      },
-      {
-        'id': 'msg-ali-5',
-        'conversation_id': convAliId,
-        'sender_id': aliId,
-        'text': 'I’m good.',
-        'created_at':
-            now.subtract(const Duration(seconds: 45)).toUtc().toIso8601String(),
-        'read_at': null,
-      },
-      {
-        'id': 'msg-ali-6',
-        'conversation_id': convAliId,
-        'sender_id': aliId,
-        'text': 'Yes exactly, that’s what I wanted to discuss with you.',
-        'created_at':
-            now.subtract(const Duration(seconds: 40)).toUtc().toIso8601String(),
-        'read_at': null,
-      },
-    ];
-
-    // 2. Conversation with Ranveer Singh (matching Figma Image 2 with unread badge "2")
-    final convRanveerId = 'conv-actor-ranveer-singh';
-    _conversations[convRanveerId] = {
-      'id': convRanveerId,
-      'participant_a': actorId,
-      'participant_b': ranveerId,
-      'last_message': 'Good Job Wajahat! I’m proud of you.',
-      'last_message_at':
-          now.subtract(const Duration(minutes: 2)).toUtc().toIso8601String(),
-      'created_at':
-          now.subtract(const Duration(days: 1)).toUtc().toIso8601String(),
-    };
-    _messages[convRanveerId] = [
-      {
-        'id': 'msg-ran-1',
-        'conversation_id': convRanveerId,
-        'sender_id': ranveerId,
-        'text': 'Hey! Loved your recent audition performance.',
-        'created_at':
-            now.subtract(const Duration(minutes: 5)).toUtc().toIso8601String(),
-        'read_at': null,
-      },
-      {
-        'id': 'msg-ran-2',
-        'conversation_id': convRanveerId,
-        'sender_id': ranveerId,
-        'text': 'Good Job Wajahat! I’m proud of you.',
-        'created_at':
-            now.subtract(const Duration(minutes: 2)).toUtc().toIso8601String(),
-        'read_at': null,
-      },
-    ];
-
-    // 3. Conversation with Emerson Dias
-    final convEmersonId = 'conv-actor-emerson-dias';
-    _conversations[convEmersonId] = {
-      'id': convEmersonId,
-      'participant_a': actorId,
-      'participant_b': emersonId,
-      'last_message': 'Hi Wajahat! Hope you’re doing well. I wanted to catch up.',
-      'last_message_at':
-          now.subtract(const Duration(hours: 22)).toUtc().toIso8601String(),
-      'created_at':
-          now.subtract(const Duration(days: 2)).toUtc().toIso8601String(),
-    };
-
-    // 4. Conversation between Actor and Alexander Cole (for live multi-persona testing)
-    final convAlexId = 'conv-actor-alexander-cole';
-    _conversations[convAlexId] = {
-      'id': convAlexId,
-      'participant_a': actorId,
-      'participant_b': alexanderId,
-      'last_message':
-          'Hey Alexander! Looking forward to collaborating on the upcoming project.',
-      'last_message_at':
-          now.subtract(const Duration(minutes: 15)).toUtc().toIso8601String(),
-      'created_at':
-          now.subtract(const Duration(days: 1)).toUtc().toIso8601String(),
-    };
-    _messages[convAlexId] = [
-      {
-        'id': 'msg-alex-1',
-        'conversation_id': convAlexId,
-        'sender_id': actorId,
-        'text':
-            'Hey Alexander! Looking forward to collaborating on the upcoming project.',
-        'created_at':
-            now.subtract(const Duration(minutes: 15)).toUtc().toIso8601String(),
-        'read_at': now.subtract(const Duration(minutes: 10)).toUtc().toIso8601String(),
-      },
-    ];
+    // Starts completely clean. Only real connections (Jeremiah Green) create genuine chat sessions.
   }
 }
