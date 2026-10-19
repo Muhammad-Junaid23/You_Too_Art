@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:you_too_art/app/config/routes.dart';
 import 'package:you_too_art/core/providers/supabase_providers.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
 import 'package:you_too_art/core/widgets/app_avatar.dart';
+import 'package:you_too_art/features/chats/providers/chat_provider.dart';
 import 'package:you_too_art/features/home/widgets/post_card.dart';
 import 'package:you_too_art/features/network/providers/network_provider.dart';
 import 'package:you_too_art/features/talent/models/talent_model.dart';
@@ -123,16 +126,41 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
     );
   }
 
-  void _onMessageTapped(BuildContext context) {
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Direct messaging will be enabled with the upcoming Chats update!'),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: Color(0xFF3899F3),
-        duration: Duration(seconds: 2),
-      ),
-    );
+  void _onMessageTapped(BuildContext context, TalentModel talent) async {
+    final isConnected = talent.connectionStatus == ConnectionStatus.connected ||
+        ref.read(chatListProvider.notifier).canMessageUser(talent.id);
+
+    if (isConnected) {
+      final convId = await ref
+          .read(chatListProvider.notifier)
+          .startConversationWith(talent);
+      if (context.mounted) {
+        context.push(
+          AppRoutes.chatRoom,
+          extra: ChatRoomArgs(
+            conversationId: convId,
+            peerTalent: talent,
+          ),
+        );
+      }
+    } else {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Connect with ${talent.name} first to start chatting!'),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: const Color(0xFF1E293B),
+          duration: const Duration(seconds: 2),
+          action: SnackBarAction(
+            label: 'Connect',
+            textColor: const Color(0xFF3899F3),
+            onPressed: () {
+              ref.read(talentListProvider.notifier).toggleConnection(talent.id);
+            },
+          ),
+        ),
+      );
+    }
   }
 
   @override
@@ -557,7 +585,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
               width: 140,
               height: 42,
               child: ElevatedButton(
-                onPressed: () => _onMessageTapped(context),
+                onPressed: () => _onMessageTapped(context, talent),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF3899F3),
                   foregroundColor: Colors.white,
@@ -814,7 +842,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                 width: 135,
                 height: 44,
                 child: ElevatedButton(
-                  onPressed: () => _onMessageTapped(context),
+                  onPressed: () => _onMessageTapped(context, talent),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF3899F3),
                     foregroundColor: Colors.white,

@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:you_too_art/core/repositories/chat_repository.dart';
 import 'package:you_too_art/core/repositories/connection_repository.dart';
 import 'package:you_too_art/core/repositories/portfolio_repository.dart';
 import 'package:you_too_art/core/repositories/post_repository.dart';
@@ -19,6 +20,11 @@ final connectionRepositoryProvider = Provider<ConnectionRepository>((ref) {
 final portfolioRepositoryProvider = Provider<PortfolioRepository>((ref) {
   final client = ref.watch(supabaseClientProvider);
   return PortfolioRepository(client);
+});
+
+final chatRepositoryProvider = Provider<ChatRepository>((ref) {
+  final client = ref.watch(supabaseClientProvider);
+  return ChatRepository(client);
 });
 
 /// Provides the [PostRepository] for social feed posts.

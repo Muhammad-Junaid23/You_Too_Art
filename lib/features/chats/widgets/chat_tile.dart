@@ -1,0 +1,160 @@
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:you_too_art/core/widgets/app_avatar.dart';
+import 'package:you_too_art/features/chats/models/conversation_model.dart';
+
+class ChatTile extends StatelessWidget {
+  final ConversationModel conversation;
+  final VoidCallback onTap;
+
+  const ChatTile({
+    super.key,
+    required this.conversation,
+    required this.onTap,
+  });
+
+  String _formatTimestamp(DateTime dt) {
+    final now = DateTime.now();
+    final diff = now.difference(dt);
+
+    if (diff.inMinutes < 2) {
+      return 'Just Now';
+    } else if (diff.inHours < 1) {
+      return '${diff.inMinutes} mins ago';
+    } else if (diff.inHours < 24 && dt.day == now.day) {
+      return '${diff.inHours} ${diff.inHours == 1 ? "hour" : "hours"} ago';
+    } else if (diff.inDays == 1 || (diff.inHours < 48 && dt.day == now.day - 1)) {
+      return 'Yesterday, at ${DateFormat('h:mm a').format(dt)}';
+    } else {
+      return DateFormat('MMM d, h:mm a').format(dt);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Avatar with online green status dot
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    AppAvatar(
+                      imageUrl: conversation.peerAvatarUrl,
+                      name: conversation.peerName,
+                      radius: 26,
+                    ),
+                    if (conversation.isOnline)
+                      Positioned(
+                        right: 1,
+                        bottom: 1,
+                        child: Container(
+                          width: 12,
+                          height: 12,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF12B76A),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Colors.white,
+                              width: 2,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(width: 14),
+
+                // Name & Message Preview
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              conversation.peerName,
+                              style: const TextStyle(
+                                fontSize: 15.5,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.black,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          if (conversation.unreadCount > 0)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 7.5,
+                                vertical: 2.5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFD8EDFE),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                '${conversation.unreadCount}',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF2196F3),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        conversation.lastMessage.isNotEmpty
+                            ? conversation.lastMessage
+                            : 'Started a conversation',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: conversation.unreadCount > 0
+                              ? FontWeight.w600
+                              : FontWeight.w400,
+                          color: conversation.unreadCount > 0
+                              ? const Color(0xFF111827)
+                              : const Color(0xFF6B7280),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        _formatTimestamp(conversation.lastMessageAt),
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          color: Color(0xFF9CA3AF),
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(
+            height: 1,
+            thickness: 0.5,
+            indent: 72,
+            endIndent: 16,
+            color: Color(0xFFF0F1F3),
+          ),
+        ],
+      ),
+    );
+  }
+}
