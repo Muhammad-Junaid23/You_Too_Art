@@ -21,6 +21,8 @@ import 'package:you_too_art/features/profile/presentation/complete_profile_produ
 import 'package:you_too_art/features/home/presentation/create_post_screen.dart';
 import 'package:you_too_art/features/home/presentation/search_screen.dart';
 import 'package:you_too_art/features/profile/presentation/user_profile_screen.dart';
+import 'package:you_too_art/features/chats/presentation/chat_room_screen.dart';
+import 'package:you_too_art/features/chats/providers/chat_provider.dart';
 import 'package:you_too_art/features/talent/models/talent_model.dart';
 
 /// Centralized route configuration for the app.
@@ -46,6 +48,7 @@ class AppRoutes {
   static const String createPost = '/create-post';
   static const String search = '/search';
   static const String profileDetail = '/profile-detail';
+  static const String chatRoom = '/chat-room';
 
   // ─── Navigator Key ────────────────────────────────
   static final GlobalKey<NavigatorState> rootNavigatorKey =
@@ -138,6 +141,13 @@ class AppRoutes {
           builder: (context, state) {
             final talent = state.extra as TalentModel;
             return UserProfileScreen(initialTalent: talent);
+          },
+        ),
+        GoRoute(
+          path: chatRoom,
+          builder: (context, state) {
+            final args = state.extra as ChatRoomArgs;
+            return ChatRoomScreen(args: args);
           },
         ),
 

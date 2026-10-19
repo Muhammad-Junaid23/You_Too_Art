@@ -19,6 +19,8 @@ class TalentDirectory {
   static const String loisId = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
   static const String kadenId = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
   static const String wandaId = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
+  static const String muhammadAliId = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee';
+  static const String ranveerSinghId = 'ffffffff-ffff-ffff-ffff-ffffffffffff';
 
   // Sample post for Jeremiah Green strictly matching Figma Image 1 & 2
   static final jeremiahPost = PostItem(
@@ -302,6 +304,24 @@ class TalentDirectory {
     email: 'wanda.maximoff@youtooart.test',
   );
 
+  static final muhammadAli = TalentModel(
+    id: muhammadAliId,
+    name: 'Muhammad Ali',
+    roles: 'Actor | Director | Producer',
+    avatarUrl:
+        'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=400&q=80',
+    email: 'muhammad.ali@youtooart.test',
+  );
+
+  static final ranveerSingh = TalentModel(
+    id: ranveerSinghId,
+    name: 'Ranveer Singh',
+    roles: 'Actor | Producer',
+    avatarUrl:
+        'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80',
+    email: 'ranveer.singh@youtooart.test',
+  );
+
   static List<TalentModel> get allCuratedTalents => [
         jeremiahGreen,
         filmfare,
@@ -330,6 +350,8 @@ class TalentDirectory {
       loisLane,
       kadenFane,
       wandaMaximoff,
+      muhammadAli,
+      ranveerSingh,
     ])
       t.id: t,
   };

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:you_too_art/app/config/routes.dart';
 import 'package:you_too_art/core/widgets/persona_switcher_modal.dart';
+import 'package:you_too_art/features/chats/providers/chat_provider.dart';
 import 'package:you_too_art/features/talent/models/talent_model.dart';
 import 'package:you_too_art/features/talent/providers/talent_provider.dart';
 import 'package:you_too_art/features/talent/widgets/talent_card.dart';
@@ -294,18 +295,45 @@ class _TalentScreenState extends ConsumerState<TalentScreen> {
                                     );
                                   }
                                 },
-                                onMessage: () {
-                                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Direct messaging will be enabled with the upcoming Chats update!',
+                                onMessage: () async {
+                                  final isConnected = talent.connectionStatus == ConnectionStatus.connected ||
+                                      ref.read(chatListProvider.notifier).canMessageUser(talent.id);
+
+                                  if (isConnected) {
+                                    final convId = await ref
+                                        .read(chatListProvider.notifier)
+                                        .startConversationWith(talent);
+                                    if (context.mounted) {
+                                      context.push(
+                                        AppRoutes.chatRoom,
+                                        extra: ChatRoomArgs(
+                                          conversationId: convId,
+                                          peerTalent: talent,
+                                        ),
+                                      );
+                                    }
+                                  } else {
+                                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          'Connect with ${talent.name} first to start chatting!',
+                                        ),
+                                        behavior: SnackBarBehavior.floating,
+                                        backgroundColor: const Color(0xFF1E293B),
+                                        duration: const Duration(seconds: 2),
+                                        action: SnackBarAction(
+                                          label: 'Connect',
+                                          textColor: const Color(0xFF3899F3),
+                                          onPressed: () {
+                                            ref
+                                                .read(talentListProvider.notifier)
+                                                .toggleConnection(talent.id);
+                                          },
+                                        ),
                                       ),
-                                      behavior: SnackBarBehavior.floating,
-                                      backgroundColor: Color(0xFF3899F3),
-                                      duration: Duration(seconds: 2),
-                                    ),
-                                  );
+                                    );
+                                  }
                                 },
                               );
                             },
