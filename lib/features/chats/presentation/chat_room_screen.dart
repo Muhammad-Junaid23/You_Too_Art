@@ -316,18 +316,33 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
             ),
           ),
 
-          // Timestamp shown below the bubble matching Figma Image 1
+          // Timestamp and Read Status checkmark shown below bubble
           if (showTimestamp) ...[
             const SizedBox(height: 4),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Text(
-                _formatTimestamp(msg.createdAt),
-                style: const TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w400,
-                  color: Color(0xFF9CA3AF),
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _formatTimestamp(msg.createdAt),
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w400,
+                      color: Color(0xFF9CA3AF),
+                    ),
+                  ),
+                  if (isMe) ...[
+                    const SizedBox(width: 4),
+                    Icon(
+                      msg.isRead ? Icons.done_all : Icons.check,
+                      size: 14,
+                      color: msg.isRead
+                          ? const Color(0xFF3899F3)
+                          : const Color(0xFF9CA3AF),
+                    ),
+                  ],
+                ],
               ),
             ),
           ],

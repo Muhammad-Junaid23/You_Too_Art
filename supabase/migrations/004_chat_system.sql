@@ -49,6 +49,10 @@ create policy "Users can update conversations"
   on public.conversations for update
   using (true);
 
+create policy "Users can delete conversations"
+  on public.conversations for delete
+  using (true);
+
 -- 5. Messages Policies
 create policy "Users can view messages"
   on public.messages for select
@@ -60,6 +64,10 @@ create policy "Users can insert messages"
 
 create policy "Users can update messages"
   on public.messages for update
+  using (true);
+
+create policy "Users can delete messages"
+  on public.messages for delete
   using (true);
 
 -- 6. Add to Supabase Realtime publication safely (idempotent)

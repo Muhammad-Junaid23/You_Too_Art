@@ -32,6 +32,8 @@ class ChatTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasUnread = conversation.unreadCount > 0;
+
     return InkWell(
       onTap: onTap,
       child: Column(
@@ -41,7 +43,7 @@ class ChatTile extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // Avatar with online green status dot
+                // ─── Avatar with online green status dot ────────────────
                 Stack(
                   clipBehavior: Clip.none,
                   children: [
@@ -71,67 +73,63 @@ class ChatTile extends StatelessWidget {
                 ),
                 const SizedBox(width: 14),
 
-                // Name & Message Preview
+                // ─── Name & Message Preview ─────────────────────────────
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Flexible(
-                            child: Text(
-                              conversation.peerName,
-                              style: const TextStyle(
-                                fontSize: 15.5,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.black,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          if (conversation.unreadCount > 0)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 7.5,
-                                vertical: 2.5,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFD8EDFE),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                '${conversation.unreadCount}',
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFF2196F3),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
+                      // Peer Name
                       Text(
-                        conversation.lastMessage.isNotEmpty
-                            ? conversation.lastMessage
-                            : 'Started a conversation',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: conversation.unreadCount > 0
-                              ? FontWeight.w600
-                              : FontWeight.w400,
-                          color: conversation.unreadCount > 0
-                              ? const Color(0xFF111827)
-                              : const Color(0xFF6B7280),
+                        conversation.peerName,
+                        style: const TextStyle(
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.black,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 3),
+
+                      // Message Preview with Read Checkmarks (if sent by user)
+                      Row(
+                        children: [
+                          if (conversation.isLastMessageMine) ...[
+                            Icon(
+                              conversation.isLastMessageRead
+                                  ? Icons.done_all
+                                  : Icons.check,
+                              size: 15,
+                              color: conversation.isLastMessageRead
+                                  ? const Color(0xFF3899F3)
+                                  : const Color(0xFF9CA3AF),
+                            ),
+                            const SizedBox(width: 4),
+                          ],
+                          Expanded(
+                            child: Text(
+                              conversation.lastMessage.isNotEmpty
+                                  ? conversation.lastMessage
+                                  : 'Started a conversation',
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: hasUnread
+                                    ? FontWeight.w700
+                                    : FontWeight.w400,
+                                color: hasUnread
+                                    ? Colors.black
+                                    : const Color(0xFF6B7280),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+
+                      // Timestamp
                       Text(
                         _formatTimestamp(conversation.lastMessageAt),
                         style: const TextStyle(
@@ -143,6 +141,30 @@ class ChatTile extends StatelessWidget {
                     ],
                   ),
                 ),
+
+                // ─── Trailing Unread Badge (matching Figma) ─────────────
+                if (hasUnread) ...[
+                  const SizedBox(width: 10),
+                  Container(
+                    width: 24,
+                    height: 24,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFD8EDFE),
+                      shape: BoxShape.circle,
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      conversation.unreadCount > 9
+                          ? '9+'
+                          : '${conversation.unreadCount}',
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF2196F3),
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

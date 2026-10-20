@@ -24,6 +24,7 @@ import 'package:you_too_art/features/profile/presentation/user_profile_screen.da
 import 'package:you_too_art/features/chats/presentation/chat_room_screen.dart';
 import 'package:you_too_art/features/chats/providers/chat_provider.dart';
 import 'package:you_too_art/features/talent/models/talent_model.dart';
+import 'package:you_too_art/features/notifications/presentation/notifications_screen.dart';
 
 /// Centralized route configuration for the app.
 class AppRoutes {
@@ -49,6 +50,7 @@ class AppRoutes {
   static const String search = '/search';
   static const String profileDetail = '/profile-detail';
   static const String chatRoom = '/chat-room';
+  static const String notifications = '/notifications';
 
   // ─── Navigator Key ────────────────────────────────
   static final GlobalKey<NavigatorState> rootNavigatorKey =
@@ -149,6 +151,10 @@ class AppRoutes {
             final args = state.extra as ChatRoomArgs;
             return ChatRoomScreen(args: args);
           },
+        ),
+        GoRoute(
+          path: notifications,
+          builder: (context, state) => const NotificationsScreen(),
         ),
 
         // ─── Main Shell with Bottom Navigation ───────

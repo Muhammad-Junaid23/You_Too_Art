@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:you_too_art/app/config/routes.dart';
 import 'package:you_too_art/core/widgets/persona_switcher_modal.dart';
 import 'package:you_too_art/features/network/models/network_item.dart';
+import 'package:you_too_art/features/notifications/providers/notification_provider.dart';
 import 'package:you_too_art/features/network/providers/network_provider.dart';
 import 'package:you_too_art/features/network/widgets/network_tiles.dart';
 
@@ -180,20 +181,50 @@ class _NetworkScreenState extends ConsumerState<NetworkScreen> {
                   const Spacer(),
                   const PersonaBadge(),
                   const SizedBox(width: 4),
-                  IconButton(
-                    icon: const Icon(
-                      Icons.notifications_none_rounded,
-                      color: Color(0xFF3899F3),
-                      size: 26,
-                    ),
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('No new network notifications'),
-                          behavior: SnackBarBehavior.floating,
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      IconButton(
+                        icon: const Icon(
+                          Icons.notifications_none_rounded,
+                          color: Color(0xFF3899F3),
+                          size: 26,
                         ),
-                      );
-                    },
+                        onPressed: () =>
+                            context.push(AppRoutes.notifications),
+                      ),
+                      if (ref.watch(notificationProvider).unreadCount > 0)
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFEF4444),
+                              shape: BoxShape.circle,
+                            ),
+                            constraints: const BoxConstraints(
+                              minWidth: 16,
+                              minHeight: 16,
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              ref
+                                          .watch(notificationProvider)
+                                          .unreadCount >
+                                      9
+                                  ? '9+'
+                                  : '${ref.watch(notificationProvider).unreadCount}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.bold,
+                                height: 1,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ],
               ),

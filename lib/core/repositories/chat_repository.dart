@@ -1,8 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:you_too_art/core/constants/supabase_tables.dart';
+import 'package:you_too_art/core/constants/talent_directory.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
 
 /// Repository for 1:1 chat conversations and messages.
@@ -124,7 +127,24 @@ class ChatRepository {
         ...cacheB,
       };
 
-      final list = mergedMap.values.toList()
+      // Filter out conversations that have been deleted for THIS user
+      mergedMap.removeWhere(
+          (id, _) => _LocalChatStore.instance.isDeletedForUser(id, uid));
+
+      final list = mergedMap.values.map((conv) {
+        final convId = conv['id'].toString();
+        final visibleMsgs =
+            _LocalChatStore.instance.getMessages(convId, userId: uid);
+        final copy = Map<String, dynamic>.from(conv);
+        if (visibleMsgs.isEmpty) {
+          copy['last_message'] = '';
+        } else {
+          copy['last_message'] = visibleMsgs.last['text'] ?? '';
+          copy['last_message_at'] =
+              visibleMsgs.last['created_at'] ?? conv['last_message_at'];
+        }
+        return copy;
+      }).toList()
         ..sort((a, b) {
           final timeA = a['last_message_at'] as String? ?? '';
           final timeB = b['last_message_at'] as String? ?? '';
@@ -199,21 +219,26 @@ class ChatRepository {
     return controller.stream;
   }
 
-  /// Real-time stream of messages in a given [conversationId].
-  Stream<List<Map<String, dynamic>>> watchMessages(String conversationId) {
+  /// Real-time stream of messages in a given [conversationId] for [userId].
+  Stream<List<Map<String, dynamic>>> watchMessages(
+    String conversationId, {
+    required String userId,
+  }) {
     late final StreamController<List<Map<String, dynamic>>> controller;
     StreamSubscription<List<Map<String, dynamic>>>? supabaseSub;
     StreamSubscription<void>? localSub;
 
     controller = StreamController<List<Map<String, dynamic>>>.broadcast(
       onListen: () {
-        // Emit current local messages immediately
-        controller.add(_LocalChatStore.instance.getMessages(conversationId));
+        // Emit current local messages for this user immediately
+        controller.add(
+            _LocalChatStore.instance.getMessages(conversationId, userId: userId));
 
         // Listen to local updates
         localSub = _LocalChatStore.instance.messagesStream.listen((_) {
           if (!controller.isClosed) {
-            controller.add(_LocalChatStore.instance.getMessages(conversationId));
+            controller.add(
+                _LocalChatStore.instance.getMessages(conversationId, userId: userId));
           }
         });
 
@@ -226,10 +251,12 @@ class ChatRepository {
                 .order('created_at')
                 .listen(
                   (rows) {
-                    if (!controller.isClosed && rows.isNotEmpty) {
+                    if (!controller.isClosed) {
                       _isSupabaseTableAvailable = true;
-                      _LocalChatStore.instance.mergeSupabaseMessages(conversationId, rows);
-                      controller.add(_LocalChatStore.instance.getMessages(conversationId));
+                      _LocalChatStore.instance
+                          .setSupabaseMessages(conversationId, rows);
+                      controller.add(_LocalChatStore.instance
+                          .getMessages(conversationId, userId: userId));
                     }
                   },
                   onError: (e) {
@@ -312,7 +339,8 @@ class ChatRepository {
     required String conversationId,
     required String userId,
   }) async {
-    _LocalChatStore.instance.markRead(conversationId, userId);
+    _LocalChatStore.instance
+        .markRead(conversationId: conversationId, userId: userId);
     if (_isSupabaseTableAvailable != false &&
         isValidUuid(conversationId) &&
         isValidUuid(userId)) {
@@ -329,43 +357,80 @@ class ChatRepository {
     }
   }
 
-  /// Clear all messages in a conversation.
-  Future<void> clearConversationMessages(String conversationId) async {
-    _LocalChatStore.instance.clearMessages(conversationId);
-    if (_isSupabaseTableAvailable != false && isValidUuid(conversationId)) {
+  /// Mark all messages across all conversations as read for [userId].
+  Future<void> markAllAsRead({required String userId}) async {
+    _LocalChatStore.instance.markAllRead(userId: userId);
+    if (_isSupabaseTableAvailable != false && isValidUuid(userId)) {
       try {
-        await _messages.delete().eq('conversation_id', conversationId);
-        await _conversations.update({
-          'last_message': '',
-          'last_message_at': DateTime.now().toUtc().toIso8601String(),
-        }).eq('id', conversationId);
+        final now = DateTime.now().toUtc().toIso8601String();
+        await _messages
+            .update({'read_at': now})
+            .neq('sender_id', userId)
+            .isFilter('read_at', null);
       } catch (e) {
         _recordSupabaseError(e);
       }
     }
   }
 
-  /// Delete a conversation and all its messages permanently.
-  Future<void> deleteConversation(String conversationId) async {
-    _LocalChatStore.instance.deleteConversation(conversationId);
-    if (_isSupabaseTableAvailable != false && isValidUuid(conversationId)) {
-      try {
-        await _messages.delete().eq('conversation_id', conversationId);
-        await _conversations.delete().eq('id', conversationId);
-      } catch (e) {
-        _recordSupabaseError(e);
-      }
-    }
+  /// Clear messages in a conversation for [userId] only.
+  Future<void> clearConversationMessages({
+    required String conversationId,
+    required String userId,
+  }) async {
+    _LocalChatStore.instance.clearMessages(
+      conversationId: conversationId,
+      userId: userId,
+    );
+  }
+
+  /// Delete a conversation for [userId] only (hide from their inbox).
+  Future<void> deleteConversation({
+    required String conversationId,
+    required String userId,
+  }) async {
+    _LocalChatStore.instance.deleteConversation(
+      conversationId: conversationId,
+      userId: userId,
+    );
+  }
+
+  /// Get the unread message count in a conversation for [userId].
+  int getUnreadCount({
+    required String conversationId,
+    required String userId,
+  }) {
+    return _LocalChatStore.instance.getUnreadCount(
+      conversationId: conversationId,
+      userId: userId,
+    );
+  }
+
+  /// Get visible messages in a conversation for [userId].
+  List<Map<String, dynamic>> getMessages(
+    String conversationId, {
+    String? userId,
+  }) {
+    return _LocalChatStore.instance.getMessages(conversationId, userId: userId);
   }
 }
 
 /// In-memory & reactive resilient store providing instant messaging across personas
+/// with per-user persistent local cache for deleted conversations and cleared timestamps.
 class _LocalChatStore {
   _LocalChatStore._() {
-    _seedDefaultData();
+    _loadFromPrefs();
   }
   static final _LocalChatStore instance = _LocalChatStore._();
 
+  static const String _deletedConvsByUserKey = 'yt_user_deleted_convs_v4';
+  static const String _clearedTimestampsByUserKey =
+      'yt_user_cleared_timestamps_v4';
+  static const String _localConvsKey = 'yt_local_conversations_v4';
+  static const String _localMsgsKey = 'yt_local_messages_v4';
+
+  final Map<String, Set<String>> _deletedConvsByUser = {};
+  final Map<String, Map<String, DateTime>> _clearedTimestampsByUser = {};
   final Map<String, Map<String, dynamic>> _conversations = {};
   final Map<String, List<Map<String, dynamic>>> _messages = {};
 
@@ -377,30 +442,12 @@ class _LocalChatStore {
   Stream<void> get conversationsStream => _convController.stream;
   Stream<void> get messagesStream => _msgController.stream;
 
-  void registerConversation(Map<String, dynamic> row) {
-    final id = row['id'].toString();
-    _conversations[id] = Map<String, dynamic>.from(row);
-    _convController.add(null);
-  }
-
-  void clearMessages(String conversationId) {
-    _messages[conversationId] = [];
-    if (_conversations.containsKey(conversationId)) {
-      _conversations[conversationId] = {
-        ..._conversations[conversationId]!,
-        'last_message': '',
-        'last_message_at': DateTime.now().toUtc().toIso8601String(),
-      };
+  String _normalizeUserId(String uid) {
+    final actorPersona = UserPersonaNotifier.buildActorPersona();
+    if (uid == UserPersonaNotifier.actorDefaultId || uid == actorPersona.id) {
+      return UserPersonaNotifier.actorDefaultId;
     }
-    _msgController.add(null);
-    _convController.add(null);
-  }
-
-  void deleteConversation(String conversationId) {
-    _conversations.remove(conversationId);
-    _messages.remove(conversationId);
-    _convController.add(null);
-    _msgController.add(null);
+    return uid;
   }
 
   bool _isActorMatch(String a, String b) {
@@ -411,11 +458,172 @@ class _LocalChatStore {
     return isA && isB;
   }
 
+  Future<void> _loadFromPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      // Load deleted convs by user
+      final deletedRaw = prefs.getString(_deletedConvsByUserKey);
+      if (deletedRaw != null && deletedRaw.isNotEmpty) {
+        final decoded = jsonDecode(deletedRaw) as Map<String, dynamic>;
+        for (final entry in decoded.entries) {
+          _deletedConvsByUser[entry.key] = Set<String>.from(entry.value as List);
+        }
+      }
+
+      // Load cleared timestamps by user
+      final clearedRaw = prefs.getString(_clearedTimestampsByUserKey);
+      if (clearedRaw != null && clearedRaw.isNotEmpty) {
+        final decoded = jsonDecode(clearedRaw) as Map<String, dynamic>;
+        for (final userEntry in decoded.entries) {
+          final userMap = <String, DateTime>{};
+          for (final convEntry in (userEntry.value as Map).entries) {
+            final dt = DateTime.tryParse(convEntry.value.toString());
+            if (dt != null) {
+              userMap[convEntry.key.toString()] = dt;
+            }
+          }
+          _clearedTimestampsByUser[userEntry.key] = userMap;
+        }
+      }
+
+      // If a user previously marked a conversation as deleted, ensure its past messages are also cleared
+      for (final userEntry in _deletedConvsByUser.entries) {
+        final user = userEntry.key;
+        for (final convId in userEntry.value) {
+          final userClears =
+              _clearedTimestampsByUser.putIfAbsent(user, () => <String, DateTime>{});
+          if (!userClears.containsKey(convId)) {
+            userClears[convId] = DateTime.now().toUtc();
+          }
+        }
+      }
+
+      // Load conversations
+      final convsRaw = prefs.getString(_localConvsKey);
+      if (convsRaw != null && convsRaw.isNotEmpty) {
+        final decoded = jsonDecode(convsRaw) as Map<String, dynamic>;
+        for (final entry in decoded.entries) {
+          _conversations[entry.key] =
+              Map<String, dynamic>.from(entry.value as Map);
+        }
+      }
+
+      // Load messages
+      final msgsRaw = prefs.getString(_localMsgsKey);
+      if (msgsRaw != null && msgsRaw.isNotEmpty) {
+        final decoded = jsonDecode(msgsRaw) as Map<String, dynamic>;
+        for (final entry in decoded.entries) {
+          final list = (entry.value as List)
+              .map((m) => Map<String, dynamic>.from(m as Map))
+              .toList();
+          _messages[entry.key] = list;
+        }
+      }
+
+      // If empty, seed default data
+      if (_conversations.isEmpty) {
+        _seedDefaultData();
+      }
+
+      _convController.add(null);
+      _msgController.add(null);
+    } catch (_) {
+      _seedDefaultData();
+    }
+  }
+
+  Future<void> _saveUserDeletedToPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final map = _deletedConvsByUser.map((k, v) => MapEntry(k, v.toList()));
+      await prefs.setString(_deletedConvsByUserKey, jsonEncode(map));
+    } catch (_) {}
+  }
+
+  Future<void> _saveUserClearedToPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final map = _clearedTimestampsByUser.map((user, convMap) {
+        return MapEntry(
+          user,
+          convMap.map((convId, dt) => MapEntry(convId, dt.toIso8601String())),
+        );
+      });
+      await prefs.setString(_clearedTimestampsByUserKey, jsonEncode(map));
+    } catch (_) {}
+  }
+
+  Future<void> _saveConvsToPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_localConvsKey, jsonEncode(_conversations));
+    } catch (_) {}
+  }
+
+  Future<void> _saveMsgsToPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_localMsgsKey, jsonEncode(_messages));
+    } catch (_) {}
+  }
+
+  bool isDeletedForUser(String conversationId, String userId) {
+    final normUser = _normalizeUserId(userId);
+    return _deletedConvsByUser[normUser]?.contains(conversationId) ?? false;
+  }
+
+  DateTime? getClearedTimestamp({
+    required String conversationId,
+    required String userId,
+  }) {
+    final normUser = _normalizeUserId(userId);
+    return _clearedTimestampsByUser[normUser]?[conversationId];
+  }
+
+  void registerConversation(Map<String, dynamic> row) {
+    final id = row['id'].toString();
+    _conversations[id] = Map<String, dynamic>.from(row);
+    _saveConvsToPrefs();
+    _convController.add(null);
+  }
+
+  void clearMessages({
+    required String conversationId,
+    required String userId,
+  }) {
+    final normUser = _normalizeUserId(userId);
+    _clearedTimestampsByUser
+        .putIfAbsent(normUser, () => <String, DateTime>{})[conversationId] =
+        DateTime.now().toUtc();
+    _saveUserClearedToPrefs();
+    _msgController.add(null);
+    _convController.add(null);
+  }
+
+  void deleteConversation({
+    required String conversationId,
+    required String userId,
+  }) {
+    final normUser = _normalizeUserId(userId);
+    _deletedConvsByUser
+        .putIfAbsent(normUser, () => <String>{})
+        .add(conversationId);
+    _clearedTimestampsByUser
+        .putIfAbsent(normUser, () => <String, DateTime>{})[conversationId] =
+        DateTime.now().toUtc();
+    _saveUserDeletedToPrefs();
+    _saveUserClearedToPrefs();
+    _convController.add(null);
+    _msgController.add(null);
+  }
+
   Map<String, dynamic> getOrCreate({
     required String userA,
     required String userB,
   }) {
     for (final c in _conversations.values) {
+      final id = c['id']?.toString() ?? '';
       final pa = c['participant_a'] as String? ?? '';
       final pb = c['participant_b'] as String? ?? '';
       final matchA = (pa == userA || _isActorMatch(pa, userA));
@@ -423,6 +631,12 @@ class _LocalChatStore {
       final matchRevA = (pa == userB || _isActorMatch(pa, userB));
       final matchRevB = (pb == userA || _isActorMatch(pb, userA));
       if ((matchA && matchB) || (matchRevA && matchRevB)) {
+        // Un-delete for both users if they explicitly open this conversation
+        final normA = _normalizeUserId(userA);
+        final normB = _normalizeUserId(userB);
+        _deletedConvsByUser[normA]?.remove(id);
+        _deletedConvsByUser[normB]?.remove(id);
+        _saveUserDeletedToPrefs();
         return c;
       }
     }
@@ -437,7 +651,14 @@ class _LocalChatStore {
       'last_message_at': now,
       'created_at': now,
     };
+    final normA = _normalizeUserId(userA);
+    final normB = _normalizeUserId(userB);
+    _deletedConvsByUser[normA]?.remove(id);
+    _deletedConvsByUser[normB]?.remove(id);
+    _saveUserDeletedToPrefs();
+
     _conversations[id] = newConv;
+    _saveConvsToPrefs();
     _convController.add(null);
     return newConv;
   }
@@ -445,28 +666,67 @@ class _LocalChatStore {
   Map<String, Map<String, dynamic>> getConversationsForMap(String uid) {
     final result = <String, Map<String, dynamic>>{};
     for (final entry in _conversations.entries) {
+      if (isDeletedForUser(entry.key, uid)) continue;
       final c = entry.value;
       final pa = c['participant_a'] as String? ?? '';
       final pb = c['participant_b'] as String? ?? '';
-      if (pa == uid || pb == uid || _isActorMatch(pa, uid) || _isActorMatch(pb, uid)) {
+      if (pa == uid ||
+          pb == uid ||
+          _isActorMatch(pa, uid) ||
+          _isActorMatch(pb, uid)) {
         result[entry.key] = c;
       }
     }
     return result;
   }
 
-  List<Map<String, dynamic>> getMessages(String conversationId) {
-    return List<Map<String, dynamic>>.from(_messages[conversationId] ?? []);
+  List<Map<String, dynamic>> getMessages(
+    String conversationId, {
+    String? userId,
+  }) {
+    final list = _messages[conversationId] ?? [];
+    if (userId == null) return List<Map<String, dynamic>>.from(list);
+
+    final clearedAt =
+        getClearedTimestamp(conversationId: conversationId, userId: userId);
+    if (clearedAt == null) return List<Map<String, dynamic>>.from(list);
+
+    return list.where((m) {
+      final createdAtStr = m['created_at']?.toString();
+      if (createdAtStr == null) return false;
+      final dt = DateTime.tryParse(createdAtStr);
+      if (dt == null) return false;
+      return dt.isAfter(clearedAt);
+    }).toList();
+  }
+
+  int getUnreadCount({
+    required String conversationId,
+    required String userId,
+  }) {
+    final normUser = _normalizeUserId(userId);
+    final visibleMsgs = getMessages(conversationId, userId: userId);
+    return visibleMsgs.where((m) {
+      final sender = m['sender_id']?.toString() ?? '';
+      final isFromUser = _normalizeUserId(sender) == normUser;
+      final readAt = m['read_at'];
+      return !isFromUser && (readAt == null || readAt.toString().isEmpty);
+    }).length;
   }
 
   void addMessage(Map<String, dynamic> msg) {
     final convId = msg['conversation_id']?.toString() ?? '';
     if (convId.isEmpty) return;
 
+    // Un-delete this conversation for all users so incoming messages appear
+    for (final set in _deletedConvsByUser.values) {
+      set.remove(convId);
+    }
+    _saveUserDeletedToPrefs();
+
     _messages.putIfAbsent(convId, () => []);
     final list = _messages[convId]!;
 
-    // Replace if id exists, otherwise append
     final id = msg['id']?.toString();
     final idx = list.indexWhere((m) => m['id']?.toString() == id);
     if (idx != -1) {
@@ -475,57 +735,122 @@ class _LocalChatStore {
       list.add(msg);
     }
 
-    // Update conversation last_message
     if (_conversations.containsKey(convId)) {
       _conversations[convId] = {
         ..._conversations[convId]!,
         'last_message': msg['text'] ?? '',
         'last_message_at': msg['created_at'] ?? '',
       };
+      _saveConvsToPrefs();
     }
+    _saveMsgsToPrefs();
 
     _msgController.add(null);
     _convController.add(null);
   }
 
-  void mergeSupabaseMessages(
+  void setSupabaseMessages(
       String conversationId, List<Map<String, dynamic>> remote) {
-    _messages.putIfAbsent(conversationId, () => []);
-    final existing = _messages[conversationId]!;
-    for (final r in remote) {
-      final rid = r['id']?.toString();
-      final idx = existing.indexWhere((m) => m['id']?.toString() == rid);
-      if (idx != -1) {
-        existing[idx] = r;
-      } else {
-        existing.add(r);
-      }
-    }
-    existing.sort((a, b) {
-      final ta = a['created_at']?.toString() ?? '';
-      final tb = b['created_at']?.toString() ?? '';
-      return ta.compareTo(tb);
-    });
+    final sorted = List<Map<String, dynamic>>.from(remote)
+      ..sort((a, b) {
+        final ta = a['created_at']?.toString() ?? '';
+        final tb = b['created_at']?.toString() ?? '';
+        return ta.compareTo(tb);
+      });
+
+    _messages[conversationId] = sorted;
+    _saveMsgsToPrefs();
     _msgController.add(null);
   }
 
-  void markRead(String conversationId, String userId) {
+  void markRead({
+    required String conversationId,
+    required String userId,
+  }) {
     final list = _messages[conversationId];
     if (list != null) {
+      final normUser = _normalizeUserId(userId);
       final now = DateTime.now().toUtc().toIso8601String();
+      bool changed = false;
       for (var i = 0; i < list.length; i++) {
-        final sid = list[i]['sender_id'] as String? ?? '';
-        final isSender = sid == userId || _isActorMatch(sid, userId);
-        if (!isSender && list[i]['read_at'] == null) {
+        final sid = list[i]['sender_id']?.toString() ?? '';
+        final isFromUser = _normalizeUserId(sid) == normUser;
+        if (!isFromUser &&
+            (list[i]['read_at'] == null ||
+                list[i]['read_at'].toString().isEmpty)) {
           list[i] = {...list[i], 'read_at': now};
+          changed = true;
         }
       }
+      if (changed) {
+        _saveMsgsToPrefs();
+        _msgController.add(null);
+        _convController.add(null);
+      }
+    }
+  }
+
+  void markAllRead({required String userId}) {
+    final normUser = _normalizeUserId(userId);
+    final now = DateTime.now().toUtc().toIso8601String();
+    bool changed = false;
+    for (final entry in _messages.entries) {
+      final list = entry.value;
+      for (var i = 0; i < list.length; i++) {
+        final sid = list[i]['sender_id']?.toString() ?? '';
+        final isFromUser = _normalizeUserId(sid) == normUser;
+        if (!isFromUser &&
+            (list[i]['read_at'] == null ||
+                list[i]['read_at'].toString().isEmpty)) {
+          list[i] = {...list[i], 'read_at': now};
+          changed = true;
+        }
+      }
+    }
+    if (changed) {
+      _saveMsgsToPrefs();
       _msgController.add(null);
       _convController.add(null);
     }
   }
 
   void _seedDefaultData() {
-    // Starts completely clean. Only real connections (Jeremiah Green) create genuine chat sessions.
+    final actorId = UserPersonaNotifier.actorDefaultId;
+    final ranveerId = TalentDirectory.ranveerSinghId;
+    final convId = 'conv-actor-ranveer';
+
+    final now = DateTime.now().toUtc();
+    final msg1Time = now.subtract(const Duration(minutes: 5)).toIso8601String();
+    final msg2Time = now.subtract(const Duration(minutes: 1)).toIso8601String();
+
+    _conversations[convId] = {
+      'id': convId,
+      'participant_a': actorId,
+      'participant_b': ranveerId,
+      'last_message': "Good Job Wajahat! I'm proud of you.",
+      'last_message_at': msg2Time,
+      'created_at': msg1Time,
+    };
+
+    _messages[convId] = [
+      {
+        'id': 'msg-ranveer-1',
+        'conversation_id': convId,
+        'sender_id': ranveerId,
+        'text': 'Hey Wajahat, saw your latest audition video!',
+        'media_url': null,
+        'created_at': msg1Time,
+        'read_at': null,
+      },
+      {
+        'id': 'msg-ranveer-2',
+        'conversation_id': convId,
+        'sender_id': ranveerId,
+        'text': "Good Job Wajahat! I'm proud of you.",
+        'media_url': null,
+        'created_at': msg2Time,
+        'read_at': null,
+      },
+    ];
   }
 }

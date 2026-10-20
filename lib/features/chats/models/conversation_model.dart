@@ -13,6 +13,8 @@ class ConversationModel {
   final int unreadCount;
   final bool isOnline;
   final TalentModel? peerTalent;
+  final bool isLastMessageMine;
+  final bool isLastMessageRead;
 
   const ConversationModel({
     required this.id,
@@ -27,6 +29,8 @@ class ConversationModel {
     this.unreadCount = 0,
     this.isOnline = true,
     this.peerTalent,
+    this.isLastMessageMine = false,
+    this.isLastMessageRead = false,
   });
 
   factory ConversationModel.fromRow({
@@ -34,6 +38,8 @@ class ConversationModel {
     required String currentUserId,
     required TalentModel peerTalent,
     int unreadCount = 0,
+    bool isLastMessageMine = false,
+    bool isLastMessageRead = false,
   }) {
     final partA = row['participant_a'] as String? ?? '';
     final partB = row['participant_b'] as String? ?? '';
@@ -54,6 +60,8 @@ class ConversationModel {
           : DateTime.now(),
       unreadCount: unreadCount,
       peerTalent: peerTalent,
+      isLastMessageMine: isLastMessageMine,
+      isLastMessageRead: isLastMessageRead,
     );
   }
 
@@ -70,6 +78,8 @@ class ConversationModel {
     int? unreadCount,
     bool? isOnline,
     TalentModel? peerTalent,
+    bool? isLastMessageMine,
+    bool? isLastMessageRead,
   }) {
     return ConversationModel(
       id: id ?? this.id,
@@ -84,6 +94,8 @@ class ConversationModel {
       unreadCount: unreadCount ?? this.unreadCount,
       isOnline: isOnline ?? this.isOnline,
       peerTalent: peerTalent ?? this.peerTalent,
+      isLastMessageMine: isLastMessageMine ?? this.isLastMessageMine,
+      isLastMessageRead: isLastMessageRead ?? this.isLastMessageRead,
     );
   }
 }
