@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:you_too_art/features/chats/providers/chat_provider.dart';
 
 class _NavItem {
   final String label;
@@ -49,6 +50,7 @@ class MainWrapper extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currentIndex = navigationShell.currentIndex;
+    final unreadChatCount = ref.watch(totalUnreadChatCountProvider);
 
     return Scaffold(
       body: navigationShell,
@@ -77,6 +79,56 @@ class MainWrapper extends ConsumerWidget {
                     final item = _items[index];
                     final isSelected = index == currentIndex;
 
+                    Widget iconWidget = SvgPicture.asset(
+                      item.svgPath,
+                      width: isSelected ? 20 : 22,
+                      height: isSelected ? 20 : 22,
+                      colorFilter: ColorFilter.mode(
+                        isSelected
+                            ? const Color(0xFF3899F3)
+                            : const Color(0xFF474B51),
+                        BlendMode.srcIn,
+                      ),
+                    );
+
+                    if (item.label == 'Chat' && unreadChatCount > 0) {
+                      iconWidget = Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          iconWidget,
+                          Positioned(
+                            top: -4,
+                            right: -6,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                                vertical: 1.5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF3899F3),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              constraints: const BoxConstraints(
+                                minWidth: 15,
+                                minHeight: 15,
+                              ),
+                              child: Center(
+                                child: Text(
+                                  unreadChatCount > 99 ? '99+' : '$unreadChatCount',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                    height: 1.0,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    }
+
                     return GestureDetector(
                       onTap: () {
                         navigationShell.goBranch(
@@ -103,17 +155,7 @@ class MainWrapper extends ConsumerWidget {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            SvgPicture.asset(
-                              item.svgPath,
-                              width: isSelected ? 20 : 22,
-                              height: isSelected ? 20 : 22,
-                              colorFilter: ColorFilter.mode(
-                                isSelected
-                                    ? const Color(0xFF3899F3)
-                                    : const Color(0xFF474B51),
-                                BlendMode.srcIn,
-                              ),
-                            ),
+                            iconWidget,
                             if (isSelected) ...[
                               const SizedBox(width: 6),
                               Text(

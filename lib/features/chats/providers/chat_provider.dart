@@ -121,11 +121,19 @@ class ChatListNotifier extends Notifier<ChatListState> {
             }
           }
 
-          // Compute unread count for active persona
-          int unreadCount = 0;
-          if (peerId == TalentDirectory.ranveerSinghId) {
-            unreadCount = 2; // Matches Figma badge
-          }
+          // Compute dynamic unread count and read status for active persona
+          final convId = row['id'] as String? ?? '';
+          final unreadCount = _chatRepo.getUnreadCount(
+            conversationId: convId,
+            userId: activeUserId,
+          );
+          final msgs = _chatRepo.getMessages(convId, userId: activeUserId);
+          final lastMsg = msgs.isNotEmpty ? msgs.last : null;
+          final isMine = lastMsg != null &&
+              _isActorMatch(lastMsg['sender_id']?.toString() ?? '', activeUserId);
+          final isRead = lastMsg != null &&
+              (lastMsg['read_at'] != null &&
+                  lastMsg['read_at'].toString().isNotEmpty);
 
           models.add(
             ConversationModel.fromRow(
@@ -133,6 +141,8 @@ class ChatListNotifier extends Notifier<ChatListState> {
               currentUserId: activeUserId,
               peerTalent: peerTalent,
               unreadCount: unreadCount,
+              isLastMessageMine: isMine,
+              isLastMessageRead: isRead,
             ),
           );
         }
@@ -243,13 +253,45 @@ class ChatListNotifier extends Notifier<ChatListState> {
     return convId;
   }
 
-  /// Delete a conversation and remove from list
+  /// Delete a conversation for the active user only and remove from their list
   Future<void> deleteConversation(String conversationId) async {
-    await _chatRepo.deleteConversation(conversationId);
+    final activePersona = ref.read(userPersonaProvider);
+    await _chatRepo.deleteConversation(
+      conversationId: conversationId,
+      userId: activePersona.id,
+    );
     state = state.copyWith(
       conversations: state.conversations
           .where((c) => c.id != conversationId)
           .toList(),
+    );
+  }
+
+  /// Mark all conversations as read for the active user
+  Future<void> markAllAsRead() async {
+    final activePersona = ref.read(userPersonaProvider);
+    await _chatRepo.markAllAsRead(userId: activePersona.id);
+    state = state.copyWith(
+      conversations: state.conversations
+          .map((c) => c.copyWith(unreadCount: 0))
+          .toList(),
+    );
+  }
+
+  /// Mark a specific conversation as read for the active user
+  Future<void> markConversationAsRead(String conversationId) async {
+    final activePersona = ref.read(userPersonaProvider);
+    await _chatRepo.markRead(
+      conversationId: conversationId,
+      userId: activePersona.id,
+    );
+    state = state.copyWith(
+      conversations: state.conversations.map((c) {
+        if (c.id == conversationId) {
+          return c.copyWith(unreadCount: 0);
+        }
+        return c;
+      }).toList(),
     );
   }
 
@@ -341,7 +383,9 @@ class ChatRoomNotifier extends Notifier<ChatRoomState> {
 
   void _subscribeToMessages(String convId, String activeUserId) {
     _msgSub?.cancel();
-    _msgSub = _chatRepo.watchMessages(convId).listen(
+    _msgSub = _chatRepo
+        .watchMessages(convId, userId: activeUserId)
+        .listen(
       (rows) {
         final messages = rows.map((r) => ChatMessageModel.fromJson(r)).toList();
         state = state.copyWith(
@@ -373,16 +417,22 @@ class ChatRoomNotifier extends Notifier<ChatRoomState> {
     }
   }
 
-  /// Clear all messages in this chat room
+  /// Clear messages in this chat room for the active user only
   Future<void> clearChat() async {
-    await _chatRepo.clearConversationMessages(arg.conversationId);
+    final activePersona = ref.read(userPersonaProvider);
+    await _chatRepo.clearConversationMessages(
+      conversationId: arg.conversationId,
+      userId: activePersona.id,
+    );
     state = state.copyWith(messages: []);
   }
 
-  /// Delete the entire conversation and pop from room
+  /// Delete the entire conversation for the active user only and pop from room
   Future<void> deleteChat() async {
-    await _chatRepo.deleteConversation(arg.conversationId);
-    ref.read(chatListProvider.notifier).deleteConversation(arg.conversationId);
+    state = state.copyWith(messages: []);
+    await ref
+        .read(chatListProvider.notifier)
+        .deleteConversation(arg.conversationId);
   }
 }
 
@@ -390,3 +440,9 @@ final chatRoomProvider =
     NotifierProvider.family<ChatRoomNotifier, ChatRoomState, ChatRoomArgs>(
   ChatRoomNotifier.new,
 );
+
+/// Provider calculating total unread messages across all conversations for the active user
+final totalUnreadChatCountProvider = Provider<int>((ref) {
+  final chatState = ref.watch(chatListProvider);
+  return chatState.conversations.fold<int>(0, (sum, c) => sum + c.unreadCount);
+});

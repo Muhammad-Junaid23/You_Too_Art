@@ -99,17 +99,20 @@ class _ChatsScreenState extends ConsumerState<ChatsScreen> {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      onSelected: (val) {
+                      onSelected: (val) async {
                         if (val == 'new_chat') {
                           _openNewChatModal();
                         } else if (val == 'mark_read') {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('All conversations marked as read'),
-                              duration: Duration(seconds: 1),
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
+                          await ref.read(chatListProvider.notifier).markAllAsRead();
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('All conversations marked as read'),
+                                duration: Duration(seconds: 1),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
                         }
                       },
                       itemBuilder: (context) => [
@@ -283,6 +286,9 @@ class _ChatsScreenState extends ConsumerState<ChatsScreen> {
                               child: ChatTile(
                                 conversation: conv,
                                 onTap: () {
+                                  ref
+                                      .read(chatListProvider.notifier)
+                                      .markConversationAsRead(conv.id);
                                   final peer = conv.peerTalent ??
                                       TalentModel(
                                         id: conv.peerId,
