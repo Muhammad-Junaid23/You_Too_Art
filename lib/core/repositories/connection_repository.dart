@@ -1,9 +1,13 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:you_too_art/core/constants/supabase_tables.dart';
+import 'package:you_too_art/core/constants/talent_directory.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
+import 'package:you_too_art/core/repositories/notification_repository.dart';
+import 'package:you_too_art/features/notifications/models/notification_item.dart';
 
 /// Centralized repository for managing user connections and follows.
 /// Synchronizes seamlessly with Supabase Postgres while maintaining a persistent
@@ -15,10 +19,22 @@ class ConnectionRepository {
 
   SupabaseQueryBuilder get _db => _client.from(SupabaseTables.connections);
 
-  static const String _connectionsPrefKey = 'yt_connections_store_v5';
+  static const String _connectionsPrefKey = 'yt_connections_clean_v1';
   static const String _followingPrefKeyPrefix = 'yt_following_set_';
 
   static bool? _isSupabaseTableAvailable;
+
+  /// Global broadcast stream of connection changes so all screens (Talent, Network, Notifications, Chat)
+  /// immediately update reactively whenever a connection is created, accepted, rejected, or removed.
+  static final StreamController<void> _changesController =
+      StreamController<void>.broadcast();
+  static Stream<void> get connectionChanges => _changesController.stream;
+
+  static void notifyChanges() {
+    if (!_changesController.isClosed) {
+      _changesController.add(null);
+    }
+  }
 
   static void resetSupabaseTableCheck() {
     _isSupabaseTableAvailable = null;
@@ -30,11 +46,32 @@ class ConnectionRepository {
     ).hasMatch(id);
   }
 
-  bool _isActorId(String id) {
-    if (id == UserPersonaNotifier.actorDefaultId) return true;
+  List<String> _actorIds() {
+    final ids = <String>{UserPersonaNotifier.actorDefaultId};
     final currentUid = _client.auth.currentUser?.id;
-    if (currentUid != null && id == currentUid) return true;
+    if (currentUid != null && currentUid.isNotEmpty) ids.add(currentUid);
+    try {
+      final actorPersona = UserPersonaNotifier.buildActorPersona();
+      ids.add(actorPersona.id);
+    } catch (_) {}
+    return ids.toList();
+  }
+
+  bool _isActorId(String id) {
+    return _actorIds().contains(id);
+  }
+
+  bool _isUserMatch(String a, String b) {
+    if (a == b) return true;
+    if (_isActorId(a) && _isActorId(b)) return true;
     return false;
+  }
+
+  String _toEffectiveId(String id) {
+    if (_isActorId(id)) {
+      return _client.auth.currentUser?.id ?? id;
+    }
+    return id;
   }
 
   void _recordSupabaseError(dynamic e) {
@@ -50,35 +87,12 @@ class ConnectionRepository {
         );
       }
     } else if (str.contains('400') || str.contains('violates foreign key')) {
-      // Table exists but foreign key constraint rejects non-auth or unseeded IDs.
-      // Operates safely with local persistent cache.
       if (kDebugMode) {
         debugPrint('ConnectionRepository local cache active for talent.');
       }
     } else if (kDebugMode) {
       debugPrint('ConnectionRepository Supabase notice: $e');
     }
-  }
-
-  /// Ensure initial relations exist.
-  /// Seeds initial mutual connection for Jeremiah Green only for clean testing.
-  /// Zero default pending requests so Alexander Cole and other talents can be tested cleanly.
-  Future<void> ensureDefaultMockConnections(String actorId) async {
-    final prefs = await SharedPreferences.getInstance();
-    if (prefs.containsKey(_connectionsPrefKey)) return;
-
-    final initialList = <Map<String, dynamic>>[
-      // Mutual accepted connection with Jeremiah Green
-      {
-        'id': 'conn-mock-jeremiah',
-        'user_id': UserPersonaNotifier.jeremiahId,
-        'connected_user_id': actorId,
-        'status': 'accepted',
-        'created_at': DateTime.now().subtract(const Duration(days: 1)).toIso8601String(),
-      },
-    ];
-
-    await prefs.setString(_connectionsPrefKey, jsonEncode(initialList));
   }
 
   Future<List<Map<String, dynamic>>> _loadLocalStore() async {
@@ -106,6 +120,30 @@ class ConnectionRepository {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_connectionsPrefKey, jsonEncode(items));
+    } catch (_) {}
+  }
+
+  Future<void> _mergeRowIntoLocalStore(Map<String, dynamic> row) async {
+    try {
+      final u1 = row['user_id']?.toString() ?? '';
+      final u2 = row['connected_user_id']?.toString() ?? '';
+      if (!isValidUuid(u1) || !isValidUuid(u2)) return;
+
+      final local = await _loadLocalStore();
+      final idx = local.indexWhere((item) {
+        final itemU1 = item['user_id']?.toString() ?? '';
+        final itemU2 = item['connected_user_id']?.toString() ?? '';
+        final direct = _isUserMatch(itemU1, u1) && _isUserMatch(itemU2, u2);
+        final reverse = _isUserMatch(itemU1, u2) && _isUserMatch(itemU2, u1);
+        return direct || reverse;
+      });
+
+      if (idx != -1) {
+        local[idx] = {...local[idx], ...row};
+      } else {
+        local.add(Map<String, dynamic>.from(row));
+      }
+      await _saveLocalStore(local);
     } catch (_) {}
   }
 
@@ -160,6 +198,32 @@ class ConnectionRepository {
         _recordSupabaseError(e);
       }
     }
+
+    // 3. Trigger realtime in-app notification for the target user
+    final actorTalent = TalentDirectory.findById(effectiveUserId);
+    final actorPersona = UserPersonaNotifier.allPersonas
+        .where((p) => p.id == effectiveUserId)
+        .firstOrNull;
+
+    final name = actorTalent?.name ??
+        actorPersona?.name ??
+        (_isActorId(effectiveUserId) ? 'Wajahat Ali (Actor)' : 'A fellow artist');
+    final avatarUrl = actorTalent?.avatarUrl ?? actorPersona?.avatarUrl;
+    final isFilmfare = effectiveUserId == UserPersonaNotifier.filmfareId ||
+        actorPersona?.isProductionHouse == true;
+
+    NotificationRepository.instance?.sendNotification(
+      recipientId: targetUserId,
+      actorId: effectiveUserId,
+      type: NotificationType.connectionRequest,
+      primarySubject: name,
+      actionText: 'sent you a connection request',
+      avatarUrl: avatarUrl,
+      isFilmfare: isFilmfare,
+      requestStatus: ConnectionRequestNotificationStatus.pending,
+    );
+
+    notifyChanges();
     return true;
   }
 
@@ -168,10 +232,8 @@ class ConnectionRepository {
     required String userId,
     required String senderUserId,
   }) async {
-    final effectiveUserId = _isActorId(userId)
-        ? (_client.auth.currentUser?.id ?? userId)
-        : userId;
-    final isCurrentActor = _isActorId(effectiveUserId);
+    final effectiveUserId = _toEffectiveId(userId);
+    final effectiveSenderId = _toEffectiveId(senderUserId);
 
     // 1. Update local cache
     final local = await _loadLocalStore();
@@ -179,10 +241,8 @@ class ConnectionRepository {
     for (var item in local) {
       final u1 = item['user_id'] as String? ?? '';
       final u2 = item['connected_user_id'] as String? ?? '';
-      final isDirect = (isCurrentActor ? _isActorId(u2) : u2 == effectiveUserId) &&
-          u1 == senderUserId;
-      final isReverse = (isCurrentActor ? _isActorId(u1) : u1 == effectiveUserId) &&
-          u2 == senderUserId;
+      final isDirect = _isUserMatch(u1, effectiveSenderId) && _isUserMatch(u2, effectiveUserId);
+      final isReverse = _isUserMatch(u1, effectiveUserId) && _isUserMatch(u2, effectiveSenderId);
 
       if (isDirect || isReverse) {
         item['status'] = 'accepted';
@@ -193,7 +253,7 @@ class ConnectionRepository {
     if (!found) {
       local.add({
         'id': 'conn-${DateTime.now().millisecondsSinceEpoch}',
-        'user_id': senderUserId,
+        'user_id': effectiveSenderId,
         'connected_user_id': effectiveUserId,
         'status': 'accepted',
         'created_at': DateTime.now().toUtc().toIso8601String(),
@@ -204,17 +264,53 @@ class ConnectionRepository {
     // 2. Sync to Supabase if table is available and both IDs are valid UUIDs
     if (_isSupabaseTableAvailable != false &&
         isValidUuid(effectiveUserId) &&
-        isValidUuid(senderUserId)) {
+        isValidUuid(effectiveSenderId)) {
       try {
         await _db
             .update({'status': 'accepted'})
-            .eq('user_id', senderUserId)
-            .eq('connected_user_id', effectiveUserId);
+            .or(
+              'and(user_id.eq.$effectiveSenderId,connected_user_id.eq.$effectiveUserId),'
+              'and(user_id.eq.$effectiveUserId,connected_user_id.eq.$effectiveSenderId)',
+            );
         _isSupabaseTableAvailable = true;
       } catch (e) {
         _recordSupabaseError(e);
       }
     }
+
+    // 3. Synchronize notifications so the incoming connection request card
+    // is instantly updated to "Connected" and marked read across all screens!
+    await NotificationRepository.instance?.syncConnectionStatus(
+      recipientId: effectiveUserId,
+      senderUserId: senderUserId,
+      status: ConnectionRequestNotificationStatus.accepted,
+    );
+
+    // 4. Send "connection_accepted" realtime notification back to the sender
+    final actorTalent = TalentDirectory.findById(effectiveUserId);
+    final actorPersona = UserPersonaNotifier.allPersonas
+        .where((p) => p.id == effectiveUserId)
+        .firstOrNull;
+
+    final name = actorTalent?.name ??
+        actorPersona?.name ??
+        (_isActorId(effectiveUserId) ? 'Wajahat Ali (Actor)' : 'A fellow artist');
+    final avatarUrl = actorTalent?.avatarUrl ?? actorPersona?.avatarUrl;
+    final isFilmfare = effectiveUserId == UserPersonaNotifier.filmfareId ||
+        actorPersona?.isProductionHouse == true;
+
+    NotificationRepository.instance?.sendNotification(
+      recipientId: senderUserId,
+      actorId: effectiveUserId,
+      type: NotificationType.connectionAccepted,
+      primarySubject: name,
+      actionText: 'accepted your connection request',
+      avatarUrl: avatarUrl,
+      isFilmfare: isFilmfare,
+      requestStatus: ConnectionRequestNotificationStatus.accepted,
+    );
+
+    notifyChanges();
     return true;
   }
 
@@ -223,35 +319,45 @@ class ConnectionRepository {
     required String userId,
     required String senderUserId,
   }) async {
-    final effectiveUserId = _isActorId(userId)
-        ? (_client.auth.currentUser?.id ?? userId)
-        : userId;
-    final isCurrentActor = _isActorId(effectiveUserId);
+    final effectiveUserId = _toEffectiveId(userId);
+    final effectiveSenderId = _toEffectiveId(senderUserId);
 
     // 1. Update local cache
     final local = await _loadLocalStore();
     local.removeWhere((item) {
       final u1 = item['user_id'] as String? ?? '';
       final u2 = item['connected_user_id'] as String? ?? '';
-      return (isCurrentActor ? _isActorId(u2) : u2 == effectiveUserId) &&
-          u1 == senderUserId;
+      final isDirect = _isUserMatch(u1, effectiveSenderId) && _isUserMatch(u2, effectiveUserId);
+      final isReverse = _isUserMatch(u1, effectiveUserId) && _isUserMatch(u2, effectiveSenderId);
+      return isDirect || isReverse;
     });
     await _saveLocalStore(local);
 
     // 2. Sync to Supabase if table is available and both IDs are valid UUIDs
     if (_isSupabaseTableAvailable != false &&
         isValidUuid(effectiveUserId) &&
-        isValidUuid(senderUserId)) {
+        isValidUuid(effectiveSenderId)) {
       try {
         await _db
             .delete()
-            .eq('user_id', senderUserId)
-            .eq('connected_user_id', effectiveUserId);
+            .or(
+              'and(user_id.eq.$effectiveSenderId,connected_user_id.eq.$effectiveUserId),'
+              'and(user_id.eq.$effectiveUserId,connected_user_id.eq.$effectiveSenderId)',
+            );
         _isSupabaseTableAvailable = true;
       } catch (e) {
         _recordSupabaseError(e);
       }
     }
+
+    // 3. Synchronize notifications so incoming request card shows "Request rejected"
+    await NotificationRepository.instance?.syncConnectionStatus(
+      recipientId: effectiveUserId,
+      senderUserId: senderUserId,
+      status: ConnectionRequestNotificationStatus.rejected,
+    );
+
+    notifyChanges();
     return true;
   }
 
@@ -260,20 +366,16 @@ class ConnectionRepository {
     required String userId,
     required String connectedUserId,
   }) async {
-    final effectiveUserId = _isActorId(userId)
-        ? (_client.auth.currentUser?.id ?? userId)
-        : userId;
-    final isCurrentActor = _isActorId(effectiveUserId);
+    final effectiveUserId = _toEffectiveId(userId);
+    final effectiveConnectedId = _toEffectiveId(connectedUserId);
 
     // 1. Update local cache
     final local = await _loadLocalStore();
     local.removeWhere((item) {
       final u1 = item['user_id'] as String? ?? '';
       final u2 = item['connected_user_id'] as String? ?? '';
-      final isDirect = (isCurrentActor ? _isActorId(u1) : u1 == effectiveUserId) &&
-          u2 == connectedUserId;
-      final isReverse = (isCurrentActor ? _isActorId(u2) : u2 == effectiveUserId) &&
-          u1 == connectedUserId;
+      final isDirect = _isUserMatch(u1, effectiveUserId) && _isUserMatch(u2, effectiveConnectedId);
+      final isReverse = _isUserMatch(u1, effectiveConnectedId) && _isUserMatch(u2, effectiveUserId);
       return isDirect || isReverse;
     });
     await _saveLocalStore(local);
@@ -281,121 +383,205 @@ class ConnectionRepository {
     // 2. Sync to Supabase if table is available and both IDs are valid UUIDs
     if (_isSupabaseTableAvailable != false &&
         isValidUuid(effectiveUserId) &&
-        isValidUuid(connectedUserId)) {
+        isValidUuid(effectiveConnectedId)) {
       try {
         await _db
             .delete()
-            .eq('user_id', effectiveUserId)
-            .eq('connected_user_id', connectedUserId);
-        await _db
-            .delete()
-            .eq('user_id', connectedUserId)
-            .eq('connected_user_id', effectiveUserId);
+            .or(
+              'and(user_id.eq.$effectiveUserId,connected_user_id.eq.$effectiveConnectedId),'
+              'and(user_id.eq.$effectiveConnectedId,connected_user_id.eq.$effectiveUserId)',
+            );
         _isSupabaseTableAvailable = true;
       } catch (e) {
         _recordSupabaseError(e);
       }
     }
+
+    // 3. Reset notification status so UI reflects removed connection
+    await NotificationRepository.instance?.syncConnectionStatus(
+      recipientId: effectiveUserId,
+      senderUserId: connectedUserId,
+      status: ConnectionRequestNotificationStatus.none,
+    );
+
+    notifyChanges();
     return true;
   }
 
   /// Fetch incoming pending requests for [userId].
   Future<List<Map<String, dynamic>>> fetchIncomingRequests(String userId) async {
-    final effectiveUserId = _isActorId(userId)
-        ? (_client.auth.currentUser?.id ?? userId)
-        : userId;
+    final effectiveUserId = _toEffectiveId(userId);
 
     if (_isSupabaseTableAvailable != false && isValidUuid(effectiveUserId)) {
       try {
+        final isActor = _isActorId(effectiveUserId);
+        final queryIds = isActor
+            ? _actorIds().where(isValidUuid).join(',')
+            : effectiveUserId;
+
         final data = await _db
             .select()
-            .eq('connected_user_id', effectiveUserId)
-            .eq('status', 'pending');
+            .eq('status', 'pending')
+            .or('connected_user_id.in.($queryIds)');
         _isSupabaseTableAvailable = true;
         final list = List<Map<String, dynamic>>.from(data as List);
-        if (list.isNotEmpty) return list;
+        if (list.isNotEmpty) {
+          for (final row in list) {
+            await _mergeRowIntoLocalStore(row);
+          }
+          return list;
+        }
       } catch (e) {
         _recordSupabaseError(e);
       }
     }
 
     // Fallback to local store with actor normalization
-    final isCurrentActor = _isActorId(effectiveUserId);
     final local = await _loadLocalStore();
     return local.where((item) {
       final u2 = item['connected_user_id'] as String? ?? '';
-      final isMatch = isCurrentActor ? _isActorId(u2) : u2 == effectiveUserId;
-      return isMatch && item['status'] == 'pending';
+      return _isUserMatch(u2, effectiveUserId) && item['status'] == 'pending';
     }).toList();
   }
 
   /// Fetch outgoing pending requests sent by [userId].
   Future<List<Map<String, dynamic>>> fetchOutgoingRequests(String userId) async {
-    final effectiveUserId = _isActorId(userId)
-        ? (_client.auth.currentUser?.id ?? userId)
-        : userId;
+    final effectiveUserId = _toEffectiveId(userId);
 
     if (_isSupabaseTableAvailable != false && isValidUuid(effectiveUserId)) {
       try {
+        final isActor = _isActorId(effectiveUserId);
+        final queryIds = isActor
+            ? _actorIds().where(isValidUuid).join(',')
+            : effectiveUserId;
+
         final data = await _db
             .select()
-            .eq('user_id', effectiveUserId)
-            .eq('status', 'pending');
+            .eq('status', 'pending')
+            .or('user_id.in.($queryIds)');
         _isSupabaseTableAvailable = true;
         final list = List<Map<String, dynamic>>.from(data as List);
-        if (list.isNotEmpty) return list;
+        if (list.isNotEmpty) {
+          for (final row in list) {
+            await _mergeRowIntoLocalStore(row);
+          }
+          return list;
+        }
       } catch (e) {
         _recordSupabaseError(e);
       }
     }
 
-    final isCurrentActor = _isActorId(effectiveUserId);
     final local = await _loadLocalStore();
     return local.where((item) {
       final u1 = item['user_id'] as String? ?? '';
-      final isMatch = isCurrentActor ? _isActorId(u1) : u1 == effectiveUserId;
-      return isMatch && item['status'] == 'pending';
+      return _isUserMatch(u1, effectiveUserId) && item['status'] == 'pending';
     }).toList();
   }
 
   /// Fetch accepted connections for [userId].
   Future<List<Map<String, dynamic>>> fetchAcceptedConnections(String userId) async {
-    final effectiveUserId = _isActorId(userId)
-        ? (_client.auth.currentUser?.id ?? userId)
-        : userId;
+    final effectiveUserId = _toEffectiveId(userId);
 
     if (_isSupabaseTableAvailable != false && isValidUuid(effectiveUserId)) {
       try {
-        final sent = await _db
+        final isActor = _isActorId(effectiveUserId);
+        final queryIds = isActor
+            ? _actorIds().where(isValidUuid).join(',')
+            : effectiveUserId;
+
+        final data = await _db
             .select()
-            .eq('user_id', effectiveUserId)
-            .eq('status', 'accepted');
-        final received = await _db
-            .select()
-            .eq('connected_user_id', effectiveUserId)
-            .eq('status', 'accepted');
+            .eq('status', 'accepted')
+            .or('user_id.in.($queryIds),connected_user_id.in.($queryIds)');
 
         _isSupabaseTableAvailable = true;
-        final all = <Map<String, dynamic>>[
-          ...List<Map<String, dynamic>>.from(sent as List),
-          ...List<Map<String, dynamic>>.from(received as List),
-        ];
-        if (all.isNotEmpty) return all;
+        final all = List<Map<String, dynamic>>.from(data as List);
+        if (all.isNotEmpty) {
+          for (final row in all) {
+            await _mergeRowIntoLocalStore(row);
+          }
+          return all;
+        }
       } catch (e) {
         _recordSupabaseError(e);
       }
     }
 
-    final isCurrentActor = _isActorId(effectiveUserId);
     final local = await _loadLocalStore();
     return local.where((item) {
       final u1 = item['user_id'] as String? ?? '';
       final u2 = item['connected_user_id'] as String? ?? '';
-      final isMatch = isCurrentActor
-          ? (_isActorId(u1) || _isActorId(u2))
-          : (u1 == effectiveUserId || u2 == effectiveUserId);
+      final isMatch = _isUserMatch(u1, effectiveUserId) || _isUserMatch(u2, effectiveUserId);
       return isMatch && item['status'] == 'accepted';
     }).toList();
+  }
+
+  /// Fetch all relationship statuses for [currentUserId] across all users in one batch.
+  /// Returns a map from peerId -> status ('none', 'pending_outgoing', 'pending_incoming', 'accepted').
+  Future<Map<String, String>> getAllRelationshipStatuses(String currentUserId) async {
+    final effectiveUserId = _toEffectiveId(currentUserId);
+    final Map<String, String> statusMap = {};
+
+    // 1. Fetch from Supabase Postgres
+    if (_isSupabaseTableAvailable != false && isValidUuid(effectiveUserId)) {
+      try {
+        final isActor = _isActorId(effectiveUserId);
+        final queryIds = isActor
+            ? _actorIds().where(isValidUuid).join(',')
+            : effectiveUserId;
+
+        final rows = await _db
+            .select()
+            .or('user_id.in.($queryIds),connected_user_id.in.($queryIds)');
+
+        if (rows.isNotEmpty) {
+          _isSupabaseTableAvailable = true;
+          for (final row in rows) {
+            await _mergeRowIntoLocalStore(row);
+
+            final u1 = row['user_id']?.toString() ?? '';
+            final u2 = row['connected_user_id']?.toString() ?? '';
+            final isSender = _isUserMatch(u1, effectiveUserId);
+            final peerId = isSender ? u2 : u1;
+            final status = row['status']?.toString() ?? 'none';
+
+            if (status == 'accepted') {
+              statusMap[peerId] = 'accepted';
+            } else if (status == 'pending') {
+              statusMap[peerId] =
+                  isSender ? 'pending_outgoing' : 'pending_incoming';
+            }
+          }
+        }
+      } catch (e) {
+        _recordSupabaseError(e);
+      }
+    }
+
+    // 2. Overlay with local store
+    final local = await _loadLocalStore();
+    for (final item in local) {
+      final u1 = item['user_id'] as String? ?? '';
+      final u2 = item['connected_user_id'] as String? ?? '';
+      final isSender = _isUserMatch(u1, effectiveUserId);
+      final isReceiver = _isUserMatch(u2, effectiveUserId);
+      if (!isSender && !isReceiver) continue;
+
+      final peerId = isSender ? u2 : u1;
+      // Do not downgrade an accepted status from Supabase
+      if (statusMap[peerId] == 'accepted') continue;
+
+      final status = item['status'] as String? ?? 'none';
+      if (status == 'accepted') {
+        statusMap[peerId] = 'accepted';
+      } else if (status == 'pending') {
+        statusMap[peerId] =
+            isSender ? 'pending_outgoing' : 'pending_incoming';
+      }
+    }
+
+    return statusMap;
   }
 
   /// Get relationship status between [currentUserId] and [targetUserId].
@@ -404,24 +590,58 @@ class ConnectionRepository {
     required String currentUserId,
     required String targetUserId,
   }) async {
-    final effectiveUserId = _isActorId(currentUserId)
-        ? (_client.auth.currentUser?.id ?? currentUserId)
-        : currentUserId;
-    final isCurrentActor = _isActorId(effectiveUserId);
+    final effectiveUserId = _toEffectiveId(currentUserId);
+    final effectiveTargetId = _toEffectiveId(targetUserId);
 
+    // 1. Check Supabase first if available
+    if (_isSupabaseTableAvailable != false &&
+        isValidUuid(effectiveUserId) &&
+        isValidUuid(effectiveTargetId)) {
+      try {
+        final isUserActor = _isActorId(effectiveUserId);
+        final isTargetActor = _isActorId(effectiveTargetId);
+        final userIds = isUserActor
+            ? _actorIds().where(isValidUuid).join(',')
+            : effectiveUserId;
+        final targetIds = isTargetActor
+            ? _actorIds().where(isValidUuid).join(',')
+            : effectiveTargetId;
+
+        final data = await _db
+            .select()
+            .or(
+              'and(user_id.in.($userIds),connected_user_id.in.($targetIds)),'
+              'and(user_id.in.($targetIds),connected_user_id.in.($userIds))',
+            )
+            .maybeSingle();
+
+        if (data != null) {
+          _isSupabaseTableAvailable = true;
+          await _mergeRowIntoLocalStore(data);
+
+          final status = data['status']?.toString() ?? 'none';
+          if (status == 'accepted') return 'accepted';
+          if (status == 'pending') {
+            final sender = data['user_id']?.toString() ?? '';
+            final isOutgoing = _isUserMatch(sender, effectiveUserId);
+            return isOutgoing ? 'pending_outgoing' : 'pending_incoming';
+          }
+        }
+      } catch (e) {
+        _recordSupabaseError(e);
+      }
+    }
+
+    // 2. Fallback to resilient local cache
     final local = await _loadLocalStore();
     for (var item in local) {
       final u1 = item['user_id'] as String? ?? '';
       final u2 = item['connected_user_id'] as String? ?? '';
 
-      final isUserMatch = isCurrentActor ? _isActorId(u1) : u1 == effectiveUserId;
-      final isTargetMatch = u2 == targetUserId;
-
-      final isReverseUserMatch = isCurrentActor ? _isActorId(u2) : u2 == effectiveUserId;
-      final isReverseTargetMatch = u1 == targetUserId;
-
-      final isDirect = isUserMatch && isTargetMatch;
-      final isReverse = isReverseUserMatch && isReverseTargetMatch;
+      final isDirect =
+          _isUserMatch(u1, effectiveUserId) && _isUserMatch(u2, effectiveTargetId);
+      final isReverse =
+          _isUserMatch(u2, effectiveUserId) && _isUserMatch(u1, effectiveTargetId);
 
       if (isDirect || isReverse) {
         final status = item['status'] as String? ?? 'none';

@@ -441,7 +441,7 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Clear Chat?'),
         content: const Text(
-          'All messages in this conversation will be permanently removed.',
+          'All messages in this conversation will be cleared from your view.',
         ),
         actions: [
           TextButton(

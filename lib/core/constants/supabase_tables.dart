@@ -13,4 +13,5 @@ class SupabaseTables {
   static const String castingCalls = 'casting_calls';
   static const String castingApplications = 'casting_applications';
   static const String portfolioItems = 'portfolio_items';
+  static const String notifications = 'notifications';
 }

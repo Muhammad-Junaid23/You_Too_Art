@@ -326,11 +326,6 @@ class TalentDirectory {
         jeremiahGreen,
         filmfare,
         alexanderCole,
-        sophiaVance,
-        marcusChen,
-        elenaRostova,
-        davidKalu,
-        lucasScott,
       ];
 
   static final Map<String, TalentModel> _byId = {

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:you_too_art/core/constants/talent_directory.dart';
 import 'package:you_too_art/core/providers/supabase_providers.dart';
@@ -63,11 +64,20 @@ class NetworkState {
 class NetworkNotifier extends Notifier<NetworkState> {
   late ConnectionRepository _connectionRepo;
   late UserPersona _activePersona;
+  StreamSubscription<void>? _connSub;
 
   @override
   NetworkState build() {
     _connectionRepo = ref.watch(connectionRepositoryProvider);
     _activePersona = ref.watch(userPersonaProvider);
+
+    _connSub?.cancel();
+    _connSub = ConnectionRepository.connectionChanges.listen((_) {
+      _loadNetworkData();
+    });
+    ref.onDispose(() {
+      _connSub?.cancel();
+    });
 
     Future.microtask(() => _loadNetworkData());
     return const NetworkState(isLoading: true);
@@ -116,7 +126,6 @@ class NetworkNotifier extends Notifier<NetworkState> {
 
   Future<void> _loadNetworkData() async {
     final actorPersona = UserPersonaNotifier.buildActorPersona();
-    await _connectionRepo.ensureDefaultMockConnections(actorPersona.id);
 
     // 1. Fetch incoming requests
     final incomingRaw =
@@ -148,20 +157,38 @@ class NetworkNotifier extends Notifier<NetworkState> {
         name: talent.name,
         roles: talent.roles,
         avatarUrl: talent.avatarUrl,
-        connectedTimeAgo: 'Connected, Yesterday',
-        talentModel: talent.copyWith(connectionStatus: ConnectionStatus.connected),
+        connectedTimeAgo: 'Connected',
+        talentModel:
+            talent.copyWith(connectionStatus: ConnectionStatus.connected),
       );
     }).toList();
 
-    // 3. Suggestions using canonical talents from TalentDirectory
-    final suggestionTemplates = [
+    // 3. Suggestions using canonical test personas (excluding self and already connected/incoming)
+    final connectedIds = connectionItems.map((c) => c.id).toSet();
+    final requestedIds = requestItems.map((r) => r.id).toSet();
+
+    final actorTalent = TalentModel(
+      id: actorPersona.id,
+      name: actorPersona.name,
+      roles: actorPersona.role,
+      avatarUrl: actorPersona.avatarUrl,
+      email: actorPersona.email,
+      bio: 'Professional performing artist on You Too Art.',
+      isProductionHouse: false,
+    );
+
+    final candidateTalents = [
+      actorTalent,
       TalentDirectory.jeremiahGreen,
-      TalentDirectory.sophiaVance,
-      TalentDirectory.marcusChen,
-    ].where((t) => t.id != _activePersona.id).toList();
+      TalentDirectory.alexanderCole,
+      TalentDirectory.filmfare,
+    ].where((t) =>
+        t.id != _activePersona.id &&
+        !connectedIds.contains(t.id) &&
+        !requestedIds.contains(t.id)).toList();
 
     final suggestions = <NetworkSuggestionItem>[];
-    for (final talent in suggestionTemplates) {
+    for (final talent in candidateTalents) {
       final rel = await _connectionRepo.getRelationshipStatus(
         currentUserId: _activePersona.id,
         targetUserId: talent.id,
@@ -185,44 +212,12 @@ class NetworkNotifier extends Notifier<NetworkState> {
       );
     }
 
-    // 4. Recommendations using canonical talents from TalentDirectory
-    final recommendationTemplates = [
-      TalentDirectory.elenaRostova,
-      TalentDirectory.davidKalu,
-      TalentDirectory.lucasScott,
-    ].where((t) => t.id != _activePersona.id).toList();
-
-    final recommendations = <NetworkSuggestionItem>[];
-    for (final talent in recommendationTemplates) {
-      final rel = await _connectionRepo.getRelationshipStatus(
-        currentUserId: _activePersona.id,
-        targetUserId: talent.id,
-      );
-      final isReq = rel == 'pending_outgoing';
-      recommendations.add(
-        NetworkSuggestionItem(
-          id: talent.id,
-          name: talent.name,
-          roles: talent.roles,
-          avatarUrl: talent.avatarUrl,
-          isRequested: isReq,
-          talentModel: talent.copyWith(
-            connectionStatus: isReq
-                ? ConnectionStatus.pendingOutgoing
-                : (rel == 'accepted'
-                    ? ConnectionStatus.connected
-                    : ConnectionStatus.none),
-          ),
-        ),
-      );
-    }
-
     state = state.copyWith(
       activeTab: state.activeTab,
       requests: requestItems,
       connections: connectionItems,
       suggestions: suggestions,
-      recommendations: recommendations,
+      recommendations: const [],
       isLoading: false,
     );
   }
