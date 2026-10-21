@@ -68,6 +68,7 @@ class ChatListNotifier extends Notifier<ChatListState> {
   late ChatRepository _chatRepo;
   late ConnectionRepository _connectionRepo;
   StreamSubscription<List<Map<String, dynamic>>>? _convSub;
+  StreamSubscription<void>? _connSub;
 
   @override
   ChatListState build() {
@@ -76,9 +77,15 @@ class ChatListNotifier extends Notifier<ChatListState> {
 
     final activePersona = ref.watch(userPersonaProvider);
 
-    // Clean up previous subscription if persona changed
+    // Clean up previous subscriptions if persona changed
+    _connSub?.cancel();
+    _connSub = ConnectionRepository.connectionChanges.listen((_) {
+      refreshConnections();
+    });
+
     ref.onDispose(() {
       _convSub?.cancel();
+      _connSub?.cancel();
     });
 
     _subscribeToConversations(activePersona.id);

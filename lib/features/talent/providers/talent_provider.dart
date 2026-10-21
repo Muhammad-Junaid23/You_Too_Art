@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:you_too_art/core/constants/supabase_tables.dart';
 import 'package:you_too_art/core/constants/talent_directory.dart';
@@ -60,11 +61,20 @@ class TalentState {
 class TalentNotifier extends Notifier<TalentState> {
   late ConnectionRepository _connectionRepo;
   late UserPersona _activePersona;
+  StreamSubscription<void>? _connSub;
 
   @override
   TalentState build() {
     _connectionRepo = ref.watch(connectionRepositoryProvider);
     _activePersona = ref.watch(userPersonaProvider);
+
+    _connSub?.cancel();
+    _connSub = ConnectionRepository.connectionChanges.listen((_) {
+      fetchTalents();
+    });
+    ref.onDispose(() {
+      _connSub?.cancel();
+    });
 
     Future.microtask(() => fetchTalents());
     return const TalentState(isLoading: true);
@@ -75,8 +85,6 @@ class TalentNotifier extends Notifier<TalentState> {
 
     try {
       final actorPersona = UserPersonaNotifier.buildActorPersona();
-      await _connectionRepo.ensureDefaultMockConnections(actorPersona.id);
-
       final followingIds =
           await _connectionRepo.getFollowingIds(_activePersona.id);
 
@@ -122,13 +130,20 @@ class TalentNotifier extends Notifier<TalentState> {
       final filteredForSelf =
           combined.where((t) => t.id != _activePersona.id).toList();
 
-      // Resolve relationship status for each talent with active persona
+      // Resolve relationship status for all talents with active persona in one batch
+      final relMap =
+          await _connectionRepo.getAllRelationshipStatuses(_activePersona.id);
+
       final resolvedTalents = <TalentModel>[];
       for (final talent in filteredForSelf) {
-        final rel = await _connectionRepo.getRelationshipStatus(
-          currentUserId: _activePersona.id,
-          targetUserId: talent.id,
-        );
+        String rel = relMap[talent.id] ?? 'none';
+        if (rel == 'none' &&
+            (talent.id == UserPersonaNotifier.actorDefaultId ||
+                talent.id == actorPersona.id)) {
+          rel = relMap[UserPersonaNotifier.actorDefaultId] ??
+              relMap[actorPersona.id] ??
+              'none';
+        }
 
         ConnectionStatus status = ConnectionStatus.none;
         if (rel == 'accepted') {

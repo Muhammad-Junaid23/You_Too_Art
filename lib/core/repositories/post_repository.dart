@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:you_too_art/core/constants/supabase_tables.dart';
+import 'package:you_too_art/core/constants/talent_directory.dart';
+import 'package:you_too_art/core/providers/user_persona_provider.dart';
 
 /// Repository for social feed post operations.
 ///
@@ -135,11 +137,55 @@ class PostRepository {
           'user_id': userId,
           'created_at': DateTime.now().toUtc().toIso8601String(),
         });
+        _notifyPostAuthorOnLike(postId: postId, likingUserId: userId);
       }
     } catch (e) {
       if (kDebugMode) debugPrint('PostRepository.toggleLike: $e');
       rethrow;
     }
+  }
+
+  void _notifyPostAuthorOnLike({
+    required String postId,
+    required String likingUserId,
+  }) async {
+    try {
+      final post = await _db
+          .select('author_id, title, content')
+          .eq('id', postId)
+          .maybeSingle();
+      if (post == null) return;
+      final authorId = post['author_id']?.toString() ?? '';
+      if (authorId.isEmpty || authorId == likingUserId) return;
+
+      final likingTalent = TalentDirectory.findById(likingUserId);
+      final likingPersona = UserPersonaNotifier.allPersonas
+          .where((p) => p.id == likingUserId)
+          .firstOrNull;
+
+      final name = likingTalent?.name ??
+          likingPersona?.name ??
+          (likingUserId == UserPersonaNotifier.actorDefaultId
+              ? 'Wajahat Ali (Actor)'
+              : 'A fellow artist');
+      final avatarUrl = likingTalent?.avatarUrl ?? likingPersona?.avatarUrl;
+      final isFilmfare = likingUserId == UserPersonaNotifier.filmfareId ||
+          likingPersona?.isProductionHouse == true;
+
+      await _client.from(SupabaseTables.notifications).insert({
+        'recipient_id': authorId,
+        'actor_id': likingUserId,
+        'type': 'post_like',
+        'primary_subject': name,
+        'action_text': 'liked your post',
+        'avatar_url': avatarUrl,
+        'is_filmfare': isFilmfare,
+        'entity_type': 'post',
+        'entity_id': postId,
+        'request_status': 'none',
+        'is_read': false,
+      });
+    } catch (_) {}
   }
 
   // ─── Comments ─────────────────────────────────────

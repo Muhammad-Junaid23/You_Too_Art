@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:you_too_art/app/config/routes.dart';
 import 'package:you_too_art/core/providers/supabase_providers.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
+import 'package:you_too_art/core/repositories/connection_repository.dart';
 import 'package:you_too_art/core/widgets/app_avatar.dart';
 import 'package:you_too_art/features/chats/providers/chat_provider.dart';
 import 'package:you_too_art/features/home/widgets/post_card.dart';
@@ -26,12 +28,22 @@ class UserProfileScreen extends ConsumerStatefulWidget {
 class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
   int _selectedTabIndex = 0;
   ConnectionStatus? _currentStatus;
+  StreamSubscription<void>? _connSub;
 
   @override
   void initState() {
     super.initState();
     _currentStatus = widget.initialTalent.connectionStatus;
+    _connSub = ConnectionRepository.connectionChanges.listen((_) {
+      if (mounted) _resolveStatus();
+    });
     _resolveStatus();
+  }
+
+  @override
+  void dispose() {
+    _connSub?.cancel();
+    super.dispose();
   }
 
   Future<void> _resolveStatus() async {
@@ -645,7 +657,8 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
         );
       }
     } else {
-      switch (talent.connectionStatus) {
+      final effectiveStatus = _currentStatus ?? talent.connectionStatus;
+      switch (effectiveStatus) {
         case ConnectionStatus.none:
           return SizedBox(
             width: 220,

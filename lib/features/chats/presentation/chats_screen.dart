@@ -249,7 +249,7 @@ class _ChatsScreenState extends ConsumerState<ChatsScreen> {
                                     ),
                                     title: const Text('Delete Conversation?'),
                                     content: Text(
-                                      'Delete conversation with ${conv.peerName}? All messages will be permanently removed.',
+                                      'Delete conversation with ${conv.peerName}? This will remove it from your chats.',
                                     ),
                                     actions: [
                                       TextButton(

@@ -5,7 +5,6 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:you_too_art/core/constants/supabase_tables.dart';
-import 'package:you_too_art/core/constants/talent_directory.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
 
 /// Repository for 1:1 chat conversations and messages.
@@ -83,6 +82,8 @@ class ChatRepository {
         if (existing != null) {
           _isSupabaseTableAvailable = true;
           _LocalChatStore.instance.registerConversation(existing);
+          _LocalChatStore.instance
+              .undeleteForUser(existing['id'].toString(), userA);
           return existing;
         }
 
@@ -101,6 +102,8 @@ class ChatRepository {
 
         _isSupabaseTableAvailable = true;
         _LocalChatStore.instance.registerConversation(inserted);
+        _LocalChatStore.instance
+            .undeleteForUser(inserted['id'].toString(), userA);
         return inserted;
       } catch (e) {
         _recordSupabaseError(e);
@@ -373,7 +376,8 @@ class ChatRepository {
     }
   }
 
-  /// Clear messages in a conversation for [userId] only.
+  /// Clear messages in a conversation for [userId] (Clear for me).
+  /// The other participant's message history remains completely intact.
   Future<void> clearConversationMessages({
     required String conversationId,
     required String userId,
@@ -384,7 +388,8 @@ class ChatRepository {
     );
   }
 
-  /// Delete a conversation for [userId] only (hide from their inbox).
+  /// Delete a conversation for [userId] (Delete for me).
+  /// The other participant's conversation and messages remain completely intact.
   Future<void> deleteConversation({
     required String conversationId,
     required String userId,
@@ -423,11 +428,11 @@ class _LocalChatStore {
   }
   static final _LocalChatStore instance = _LocalChatStore._();
 
-  static const String _deletedConvsByUserKey = 'yt_user_deleted_convs_v4';
+  static const String _deletedConvsByUserKey = 'yt_user_deleted_convs_clean_v3';
   static const String _clearedTimestampsByUserKey =
-      'yt_user_cleared_timestamps_v4';
-  static const String _localConvsKey = 'yt_local_conversations_v4';
-  static const String _localMsgsKey = 'yt_local_messages_v4';
+      'yt_user_cleared_timestamps_clean_v3';
+  static const String _localConvsKey = 'yt_local_conversations_clean_v3';
+  static const String _localMsgsKey = 'yt_local_messages_clean_v3';
 
   final Map<String, Set<String>> _deletedConvsByUser = {};
   final Map<String, Map<String, DateTime>> _clearedTimestampsByUser = {};
@@ -458,9 +463,37 @@ class _LocalChatStore {
     return isA && isB;
   }
 
+  List<String> _allUserKeys(String uid) {
+    final keys = <String>{uid};
+    final norm = _normalizeUserId(uid);
+    keys.add(norm);
+    try {
+      final actor = UserPersonaNotifier.buildActorPersona();
+      if (uid == UserPersonaNotifier.actorDefaultId ||
+          uid == actor.id ||
+          norm == UserPersonaNotifier.actorDefaultId) {
+        keys.add(UserPersonaNotifier.actorDefaultId);
+        keys.add(actor.id);
+        final curId = Supabase.instance.client.auth.currentUser?.id;
+        if (curId != null) keys.add(curId);
+      }
+    } catch (_) {}
+    return keys.toList();
+  }
+
   Future<void> _loadFromPrefs() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+
+      // Clean up legacy v1 and v2 keys from device storage if present
+      await prefs.remove('yt_local_conversations_clean_v1');
+      await prefs.remove('yt_local_messages_clean_v1');
+      await prefs.remove('yt_user_deleted_convs_clean_v1');
+      await prefs.remove('yt_user_cleared_timestamps_clean_v1');
+      await prefs.remove('yt_local_conversations_clean_v2');
+      await prefs.remove('yt_local_messages_clean_v2');
+      await prefs.remove('yt_user_deleted_convs_clean_v2');
+      await prefs.remove('yt_user_cleared_timestamps_clean_v2');
 
       // Load deleted convs by user
       final deletedRaw = prefs.getString(_deletedConvsByUserKey);
@@ -487,18 +520,6 @@ class _LocalChatStore {
         }
       }
 
-      // If a user previously marked a conversation as deleted, ensure its past messages are also cleared
-      for (final userEntry in _deletedConvsByUser.entries) {
-        final user = userEntry.key;
-        for (final convId in userEntry.value) {
-          final userClears =
-              _clearedTimestampsByUser.putIfAbsent(user, () => <String, DateTime>{});
-          if (!userClears.containsKey(convId)) {
-            userClears[convId] = DateTime.now().toUtc();
-          }
-        }
-      }
-
       // Load conversations
       final convsRaw = prefs.getString(_localConvsKey);
       if (convsRaw != null && convsRaw.isNotEmpty) {
@@ -521,15 +542,11 @@ class _LocalChatStore {
         }
       }
 
-      // If empty, seed default data
-      if (_conversations.isEmpty) {
-        _seedDefaultData();
-      }
-
       _convController.add(null);
       _msgController.add(null);
     } catch (_) {
-      _seedDefaultData();
+      _convController.add(null);
+      _msgController.add(null);
     }
   }
 
@@ -569,16 +586,41 @@ class _LocalChatStore {
   }
 
   bool isDeletedForUser(String conversationId, String userId) {
-    final normUser = _normalizeUserId(userId);
-    return _deletedConvsByUser[normUser]?.contains(conversationId) ?? false;
+    for (final k in _allUserKeys(userId)) {
+      if (_deletedConvsByUser[k]?.contains(conversationId) == true) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  void undeleteForUser(String conversationId, String userId) {
+    bool changed = false;
+    for (final k in _allUserKeys(userId)) {
+      if (_deletedConvsByUser[k]?.remove(conversationId) == true) {
+        changed = true;
+      }
+    }
+    if (changed) {
+      _saveUserDeletedToPrefs();
+      _convController.add(null);
+    }
   }
 
   DateTime? getClearedTimestamp({
     required String conversationId,
     required String userId,
   }) {
-    final normUser = _normalizeUserId(userId);
-    return _clearedTimestampsByUser[normUser]?[conversationId];
+    DateTime? latest;
+    for (final k in _allUserKeys(userId)) {
+      final dt = _clearedTimestampsByUser[k]?[conversationId];
+      if (dt != null) {
+        if (latest == null || dt.isAfter(latest)) {
+          latest = dt;
+        }
+      }
+    }
+    return latest;
   }
 
   void registerConversation(Map<String, dynamic> row) {
@@ -592,10 +634,12 @@ class _LocalChatStore {
     required String conversationId,
     required String userId,
   }) {
-    final normUser = _normalizeUserId(userId);
-    _clearedTimestampsByUser
-        .putIfAbsent(normUser, () => <String, DateTime>{})[conversationId] =
-        DateTime.now().toUtc();
+    final now = DateTime.now().toUtc();
+    for (final k in _allUserKeys(userId)) {
+      _clearedTimestampsByUser
+          .putIfAbsent(k, () => <String, DateTime>{})[conversationId] = now;
+    }
+
     _saveUserClearedToPrefs();
     _msgController.add(null);
     _convController.add(null);
@@ -605,13 +649,15 @@ class _LocalChatStore {
     required String conversationId,
     required String userId,
   }) {
-    final normUser = _normalizeUserId(userId);
-    _deletedConvsByUser
-        .putIfAbsent(normUser, () => <String>{})
-        .add(conversationId);
-    _clearedTimestampsByUser
-        .putIfAbsent(normUser, () => <String, DateTime>{})[conversationId] =
-        DateTime.now().toUtc();
+    final now = DateTime.now().toUtc();
+    for (final k in _allUserKeys(userId)) {
+      _deletedConvsByUser
+          .putIfAbsent(k, () => <String>{})
+          .add(conversationId);
+      _clearedTimestampsByUser
+          .putIfAbsent(k, () => <String, DateTime>{})[conversationId] = now;
+    }
+
     _saveUserDeletedToPrefs();
     _saveUserClearedToPrefs();
     _convController.add(null);
@@ -631,12 +677,7 @@ class _LocalChatStore {
       final matchRevA = (pa == userB || _isActorMatch(pa, userB));
       final matchRevB = (pb == userA || _isActorMatch(pb, userA));
       if ((matchA && matchB) || (matchRevA && matchRevB)) {
-        // Un-delete for both users if they explicitly open this conversation
-        final normA = _normalizeUserId(userA);
-        final normB = _normalizeUserId(userB);
-        _deletedConvsByUser[normA]?.remove(id);
-        _deletedConvsByUser[normB]?.remove(id);
-        _saveUserDeletedToPrefs();
+        undeleteForUser(id, userA);
         return c;
       }
     }
@@ -651,11 +692,8 @@ class _LocalChatStore {
       'last_message_at': now,
       'created_at': now,
     };
-    final normA = _normalizeUserId(userA);
-    final normB = _normalizeUserId(userB);
-    _deletedConvsByUser[normA]?.remove(id);
-    _deletedConvsByUser[normB]?.remove(id);
-    _saveUserDeletedToPrefs();
+    undeleteForUser(id, userA);
+    undeleteForUser(id, userB);
 
     _conversations[id] = newConv;
     _saveConvsToPrefs();
@@ -694,9 +732,9 @@ class _LocalChatStore {
     return list.where((m) {
       final createdAtStr = m['created_at']?.toString();
       if (createdAtStr == null) return false;
-      final dt = DateTime.tryParse(createdAtStr);
+      final dt = DateTime.tryParse(createdAtStr)?.toUtc();
       if (dt == null) return false;
-      return dt.isAfter(clearedAt);
+      return dt.isAfter(clearedAt.toUtc());
     }).toList();
   }
 
@@ -708,7 +746,8 @@ class _LocalChatStore {
     final visibleMsgs = getMessages(conversationId, userId: userId);
     return visibleMsgs.where((m) {
       final sender = m['sender_id']?.toString() ?? '';
-      final isFromUser = _normalizeUserId(sender) == normUser;
+      final isFromUser =
+          _isActorMatch(sender, userId) || _normalizeUserId(sender) == normUser;
       final readAt = m['read_at'];
       return !isFromUser && (readAt == null || readAt.toString().isEmpty);
     }).length;
@@ -718,11 +757,19 @@ class _LocalChatStore {
     final convId = msg['conversation_id']?.toString() ?? '';
     if (convId.isEmpty) return;
 
-    // Un-delete this conversation for all users so incoming messages appear
-    for (final set in _deletedConvsByUser.values) {
-      set.remove(convId);
+    // Un-delete this conversation for conversation participants so incoming messages appear
+    final conv = _conversations[convId];
+    if (conv != null) {
+      final pa = conv['participant_a']?.toString() ?? '';
+      final pb = conv['participant_b']?.toString() ?? '';
+      undeleteForUser(convId, pa);
+      undeleteForUser(convId, pb);
+    } else {
+      final sender = msg['sender_id']?.toString() ?? '';
+      if (sender.isNotEmpty) {
+        undeleteForUser(convId, sender);
+      }
     }
-    _saveUserDeletedToPrefs();
 
     _messages.putIfAbsent(convId, () => []);
     final list = _messages[convId]!;
@@ -774,7 +821,8 @@ class _LocalChatStore {
       bool changed = false;
       for (var i = 0; i < list.length; i++) {
         final sid = list[i]['sender_id']?.toString() ?? '';
-        final isFromUser = _normalizeUserId(sid) == normUser;
+        final isFromUser =
+            _isActorMatch(sid, userId) || _normalizeUserId(sid) == normUser;
         if (!isFromUser &&
             (list[i]['read_at'] == null ||
                 list[i]['read_at'].toString().isEmpty)) {
@@ -798,7 +846,8 @@ class _LocalChatStore {
       final list = entry.value;
       for (var i = 0; i < list.length; i++) {
         final sid = list[i]['sender_id']?.toString() ?? '';
-        final isFromUser = _normalizeUserId(sid) == normUser;
+        final isFromUser =
+            _isActorMatch(sid, userId) || _normalizeUserId(sid) == normUser;
         if (!isFromUser &&
             (list[i]['read_at'] == null ||
                 list[i]['read_at'].toString().isEmpty)) {
@@ -812,45 +861,5 @@ class _LocalChatStore {
       _msgController.add(null);
       _convController.add(null);
     }
-  }
-
-  void _seedDefaultData() {
-    final actorId = UserPersonaNotifier.actorDefaultId;
-    final ranveerId = TalentDirectory.ranveerSinghId;
-    final convId = 'conv-actor-ranveer';
-
-    final now = DateTime.now().toUtc();
-    final msg1Time = now.subtract(const Duration(minutes: 5)).toIso8601String();
-    final msg2Time = now.subtract(const Duration(minutes: 1)).toIso8601String();
-
-    _conversations[convId] = {
-      'id': convId,
-      'participant_a': actorId,
-      'participant_b': ranveerId,
-      'last_message': "Good Job Wajahat! I'm proud of you.",
-      'last_message_at': msg2Time,
-      'created_at': msg1Time,
-    };
-
-    _messages[convId] = [
-      {
-        'id': 'msg-ranveer-1',
-        'conversation_id': convId,
-        'sender_id': ranveerId,
-        'text': 'Hey Wajahat, saw your latest audition video!',
-        'media_url': null,
-        'created_at': msg1Time,
-        'read_at': null,
-      },
-      {
-        'id': 'msg-ranveer-2',
-        'conversation_id': convId,
-        'sender_id': ranveerId,
-        'text': "Good Job Wajahat! I'm proud of you.",
-        'media_url': null,
-        'created_at': msg2Time,
-        'read_at': null,
-      },
-    ];
   }
 }

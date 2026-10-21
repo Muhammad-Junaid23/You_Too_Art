@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:you_too_art/core/repositories/chat_repository.dart';
 import 'package:you_too_art/core/repositories/connection_repository.dart';
+import 'package:you_too_art/core/repositories/notification_repository.dart';
 import 'package:you_too_art/core/repositories/portfolio_repository.dart';
 import 'package:you_too_art/core/repositories/post_repository.dart';
 import 'package:you_too_art/core/repositories/storage_repository.dart';
@@ -10,6 +11,11 @@ import 'package:you_too_art/core/repositories/storage_repository.dart';
 /// Provides the [SupabaseClient] singleton to the app via Riverpod.
 final supabaseClientProvider = Provider<SupabaseClient>((ref) {
   return Supabase.instance.client;
+});
+
+final notificationRepositoryProvider = Provider<NotificationRepository>((ref) {
+  final client = ref.watch(supabaseClientProvider);
+  return NotificationRepository(client);
 });
 
 final connectionRepositoryProvider = Provider<ConnectionRepository>((ref) {
