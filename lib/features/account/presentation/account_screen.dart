@@ -2,10 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
 import 'package:you_too_art/core/widgets/persona_switcher_modal.dart';
+import 'package:you_too_art/features/account/presentation/account_sheets.dart';
+import 'package:you_too_art/features/account/presentation/help_support_screen.dart';
+import 'package:you_too_art/features/account/presentation/transaction_history_screen.dart';
 import 'package:you_too_art/features/auth/providers/auth_provider.dart';
 import 'package:you_too_art/features/network/providers/network_provider.dart';
-import 'package:you_too_art/features/talent/providers/talent_provider.dart';
+import 'package:you_too_art/features/profile/presentation/user_profile_screen.dart';
+import 'package:you_too_art/features/talent/models/talent_model.dart';
 
+/// "My Account" screen matching the exact Figma design
 class AccountScreen extends ConsumerWidget {
   const AccountScreen({super.key});
 
@@ -13,346 +18,289 @@ class AccountScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final activePersona = ref.watch(userPersonaProvider);
     final netState = ref.watch(networkProvider);
-    final talentState = ref.watch(talentListProvider);
 
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        title: const Text(
-          'My Account',
-          style: TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
-            fontSize: 22,
-          ),
-        ),
-        actions: const [
-          Padding(
-            padding: EdgeInsets.only(right: 16),
-            child: PersonaBadge(),
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Profile Card
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8F9FA),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFE6E7E8)),
+            // ─── Header: "My Account" ──────────────────────────
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 20, 20, 16),
+              child: Text(
+                'My Account',
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF1A1A2E),
+                  letterSpacing: -0.5,
+                ),
               ),
+            ),
+
+            // ─── User Profile Row ──────────────────────────────
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
               child: Row(
                 children: [
-                  CircleAvatar(
-                    radius: 32,
-                    backgroundImage: NetworkImage(activePersona.avatarUrl),
+                  // Avatar with Verified badge overlay
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      CircleAvatar(
+                        radius: 28,
+                        backgroundColor: const Color(0xFFEEEEEE),
+                        backgroundImage: NetworkImage(activePersona.avatarUrl),
+                      ),
+                      Positioned(
+                        right: -2,
+                        bottom: -2,
+                        child: Container(
+                          width: 20,
+                          height: 20,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF3899F3),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.check,
+                            color: Colors.white,
+                            size: 13,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 14),
+
+                  // Name & Verified Subtitle
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            Flexible(
-                              child: Text(
-                                activePersona.name,
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.black,
-                                ),
-                              ),
-                            ),
-                            if (activePersona.isProductionHouse) ...[
-                              const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFFFF3CD),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: const Text(
-                                  'Studio',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF856404),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ],
+                        Text(
+                          activePersona.name,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF1A1A2E),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 3),
-                        Text(
-                          activePersona.role,
-                          style: const TextStyle(
+                        const Text(
+                          'Account Verified',
+                          style: TextStyle(
                             fontSize: 13,
-                            color: Color(0xFF616161),
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          activePersona.email,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF9E9E9E),
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF00C48C),
                           ),
                         ),
                       ],
+                    ),
+                  ),
+
+                  // "View Profile ->" Action
+                  InkWell(
+                    onTap: () => _openUserProfile(context, activePersona, netState),
+                    borderRadius: BorderRadius.circular(8),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'View Profile',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF3899F3),
+                            ),
+                          ),
+                          SizedBox(width: 4),
+                          Icon(
+                            Icons.arrow_forward_rounded,
+                            size: 16,
+                            color: Color(0xFF3899F3),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 16),
 
-            // Metrics row
-            Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF1F6FE),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      children: [
-                        Text(
-                          '${netState.connections.length}',
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF3899F3),
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        const Text(
-                          'Connections',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF616161),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF1F6FE),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      children: [
-                        Text(
-                          '${netState.requests.length}',
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF3899F3),
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        const Text(
-                          'Pending Requests',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF616161),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF1F6FE),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      children: [
-                        Text(
-                          '${talentState.talents.length}',
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF3899F3),
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        const Text(
-                          'Discoverable',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF616161),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 8),
+            const Divider(height: 1, thickness: 1, color: Color(0xFFF0F0F0)),
 
-            // Multi-user persona switcher section
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Multi-User Testing Accounts',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
+            // ─── Menu Items List ───────────────────────────────
+            Expanded(
+              child: ListView(
+                physics: const BouncingScrollPhysics(),
+                children: [
+                  _buildMenuItem(
+                    icon: Icons.check_circle_outline_rounded,
+                    title: 'Verify Account',
+                    onTap: () => AccountSheets.showVerifyAccount(context),
                   ),
-                ),
-                TextButton(
-                  onPressed: () => showPersonaSwitcherModal(context, ref),
-                  child: const Text('Change'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'Switch between different personas to test sending, receiving, and accepting connection requests on Screens 2 & 3.',
-              style: TextStyle(fontSize: 13, color: Color(0xFF757575)),
-            ),
-            const SizedBox(height: 12),
-
-            // Persona Cards
-            ...UserPersonaNotifier.allPersonas.map((persona) {
-              final isCurrent = persona.id == activePersona.id;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: InkWell(
-                  onTap: () async {
-                    await ref
-                        .read(userPersonaProvider.notifier)
-                        .switchPersona(persona);
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Switched to ${persona.name}'),
-                          behavior: SnackBarBehavior.floating,
-                          backgroundColor: const Color(0xFF3899F3),
+                  _buildMenuItem(
+                    icon: Icons.swap_horiz_rounded,
+                    title: 'Transaction History',
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const TransactionHistoryScreen(),
                         ),
                       );
-                    }
-                  },
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: isCurrent
-                          ? const Color(0xFFE7F3FE)
-                          : const Color(0xFFF8F9FA),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: isCurrent
-                            ? const Color(0xFF3899F3)
-                            : const Color(0xFFE6E7E8),
-                        width: isCurrent ? 1.5 : 1.0,
+                    },
+                  ),
+                  _buildMenuItem(
+                    icon: Icons.support_outlined,
+                    title: 'Support',
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const HelpSupportScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  _buildMenuItem(
+                    icon: Icons.info_outline_rounded,
+                    title: 'About us',
+                    onTap: () => AccountSheets.showAboutUs(context),
+                  ),
+                  _buildMenuItem(
+                    icon: Icons.description_outlined,
+                    title: 'Terms & Conditions',
+                    onTap: () => AccountSheets.showTermsConditions(context),
+                  ),
+                  _buildMenuItem(
+                    icon: Icons.privacy_tip_outlined,
+                    title: 'Privacy Policy',
+                    onTap: () => AccountSheets.showPrivacyPolicy(context),
+                  ),
+                  _buildMenuItem(
+                    icon: Icons.logout_rounded,
+                    iconColor: const Color(0xFFE53935),
+                    title: 'Logout',
+                    titleColor: const Color(0xFFE53935),
+                    onTap: () {
+                      AccountSheets.showLogoutModal(
+                        context,
+                        onLogout: () {
+                          ref.read(authProvider.notifier).logout();
+                        },
+                      );
+                    },
+                  ),
+
+                  const SizedBox(height: 32),
+
+                  // ─── Multi-Persona Testing Switcher (Practice Project Helper) ──
+                  Center(
+                    child: TextButton.icon(
+                      onPressed: () => showPersonaSwitcherModal(context, ref),
+                      icon: const Icon(
+                        Icons.swap_horiz,
+                        size: 16,
+                        color: Color(0xFF9E9E9E),
+                      ),
+                      label: Text(
+                        'Switch Persona (${activePersona.name})',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF9E9E9E),
+                        ),
                       ),
                     ),
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 18,
-                          backgroundImage: NetworkImage(persona.avatarUrl),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                persona.name,
-                                style: TextStyle(
-                                  fontWeight: isCurrent
-                                      ? FontWeight.bold
-                                      : FontWeight.w600,
-                                  fontSize: 14,
-                                ),
-                              ),
-                              Text(
-                                '${persona.role} • ${persona.email}',
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  color: Color(0xFF757575),
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (isCurrent)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF3899F3),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Text(
-                              'Active',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
                   ),
-                ),
-              );
-            }),
-
-            const SizedBox(height: 20),
-            const Divider(),
-            const SizedBox(height: 10),
-
-            // Logout
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.logout, color: Colors.red),
-              title: const Text(
-                'Log Out',
-                style: TextStyle(
-                  color: Colors.red,
-                  fontWeight: FontWeight.w600,
-                ),
+                  const SizedBox(height: 16),
+                ],
               ),
-              onTap: () async {
-                await ref.read(authProvider.notifier).logout();
-              },
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildMenuItem({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+    Color iconColor = const Color(0xFF9E9E9E),
+    Color titleColor = const Color(0xFF1A1A2E),
+  }) {
+    return Column(
+      children: [
+        InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Row(
+              children: [
+                Icon(icon, size: 22, color: iconColor),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                      color: titleColor,
+                    ),
+                  ),
+                ),
+                const Icon(
+                  Icons.arrow_forward_rounded,
+                  size: 18,
+                  color: Color(0xFF3899F3),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const Divider(
+          height: 1,
+          thickness: 1,
+          color: Color(0xFFF5F5F5),
+          indent: 20,
+          endIndent: 20,
+        ),
+      ],
+    );
+  }
+
+  void _openUserProfile(
+    BuildContext context,
+    UserPersona persona,
+    NetworkState netState,
+  ) {
+    final talent = TalentModel(
+      id: persona.id,
+      name: persona.name,
+      avatarUrl: persona.avatarUrl,
+      roles: persona.role,
+      email: persona.email,
+      isProductionHouse: persona.isProductionHouse,
+      connectsCount: '${netState.connections.length}',
+      postsCount: '252',
+      bio: persona.bio,
+      location: persona.location,
+      aboutInfo: {
+        'Personal Website': persona.website,
+        'Experience': persona.experience,
+        'Location': persona.location,
+      },
+    );
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => UserProfileScreen(initialTalent: talent),
       ),
     );
   }
