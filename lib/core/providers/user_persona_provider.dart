@@ -9,6 +9,10 @@ class UserPersona {
   final String role;
   final String avatarUrl;
   final bool isProductionHouse;
+  final String bio;
+  final String website;
+  final String experience;
+  final String location;
 
   const UserPersona({
     required this.id,
@@ -17,6 +21,11 @@ class UserPersona {
     required this.role,
     required this.avatarUrl,
     this.isProductionHouse = false,
+    this.bio =
+        'Netus vel neque vulputate nam nam sit amet a pulvinar. Vitae consequat sed sit interdum nulla. Libero viverra facilisis.',
+    this.website = 'www.be.net/WajahatUIUX',
+    this.experience = '5+ Years',
+    this.location = 'Islamabad, Pakistan',
   });
 
   UserPersona copyWith({
@@ -26,6 +35,10 @@ class UserPersona {
     String? role,
     String? avatarUrl,
     bool? isProductionHouse,
+    String? bio,
+    String? website,
+    String? experience,
+    String? location,
   }) {
     return UserPersona(
       id: id ?? this.id,
@@ -34,6 +47,10 @@ class UserPersona {
       role: role ?? this.role,
       avatarUrl: avatarUrl ?? this.avatarUrl,
       isProductionHouse: isProductionHouse ?? this.isProductionHouse,
+      bio: bio ?? this.bio,
+      website: website ?? this.website,
+      experience: experience ?? this.experience,
+      location: location ?? this.location,
     );
   }
 }
