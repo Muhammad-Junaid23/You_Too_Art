@@ -1,4 +1,6 @@
 import 'package:you_too_art/core/models/user_model.dart';
+import 'package:you_too_art/core/providers/user_persona_provider.dart';
+import 'package:you_too_art/core/services/app_persistence_service.dart';
 import 'package:you_too_art/features/home/models/post_item.dart';
 
 enum ConnectionStatus {
@@ -35,7 +37,7 @@ class TalentModel {
     this.isFollowing = false,
     this.isProductionHouse = false,
     this.connectsCount = '124.7K',
-    this.postsCount = '252',
+    this.postsCount = '0',
     this.followersCount = '124.7K',
     this.email,
     this.bio,
@@ -53,6 +55,59 @@ class TalentModel {
       connectionStatus == ConnectionStatus.pendingOutgoing;
   bool get isPendingIncoming =>
       connectionStatus == ConnectionStatus.pendingIncoming;
+
+  factory TalentModel.fromPersona(
+    UserPersona persona, {
+    ConnectionStatus connectionStatus = ConnectionStatus.none,
+    bool isFollowing = false,
+    String connectsCount = '124.7K',
+    String? postsCount,
+    String followersCount = '124.7K',
+    List<PostItem> posts = const [],
+    Map<String, String>? aboutInfo,
+    List<String>? workPortfolio,
+  }) {
+    final portfolio = AppPersistenceService.instance.getPortfolio(persona.id);
+    final photos = workPortfolio ?? portfolio.photos.map((p) => p.mediaUrl).toList();
+    final calculatedPosts = postsCount ?? '${portfolio.videos.length + portfolio.photos.length}';
+
+    final mergedAbout = Map<String, String>.from(aboutInfo ?? {});
+    if (persona.website.isNotEmpty) {
+      mergedAbout['Personal Website'] = persona.website;
+    }
+    if (persona.experience.isNotEmpty) {
+      mergedAbout['Experience'] = persona.experience;
+    }
+    if (persona.location.isNotEmpty) {
+      mergedAbout['Location'] = persona.location;
+    }
+    if (persona.email.isNotEmpty) mergedAbout['Email'] = persona.email;
+    if (persona.role.isNotEmpty && !mergedAbout.containsKey('Category')) {
+      mergedAbout['Category'] = persona.role;
+    }
+    if (persona.bio.isNotEmpty && !mergedAbout.containsKey('Bio')) {
+      mergedAbout['Bio'] = persona.bio;
+    }
+
+    return TalentModel(
+      id: persona.id,
+      name: persona.name,
+      avatarUrl: persona.avatarUrl,
+      roles: persona.role,
+      connectionStatus: connectionStatus,
+      isFollowing: isFollowing,
+      isProductionHouse: persona.isProductionHouse,
+      connectsCount: connectsCount,
+      postsCount: calculatedPosts,
+      followersCount: followersCount,
+      email: persona.email,
+      bio: persona.bio,
+      location: persona.location,
+      posts: posts,
+      aboutInfo: mergedAbout,
+      workPortfolio: photos,
+    );
+  }
 
   factory TalentModel.fromUser(
     UserModel user, {

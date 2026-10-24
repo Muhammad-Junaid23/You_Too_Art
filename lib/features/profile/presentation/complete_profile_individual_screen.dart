@@ -5,8 +5,10 @@ import 'package:you_too_art/app/config/routes.dart';
 import 'package:you_too_art/app/constants/app_colors.dart';
 import 'package:you_too_art/core/providers/geo_providers.dart';
 import 'package:you_too_art/core/providers/supabase_providers.dart';
+import 'package:you_too_art/core/services/app_persistence_service.dart';
 import 'package:you_too_art/features/auth/providers/auth_provider.dart';
 import 'package:you_too_art/features/profile/providers/complete_profile_provider.dart';
+import 'package:you_too_art/features/profile/providers/user_portfolio_provider.dart';
 import 'package:you_too_art/features/profile/widgets/add_media_sheet.dart';
 import 'package:you_too_art/features/profile/widgets/profile_avatar_picker.dart';
 import 'package:you_too_art/features/profile/widgets/profile_complete_sheet.dart';
@@ -66,9 +68,19 @@ class _CompleteProfileIndividualScreenState
   Future<void> _deleteItem(String id) async {
     try {
       await ref.read(portfolioRepositoryProvider).deletePortfolioItem(id);
-      ref.invalidate(
-        userPortfolioProvider(ref.read(authProvider.notifier).currentUid ?? ''),
-      );
+      final uid = ref.read(authProvider.notifier).currentUid ?? '';
+      ref.invalidate(userPortfolioProvider(uid));
+
+      // Also remove from local portfolio if present
+      final currentPort = AppPersistenceService.instance.getPortfolio(uid);
+      final vidIdx = currentPort.videos.indexWhere((v) => v.id == id || v.url == id);
+      if (vidIdx != -1) {
+        ref.read(userWorkPortfolioProvider.notifier).deleteVideo(vidIdx, uid);
+      }
+      final photoIdx = currentPort.photos.indexWhere((p) => p.id == id || p.url == id);
+      if (photoIdx != -1) {
+        ref.read(userWorkPortfolioProvider.notifier).deletePhoto(photoIdx, uid);
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
@@ -379,7 +391,7 @@ class _CompleteProfileIndividualScreenState
 
     if (result == null || !mounted) return;
 
-    // Persist to portfolio_items. For now, add a snackbar on success.
+    // Persist to portfolio_items and local persistent portfolio state.
     try {
       final uid = ref.read(authProvider.notifier).currentUid;
       if (uid == null) throw StateError('Not signed in');
@@ -392,6 +404,34 @@ class _CompleteProfileIndividualScreenState
             mediaType: type,
           );
       ref.invalidate(userPortfolioProvider(uid));
+
+      final isVideo = type.toLowerCase() == 'video';
+      final rawMediaUrl = result['url']!;
+      final sanitized = resolvePortfolioMediaUrl(rawMediaUrl, isVideo: isVideo);
+      final newItem = WorkMediaItem(
+        id: 'port_${DateTime.now().millisecondsSinceEpoch}',
+        title: result['title']!,
+        url: rawMediaUrl,
+        mediaUrl: sanitized.isNotEmpty ? sanitized : rawMediaUrl,
+        isVideo: isVideo,
+        lastUpdated: 'Just Now',
+      );
+
+      final currentPort = AppPersistenceService.instance.getPortfolio(uid);
+      final isDummy = currentPort.videos.any((v) => v.id == 'vid_1' && v.title.contains('Gilgit-Baltistan'));
+      if (isDummy) {
+        const emptyPort = UserPortfolioState(videos: [], photos: []);
+        AppPersistenceService.instance.savePortfolio(uid, emptyPort);
+        AppPersistenceService.instance.savePortfolio('actor', emptyPort);
+        AppPersistenceService.instance.savePortfolio(AppPersistenceService.actorDefaultId, emptyPort);
+      }
+
+      if (isVideo) {
+        ref.read(userWorkPortfolioProvider.notifier).addVideo(newItem, uid);
+      } else {
+        ref.read(userWorkPortfolioProvider.notifier).addPhoto(newItem, uid);
+      }
+
       if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('$type added')));

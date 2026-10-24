@@ -1,6 +1,8 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:you_too_art/core/providers/user_persona_provider.dart';
+import 'package:you_too_art/core/repositories/storage_repository.dart';
 import 'package:you_too_art/features/profile/providers/user_portfolio_provider.dart';
 
 class EditWorkMediaModal {
@@ -59,13 +61,28 @@ class _EditWorkMediaSheetState extends State<_EditWorkMediaSheet> {
   void initState() {
     super.initState();
     final existingMedia = widget.existingItem?.mediaUrl ?? '';
+    final existingUrl = widget.existingItem?.url ?? '';
     final isBase64 = existingMedia.startsWith('data:image');
     _titleController =
         TextEditingController(text: widget.existingItem?.title ?? '');
-    _urlController = TextEditingController(text: widget.existingItem?.url ?? '');
-    _mediaUrlController =
-        TextEditingController(text: isBase64 ? '' : existingMedia);
-    _previewMediaUrl = widget.existingItem?.mediaUrl;
+    _urlController = TextEditingController(text: existingUrl);
+
+    // Auto-resolve YouTube thumbnails from mediaUrl or url
+    var resolvedMedia = resolvePortfolioMediaUrl(existingMedia, isVideo: widget.isVideo);
+    if ((resolvedMedia.isEmpty || !resolvedMedia.startsWith('http')) &&
+        widget.isVideo &&
+        existingUrl.isNotEmpty) {
+      final ytThumb = extractYouTubeThumbnail(existingUrl);
+      if (ytThumb != null) {
+        resolvedMedia = ytThumb;
+      }
+    }
+
+    _mediaUrlController = TextEditingController(
+        text: isBase64 ? '' : (resolvedMedia.isNotEmpty ? resolvedMedia : existingMedia));
+    _previewMediaUrl = resolvedMedia.isNotEmpty
+        ? resolvedMedia
+        : (existingMedia.isNotEmpty ? existingMedia : null);
   }
 
   @override
@@ -76,6 +93,8 @@ class _EditWorkMediaSheetState extends State<_EditWorkMediaSheet> {
     super.dispose();
   }
 
+  bool _isUploading = false;
+
   Future<void> _pickImage() async {
     try {
       final picker = ImagePicker();
@@ -85,26 +104,68 @@ class _EditWorkMediaSheetState extends State<_EditWorkMediaSheet> {
         maxWidth: 1200,
       );
       if (file != null) {
+        setState(() => _isUploading = true);
         final bytes = await file.readAsBytes();
-        final base64String = 'data:image/jpeg;base64,${base64Encode(bytes)}';
-        setState(() {
-          _previewMediaUrl = base64String;
-          _mediaUrlController.text = '';
-        });
+        try {
+          final user = Supabase.instance.client.auth.currentUser;
+          final uid = user?.id ?? UserPersonaNotifier.actorDefaultId;
+          final storageRepo = StorageRepository();
+          final secureUrl = await storageRepo.uploadImage(
+            folder: 'portfolio',
+            userId: uid,
+            bytes: bytes,
+            fileName: file.name,
+          );
+          if (mounted) {
+            setState(() {
+              _previewMediaUrl = secureUrl;
+              _mediaUrlController.text = secureUrl;
+              _isUploading = false;
+            });
+          }
+        } catch (_) {
+          if (mounted) {
+            // High quality fallback sample so localstorage is not bloated with multi-MB base64
+            setState(() {
+              _previewMediaUrl = widget.isVideo
+                  ? 'https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&fit=crop&w=800&q=80'
+                  : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80';
+              _mediaUrlController.text = _previewMediaUrl!;
+              _isUploading = false;
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Offline/network error: fallback image applied.'),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+        }
       }
-    } catch (_) {}
+    } catch (_) {
+      if (mounted) setState(() => _isUploading = false);
+    }
   }
 
   void _submit() {
     final title = _titleController.text.trim();
     final url = _urlController.text.trim();
-    final mediaUrl = _previewMediaUrl ?? _mediaUrlController.text.trim();
+    var mediaUrl = _previewMediaUrl ?? _mediaUrlController.text.trim();
 
     if (title.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter a title')),
       );
       return;
+    }
+
+    if (widget.isVideo) {
+      // If mediaUrl is empty or a YouTube video link, resolve thumbnail from mediaUrl or url
+      final ytThumb =
+          extractYouTubeThumbnail(mediaUrl) ?? extractYouTubeThumbnail(url);
+      if (ytThumb != null) {
+        mediaUrl = ytThumb;
+      }
     }
 
     final newItem = WorkMediaItem(
@@ -243,10 +304,22 @@ class _EditWorkMediaSheetState extends State<_EditWorkMediaSheet> {
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
-                  onPressed: _pickImage,
-                  icon: const Icon(Icons.photo_library_outlined, size: 18),
-                  label: Text(
-                      widget.isVideo ? 'Pick Video Thumbnail' : 'Pick Photo Image'),
+                  onPressed: _isUploading ? null : _pickImage,
+                  icon: _isUploading
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Color(0xFF3899F3),
+                          ),
+                        )
+                      : const Icon(Icons.photo_library_outlined, size: 18),
+                  label: Text(_isUploading
+                      ? 'Uploading to Cloudinary...'
+                      : (widget.isVideo
+                          ? 'Pick Video Thumbnail'
+                          : 'Pick Photo Image')),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: const Color(0xFF3899F3),
                     side: const BorderSide(color: Color(0xFF3899F3), width: 1.2),
@@ -295,6 +368,24 @@ class _EditWorkMediaSheetState extends State<_EditWorkMediaSheet> {
               const SizedBox(height: 6),
               TextField(
                 controller: _urlController,
+                onChanged: (val) {
+                  if (widget.isVideo) {
+                    final ytThumb = extractYouTubeThumbnail(val);
+                    if (ytThumb != null &&
+                        (_previewMediaUrl == null ||
+                            _previewMediaUrl!.isEmpty ||
+                            _previewMediaUrl!.contains('img.youtube.com') ||
+                            _previewMediaUrl!.contains('i.ytimg.com') ||
+                            _mediaUrlController.text.isEmpty ||
+                            _mediaUrlController.text.contains('youtube.com') ||
+                            _mediaUrlController.text.contains('youtu.be'))) {
+                      setState(() {
+                        _previewMediaUrl = ytThumb;
+                        _mediaUrlController.text = ytThumb;
+                      });
+                    }
+                  }
+                },
                 style: const TextStyle(fontSize: 14),
                 decoration: InputDecoration(
                   hintText: widget.isVideo
@@ -323,7 +414,9 @@ class _EditWorkMediaSheetState extends State<_EditWorkMediaSheet> {
               TextField(
                 controller: _mediaUrlController,
                 onChanged: (val) {
-                  setState(() => _previewMediaUrl = val.trim());
+                  final trimmed = val.trim();
+                  final ytThumb = extractYouTubeThumbnail(trimmed);
+                  setState(() => _previewMediaUrl = ytThumb ?? trimmed);
                 },
                 style: const TextStyle(fontSize: 14),
                 decoration: InputDecoration(
@@ -336,7 +429,16 @@ class _EditWorkMediaSheetState extends State<_EditWorkMediaSheet> {
                       const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 6),
+              const Text(
+                'Tip: Use direct image links (e.g. Unsplash, Supabase, Cloudinary) or tap Pick above. Protected wallpaper sites block external embedding.',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Color(0xFF9E9E9E),
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+              const SizedBox(height: 20),
 
               // Buttons
               Row(

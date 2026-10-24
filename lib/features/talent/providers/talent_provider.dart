@@ -104,7 +104,16 @@ class TalentNotifier extends Notifier<TalentState> {
       } catch (_) {}
 
       // Combine with curated sample talents from TalentDirectory
-      final combined = <TalentModel>[...fetchedList];
+      final combined = <TalentModel>[];
+      for (final fetched in fetchedList) {
+        if (UserPersonaNotifier.hasPersona(fetched.id)) {
+          final p = UserPersonaNotifier.getPersonaById(fetched.id);
+          combined.add(TalentModel.fromPersona(p));
+        } else {
+          combined.add(fetched);
+        }
+      }
+
       for (final sample in TalentDirectory.allCuratedTalents) {
         if (!combined.any((t) => t.id == sample.id)) {
           combined.add(sample);
@@ -112,23 +121,17 @@ class TalentNotifier extends Notifier<TalentState> {
       }
 
       // Add Actor persona so if another persona is active, Actor is visible to connect with
-      if (!combined.any((t) => t.id == actorPersona.id)) {
-        combined.add(
-          TalentModel(
-            id: actorPersona.id,
-            name: actorPersona.name,
-            roles: actorPersona.role,
-            avatarUrl: actorPersona.avatarUrl,
-            email: actorPersona.email,
-            bio: 'Professional actor and performing artist on You Too Art.',
-            isProductionHouse: false,
-          ),
-        );
+      final currentActor = UserPersonaNotifier.getActorPersona();
+      if (!combined.any(
+          (t) => UserPersonaNotifier.isSamePersona(t.id, currentActor.id))) {
+        combined.add(TalentModel.fromPersona(currentActor));
       }
 
       // Filter out active persona (cannot discover yourself)
-      final filteredForSelf =
-          combined.where((t) => t.id != _activePersona.id).toList();
+      final filteredForSelf = combined
+          .where((t) =>
+              !UserPersonaNotifier.isSamePersona(t.id, _activePersona.id))
+          .toList();
 
       // Resolve relationship status for all talents with active persona in one batch
       final relMap =

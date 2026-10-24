@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:you_too_art/core/providers/geo_providers.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
+import 'package:you_too_art/features/network/providers/network_provider.dart';
 import 'package:you_too_art/features/profile/widgets/profile_avatar_picker.dart';
+import 'package:you_too_art/features/talent/providers/talent_provider.dart';
 
 /// Edit Profile screen — lets the active persona update their
 /// name, bio, location, and avatar.
@@ -60,9 +62,19 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     await Future.delayed(const Duration(milliseconds: 500));
 
     final persona = ref.read(userPersonaProvider);
-    final locationStr = (_selectedCity != null && _selectedCountry != null)
-        ? '$_selectedCity, $_selectedCountry'
-        : (_selectedCountry ?? persona.location);
+    final countries = ref.read(countriesProvider).value ?? [];
+    String? countryName = _selectedCountry;
+    if (_selectedCountry != null) {
+      final match =
+          countries.where((c) => c['code'] == _selectedCountry).firstOrNull;
+      if (match != null) {
+        countryName = match['name'] as String?;
+      }
+    }
+
+    final locationStr = (_selectedCity != null && countryName != null)
+        ? '$_selectedCity, $countryName'
+        : (countryName ?? persona.location);
 
     final updatedPersona = persona.copyWith(
       name: _nameController.text.trim().isNotEmpty
@@ -87,7 +99,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       avatarUrl: _avatarUrl ?? persona.avatarUrl,
     );
 
-    await ref.read(userPersonaProvider.notifier).switchPersona(updatedPersona);
+    await ref.read(userPersonaProvider.notifier).updateProfile(updatedPersona);
+    ref.read(talentListProvider.notifier).fetchTalents();
+    ref.read(networkProvider.notifier).refresh();
 
     if (!mounted) return;
     setState(() => _isSaving = false);

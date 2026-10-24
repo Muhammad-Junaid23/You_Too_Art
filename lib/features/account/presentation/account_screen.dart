@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
+import 'package:you_too_art/core/services/app_persistence_service.dart';
 import 'package:you_too_art/core/widgets/persona_switcher_modal.dart';
 import 'package:you_too_art/features/account/presentation/account_sheets.dart';
 import 'package:you_too_art/features/account/presentation/help_support_screen.dart';
@@ -44,67 +45,81 @@ class AccountScreen extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
               child: Row(
                 children: [
-                  // Avatar with Verified badge overlay
-                  Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      CircleAvatar(
-                        radius: 28,
-                        backgroundColor: const Color(0xFFEEEEEE),
-                        backgroundImage: NetworkImage(activePersona.avatarUrl),
-                      ),
-                      Positioned(
-                        right: -2,
-                        bottom: -2,
-                        child: Container(
-                          width: 20,
-                          height: 20,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF3899F3),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.check,
-                            color: Colors.white,
-                            size: 13,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(width: 14),
-
-                  // Name & Verified Subtitle
+                  // Avatar and Name clickable
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          activePersona.name,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF1A1A2E),
+                    child: InkWell(
+                      onTap: () =>
+                          _openUserProfile(context, activePersona, netState),
+                      borderRadius: BorderRadius.circular(12),
+                      child: Row(
+                        children: [
+                          // Avatar with Verified badge overlay
+                          Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              CircleAvatar(
+                                radius: 28,
+                                backgroundColor: const Color(0xFFEEEEEE),
+                                backgroundImage:
+                                    NetworkImage(activePersona.avatarUrl),
+                              ),
+                              Positioned(
+                                right: -2,
+                                bottom: -2,
+                                child: Container(
+                                  width: 20,
+                                  height: 20,
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFF3899F3),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.check,
+                                    color: Colors.white,
+                                    size: 13,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 3),
-                        const Text(
-                          'Account Verified',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: Color(0xFF00C48C),
+                          const SizedBox(width: 14),
+
+                          // Name & Verified Subtitle
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  activePersona.name,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF1A1A2E),
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 3),
+                                const Text(
+                                  'Account Verified',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                    color: Color(0xFF00C48C),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
 
                   // "View Profile ->" Action
                   InkWell(
-                    onTap: () => _openUserProfile(context, activePersona, netState),
+                    onTap: () =>
+                        _openUserProfile(context, activePersona, netState),
                     borderRadius: BorderRadius.circular(8),
                     child: const Padding(
                       padding: EdgeInsets.symmetric(horizontal: 4, vertical: 6),
@@ -280,22 +295,12 @@ class AccountScreen extends ConsumerWidget {
     UserPersona persona,
     NetworkState netState,
   ) {
-    final talent = TalentModel(
-      id: persona.id,
-      name: persona.name,
-      avatarUrl: persona.avatarUrl,
-      roles: persona.role,
-      email: persona.email,
-      isProductionHouse: persona.isProductionHouse,
+    final portfolio = AppPersistenceService.instance.getPortfolio(persona.id);
+    final talent = TalentModel.fromPersona(
+      persona,
       connectsCount: '${netState.connections.length}',
-      postsCount: '252',
-      bio: persona.bio,
-      location: persona.location,
-      aboutInfo: {
-        'Personal Website': persona.website,
-        'Experience': persona.experience,
-        'Location': persona.location,
-      },
+      postsCount: '${portfolio.videos.length + portfolio.photos.length}',
+      workPortfolio: portfolio.photos.map((p) => p.mediaUrl).toList(),
     );
 
     Navigator.of(context).push(

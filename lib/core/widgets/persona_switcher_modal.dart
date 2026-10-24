@@ -77,7 +77,10 @@ void showPersonaSwitcherModal(BuildContext context, WidgetRef ref) {
                   separatorBuilder: (_, _) => const SizedBox(height: 10),
                   itemBuilder: (context, index) {
                     final persona = allPersonas[index];
-                    final isSelected = persona.id == activePersona.id;
+                    final isSelected = UserPersonaNotifier.isSamePersona(
+                      persona.id,
+                      activePersona.id,
+                    );
 
                     return InkWell(
                       onTap: () async {
