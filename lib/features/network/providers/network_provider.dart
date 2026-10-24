@@ -91,16 +91,14 @@ class NetworkNotifier extends Notifier<NetworkState> {
     final direct = TalentDirectory.findById(id);
     if (direct != null) return direct;
 
-    final actorPersona = UserPersonaNotifier.buildActorPersona();
-    if (id == actorPersona.id) {
-      return TalentModel(
-        id: actorPersona.id,
-        name: actorPersona.name,
-        roles: actorPersona.role,
-        avatarUrl: actorPersona.avatarUrl,
-        email: actorPersona.email,
-        bio: 'Professional performing artist on You Too Art.',
-      );
+    if (UserPersonaNotifier.isActorId(id)) {
+      final persona = UserPersonaNotifier.getActorPersona();
+      return TalentModel.fromPersona(persona);
+    }
+
+    if (UserPersonaNotifier.hasPersona(id)) {
+      final persona = UserPersonaNotifier.getPersonaById(id);
+      return TalentModel.fromPersona(persona);
     }
 
     return TalentModel(
@@ -125,8 +123,6 @@ class NetworkNotifier extends Notifier<NetworkState> {
   }
 
   Future<void> _loadNetworkData() async {
-    final actorPersona = UserPersonaNotifier.buildActorPersona();
-
     // 1. Fetch incoming requests
     final incomingRaw =
         await _connectionRepo.fetchIncomingRequests(_activePersona.id);
@@ -167,25 +163,23 @@ class NetworkNotifier extends Notifier<NetworkState> {
     final connectedIds = connectionItems.map((c) => c.id).toSet();
     final requestedIds = requestItems.map((r) => r.id).toSet();
 
-    final actorTalent = TalentModel(
-      id: actorPersona.id,
-      name: actorPersona.name,
-      roles: actorPersona.role,
-      avatarUrl: actorPersona.avatarUrl,
-      email: actorPersona.email,
-      bio: 'Professional performing artist on You Too Art.',
-      isProductionHouse: false,
-    );
+    final candidateIds = [
+      UserPersonaNotifier.actorDefaultId,
+      UserPersonaNotifier.jeremiahId,
+      UserPersonaNotifier.alexanderId,
+      UserPersonaNotifier.filmfareId,
+    ];
 
-    final candidateTalents = [
-      actorTalent,
-      TalentDirectory.jeremiahGreen,
-      TalentDirectory.alexanderCole,
-      TalentDirectory.filmfare,
-    ].where((t) =>
-        t.id != _activePersona.id &&
-        !connectedIds.contains(t.id) &&
-        !requestedIds.contains(t.id)).toList();
+    final candidateMap = <String, TalentModel>{};
+    for (final id in candidateIds) {
+      if (!UserPersonaNotifier.isSamePersona(id, _activePersona.id) &&
+          !connectedIds.contains(id) &&
+          !requestedIds.contains(id)) {
+        final t = _resolveTalent(id);
+        candidateMap[t.id] = t;
+      }
+    }
+    final candidateTalents = candidateMap.values.toList();
 
     final suggestions = <NetworkSuggestionItem>[];
     for (final talent in candidateTalents) {

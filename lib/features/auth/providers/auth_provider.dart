@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 import 'package:you_too_art/core/providers/supabase_providers.dart';
 import 'package:you_too_art/core/repositories/auth_repository.dart';
@@ -9,15 +8,11 @@ import 'package:you_too_art/core/services/storage_service.dart';
 import 'package:you_too_art/core/utils/error_messages.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
 import 'package:you_too_art/core/models/user_model.dart';
+import 'package:you_too_art/core/providers/shared_preferences_provider.dart';
 
 // ─── Foundation Providers ───────────────────────────
 
-/// Override this in main.dart with the actual SharedPreferences instance.
-final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
-  throw UnimplementedError(
-    'sharedPreferencesProvider must be overridden in ProviderScope.',
-  );
-});
+export 'package:you_too_art/core/providers/shared_preferences_provider.dart';
 
 /// Provides the [StorageService] backed by SharedPreferences.
 final storageServiceProvider = Provider<StorageService>((ref) {

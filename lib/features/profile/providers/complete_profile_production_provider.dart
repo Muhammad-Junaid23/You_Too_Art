@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:you_too_art/core/services/app_persistence_service.dart';
 import 'package:you_too_art/features/auth/providers/auth_provider.dart';
 
 /// State for the Complete Profile (Production House) form.
@@ -128,6 +129,25 @@ class ProductionProfileNotifier extends Notifier<ProductionProfileState> {
                 'profile_image_path': state.profileImagePath,
             },
           );
+
+      // Immediately propagate created production profile into persistent state
+      final currentActor = AppPersistenceService.instance.getActorPersona();
+      final updatedProd = currentActor.copyWith(
+        id: uid,
+        name: state.companyName.trim(),
+        role: 'Production House',
+        isProductionHouse: true,
+        location: '${state.city}, ${state.country}',
+        bio: state.bio.trim(),
+        avatarUrl: state.profileImagePath ?? currentActor.avatarUrl,
+      );
+      AppPersistenceService.instance.savePersona(updatedProd);
+      AppPersistenceService.instance.setActivePersonaId(uid);
+
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user != null) {
+        await AppPersistenceService.instance.syncWithSupabaseUser(user);
+      }
 
       state = state.copyWith(isSaving: false);
       return true;

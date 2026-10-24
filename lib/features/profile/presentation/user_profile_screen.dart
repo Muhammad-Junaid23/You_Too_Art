@@ -3,12 +3,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:you_too_art/app/config/routes.dart';
+import 'package:you_too_art/core/constants/talent_directory.dart';
 import 'package:you_too_art/core/providers/supabase_providers.dart'
     hide userPortfolioProvider;
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
 import 'package:you_too_art/core/repositories/connection_repository.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:you_too_art/features/account/presentation/edit_profile_screen.dart';
 import 'package:you_too_art/features/chats/providers/chat_provider.dart';
+import 'package:you_too_art/features/home/models/post_item.dart';
+import 'package:you_too_art/features/home/providers/home_feed_provider.dart';
+import 'package:you_too_art/features/home/widgets/post_card.dart';
 import 'package:you_too_art/features/network/providers/network_provider.dart';
 import 'package:you_too_art/features/profile/providers/user_portfolio_provider.dart';
 import 'package:you_too_art/features/profile/widgets/edit_work_media_modal.dart';
@@ -94,47 +99,83 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                   ),
                 ),
               ),
-              ListTile(
-                leading: const Icon(Icons.share_outlined, color: Colors.black87),
-                title: const Text('Share Profile'),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Profile link copied: @${talent.name}'),
-                      behavior: SnackBarBehavior.floating,
-                      backgroundColor: const Color(0xFF3899F3),
-                    ),
-                  );
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.flag_outlined, color: Colors.black87),
-                title: const Text('Report Account'),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Thank you. We will review this profile.'),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.block_outlined, color: Colors.red),
-                title: const Text('Block User', style: TextStyle(color: Colors.red)),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Blocked ${talent.name}'),
-                      behavior: SnackBarBehavior.floating,
-                      backgroundColor: Colors.redAccent,
-                    ),
-                  );
-                },
-              ),
+              if (UserPersonaNotifier.isSamePersona(
+                talent.id,
+                ref.read(userPersonaProvider).id,
+              )) ...[
+                ListTile(
+                  leading: const Icon(Icons.edit_outlined, color: Colors.black87),
+                  title: const Text('Edit Profile'),
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    final updated = await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const EditProfileScreen(),
+                      ),
+                    );
+                    if (updated == true && mounted) {
+                      setState(() {});
+                    }
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.share_outlined, color: Colors.black87),
+                  title: const Text('Share Profile'),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Profile link copied: @${talent.name}'),
+                        behavior: SnackBarBehavior.floating,
+                        backgroundColor: const Color(0xFF3899F3),
+                      ),
+                    );
+                  },
+                ),
+              ] else ...[
+                ListTile(
+                  leading: const Icon(Icons.share_outlined, color: Colors.black87),
+                  title: const Text('Share Profile'),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Profile link copied: @${talent.name}'),
+                        behavior: SnackBarBehavior.floating,
+                        backgroundColor: const Color(0xFF3899F3),
+                      ),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.flag_outlined, color: Colors.black87),
+                  title: const Text('Report Account'),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Thank you. We will review this profile.'),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.block_outlined, color: Colors.red),
+                  title:
+                      const Text('Block User', style: TextStyle(color: Colors.red)),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Blocked ${talent.name}'),
+                        behavior: SnackBarBehavior.floating,
+                        backgroundColor: Colors.redAccent,
+                      ),
+                    );
+                  },
+                ),
+              ],
             ],
           ),
         );
@@ -193,19 +234,56 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final activePersona = ref.watch(userPersonaProvider);
-    final isOwnProfile = widget.initialTalent.id == activePersona.id;
-    final portfolio = ref.watch(userWorkPortfolioProvider);
+    final isOwnProfile = UserPersonaNotifier.isSamePersona(
+      widget.initialTalent.id,
+      activePersona.id,
+    );
+
+    final isActor = UserPersonaNotifier.isActorId(widget.initialTalent.id);
+    final targetPersona = isOwnProfile
+        ? activePersona
+        : (isActor
+            ? UserPersonaNotifier.getActorPersona()
+            : (UserPersonaNotifier.hasPersona(widget.initialTalent.id)
+                ? UserPersonaNotifier.getPersonaById(widget.initialTalent.id)
+                : null));
+
     final talentState = ref.watch(talentListProvider);
     final fromState = talentState.findById(widget.initialTalent.id);
-    final baseTalent = fromState ?? widget.initialTalent;
-    final effectiveStatus = _currentStatus ?? baseTalent.connectionStatus;
-    final talent = baseTalent.copyWith(connectionStatus: effectiveStatus);
-    final isProd = talent.isProductionHouse;
 
-    final displayName = isOwnProfile ? activePersona.name : talent.name;
-    final displayRoles = isOwnProfile ? activePersona.role : talent.roles;
-    final displayAvatar =
-        isOwnProfile ? activePersona.avatarUrl : talent.avatarUrl;
+    final portfolio = isOwnProfile
+        ? ref.watch(userWorkPortfolioProvider)
+        : UserPortfolioNotifier.getPortfolioFor(targetPersona?.id ?? widget.initialTalent.id);
+
+    final dynamicPostsCount = '${portfolio.videos.length + portfolio.photos.length}';
+
+    final baseTalent = isOwnProfile
+        ? TalentModel.fromPersona(
+            activePersona,
+            connectsCount: '${ref.watch(networkProvider).connections.length}',
+            postsCount: dynamicPostsCount,
+            workPortfolio: portfolio.photos.map((p) => p.mediaUrl).toList(),
+          )
+        : (targetPersona != null
+            ? TalentModel.fromPersona(
+                targetPersona,
+                postsCount: dynamicPostsCount,
+                workPortfolio: portfolio.photos.map((p) => p.mediaUrl).toList(),
+              )
+            : (fromState ??
+                TalentDirectory.findById(widget.initialTalent.id) ??
+                widget.initialTalent));
+
+    final effectiveStatus = _currentStatus ?? baseTalent.connectionStatus;
+    final talent = baseTalent.copyWith(
+      connectionStatus: effectiveStatus,
+      postsCount: dynamicPostsCount,
+    );
+    final isProd = targetPersona?.isProductionHouse ?? talent.isProductionHouse;
+
+    final displayName = targetPersona?.name ?? talent.name;
+    final displayRoles = targetPersona?.role ?? talent.roles;
+    final displayAvatar = targetPersona?.avatarUrl ?? talent.avatarUrl;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -523,6 +601,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
               child: _buildAboutContent(
                 talent,
                 isProd,
+                targetPersona,
                 activePersona,
                 isOwnProfile,
               ),
@@ -530,7 +609,12 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
           ] else if (_selectedTabIndex == 2 && !isProd) ...[
             // My Work Tab Content
             SliverToBoxAdapter(
-              child: _buildWorkContent(context, portfolio),
+              child: _buildWorkContent(
+                context,
+                portfolio,
+                isOwnProfile,
+                talent,
+              ),
             ),
           ],
         ],
@@ -865,20 +949,27 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
   Widget _buildAboutContent(
     TalentModel talent,
     bool isProd,
+    UserPersona? targetPersona,
     UserPersona activePersona,
     bool isOwnProfile,
   ) {
-    final bioText = isOwnProfile
-        ? activePersona.bio
-        : (talent.bio ??
-            'Netus vel neque vulputate nam nam sit amet a pulvinar. '
-            'Vitae consequat sed sit interdum nulla. Libero viverra facilisis.');
-    final websiteText =
-        isOwnProfile ? activePersona.website : 'www.be.net/WajahatUIUX';
-    final experienceText =
-        isOwnProfile ? activePersona.experience : '5+ Years';
-    final locationText =
-        isOwnProfile ? activePersona.location : 'Islamabad, Pakistan';
+    final effective = isOwnProfile ? activePersona : targetPersona;
+    final bioText = (effective?.bio.isNotEmpty ?? false)
+        ? effective!.bio
+        : (talent.bio?.isNotEmpty ?? false
+            ? talent.bio!
+            : 'Award-winning performing artist and creative talent.');
+    final websiteText = (effective?.website.isNotEmpty ?? false)
+        ? effective!.website
+        : (talent.aboutInfo['Personal Website'] ??
+            talent.aboutInfo['Website'] ??
+            'www.youtooart.com');
+    final experienceText = (effective?.experience.isNotEmpty ?? false)
+        ? effective!.experience
+        : (talent.aboutInfo['Experience'] ?? '5+ Years');
+    final locationText = (effective?.location.isNotEmpty ?? false)
+        ? effective!.location
+        : (talent.location ?? talent.aboutInfo['Location'] ?? '');
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
@@ -958,7 +1049,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
           Row(
             children: [
               Text(
-                locationText.contains('🇵🇰') ? locationText : '🇵🇰 $locationText',
+                locationText,
                 style: const TextStyle(
                   fontSize: 14.5,
                   fontWeight: FontWeight.w700,
@@ -976,7 +1067,10 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
   Widget _buildWorkContent(
     BuildContext context,
     UserPortfolioState portfolio,
+    bool isOwnProfile,
+    TalentModel talent,
   ) {
+    final targetId = isOwnProfile ? ref.read(userPersonaProvider).id : talent.id;
     final videos = portfolio.videos;
     final photos = portfolio.photos;
 
@@ -1020,53 +1114,63 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                   ),
                 ],
               ),
-              Row(
-                children: [
-                  _buildWorkActionButton(
-                    icon: Icons.edit_outlined,
-                    bgColor: const Color(0xFFE8F2FD),
-                    iconColor: const Color(0xFF3899F3),
-                    onTap: currentVideo == null
-                        ? () {}
-                        : () {
-                            EditWorkMediaModal.showEditOrAddModal(
-                              context: context,
-                              isVideo: true,
-                              isEditing: true,
-                              existingItem: currentVideo,
-                              onSave: (item) {
-                                ref
-                                    .read(userWorkPortfolioProvider.notifier)
-                                    .updateVideo(videoIndex, item);
-                              },
-                              onDelete: () {
-                                ref
-                                    .read(userWorkPortfolioProvider.notifier)
-                                    .deleteVideo(videoIndex);
-                                if (_currentVideoIndex > 0) {
-                                  setState(() {
-                                    _currentVideoIndex =
-                                        _currentVideoIndex - 1;
-                                  });
-                                }
-                              },
-                            );
-                          },
-                  ),
-                  const SizedBox(width: 8),
-                  _buildWorkActionButton(
-                    icon: Icons.add,
-                    bgColor: const Color(0xFFE8F8F3),
-                    iconColor: const Color(0xFF00C48C),
-                    onTap: () {
-                      EditWorkMediaModal.showEditOrAddModal(
+              if (isOwnProfile)
+                Row(
+                  children: [
+                    _buildWorkActionButton(
+                      icon: Icons.edit_outlined,
+                      bgColor: const Color(0xFFE8F2FD),
+                      iconColor: const Color(0xFF3899F3),
+                      onTap: currentVideo == null
+                          ? () {}
+                          : () {
+                              EditWorkMediaModal.showEditOrAddModal(
+                                context: context,
+                                isVideo: true,
+                                isEditing: true,
+                                existingItem: currentVideo,
+                                onSave: (item) {
+                                  ref
+                                      .read(userWorkPortfolioProvider.notifier)
+                                      .updateVideo(videoIndex, item, targetId);
+                                  ref.read(talentListProvider.notifier).fetchTalents();
+                                  ref.read(networkProvider.notifier).refresh();
+                                  setState(() {});
+                                },
+                                onDelete: () {
+                                  ref
+                                      .read(userWorkPortfolioProvider.notifier)
+                                      .deleteVideo(videoIndex, targetId);
+                                  ref.read(talentListProvider.notifier).fetchTalents();
+                                  ref.read(networkProvider.notifier).refresh();
+                                  if (_currentVideoIndex > 0) {
+                                    setState(() {
+                                      _currentVideoIndex =
+                                          _currentVideoIndex - 1;
+                                    });
+                                  } else {
+                                    setState(() {});
+                                  }
+                                },
+                              );
+                            },
+                    ),
+                    const SizedBox(width: 8),
+                    _buildWorkActionButton(
+                      icon: Icons.add,
+                      bgColor: const Color(0xFFE8F8F3),
+                      iconColor: const Color(0xFF00C48C),
+                      onTap: () {
+                        EditWorkMediaModal.showEditOrAddModal(
                         context: context,
                         isVideo: true,
                         isEditing: false,
                         onSave: (item) {
                           ref
                               .read(userWorkPortfolioProvider.notifier)
-                              .addVideo(item);
+                              .addVideo(item, targetId);
+                          ref.read(talentListProvider.notifier).fetchTalents();
+                          ref.read(networkProvider.notifier).refresh();
                           setState(() {
                             _currentVideoIndex = videos.length;
                           });
@@ -1266,12 +1370,13 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                   ),
                 ],
               ),
-              Row(
-                children: [
-                  _buildWorkActionButton(
-                    icon: Icons.edit_outlined,
-                    bgColor: const Color(0xFFE8F2FD),
-                    iconColor: const Color(0xFF3899F3),
+              if (isOwnProfile)
+                Row(
+                  children: [
+                    _buildWorkActionButton(
+                      icon: Icons.edit_outlined,
+                      bgColor: const Color(0xFFE8F2FD),
+                      iconColor: const Color(0xFF3899F3),
                     onTap: currentPhoto == null
                         ? () {}
                         : () {
@@ -1283,17 +1388,24 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                               onSave: (item) {
                                 ref
                                     .read(userWorkPortfolioProvider.notifier)
-                                    .updatePhoto(photoIndex, item);
+                                    .updatePhoto(photoIndex, item, targetId);
+                                ref.read(talentListProvider.notifier).fetchTalents();
+                                ref.read(networkProvider.notifier).refresh();
+                                setState(() {});
                               },
                               onDelete: () {
                                 ref
                                     .read(userWorkPortfolioProvider.notifier)
-                                    .deletePhoto(photoIndex);
+                                    .deletePhoto(photoIndex, targetId);
+                                ref.read(talentListProvider.notifier).fetchTalents();
+                                ref.read(networkProvider.notifier).refresh();
                                 if (_currentPhotoIndex > 0) {
                                   setState(() {
                                     _currentPhotoIndex =
                                         _currentPhotoIndex - 1;
                                   });
+                                } else {
+                                  setState(() {});
                                 }
                               },
                             );
@@ -1312,7 +1424,9 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                         onSave: (item) {
                           ref
                               .read(userWorkPortfolioProvider.notifier)
-                              .addPhoto(item);
+                              .addPhoto(item, targetId);
+                          ref.read(talentListProvider.notifier).fetchTalents();
+                          ref.read(networkProvider.notifier).refresh();
                           setState(() {
                             _currentPhotoIndex = photos.length;
                           });
@@ -1491,185 +1605,117 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
     String displayName,
     String? displayAvatar,
   ) {
+    final feedAsync = ref.watch(homeFeedProvider);
+    final allFeedPosts = feedAsync.value ?? const <PostItem>[];
+
+    final currentUid = Supabase.instance.client.auth.currentUser?.id;
+    final activePersona = ref.watch(userPersonaProvider);
+
+    // Filter posts from feed that belong to this profile
+    final matchingPosts = allFeedPosts.where((post) {
+      if (isOwnProfile) {
+        return post.authorId == talent.id ||
+            post.authorId == activePersona.id ||
+            (currentUid != null && post.authorId == currentUid) ||
+            post.authorName.toLowerCase() == displayName.toLowerCase();
+      }
+      return post.authorId == talent.id ||
+          post.authorName.toLowerCase() == talent.name.toLowerCase();
+    }).toList();
+
+    // Include talent.posts if not already present
+    for (final post in talent.posts) {
+      if (!matchingPosts.any((p) => p.id == post.id)) {
+        matchingPosts.add(post);
+      }
+    }
+
+    // Predefined posts for primary personas if matching list is still empty
+    if (matchingPosts.isEmpty) {
+      if (talent.id == UserPersonaNotifier.alexanderId ||
+          talent.name == 'Alexander Cole') {
+        matchingPosts.addAll([
+          TalentDirectory.alexanderPost,
+          TalentDirectory.alexanderPost2,
+        ]);
+      } else if (talent.id == UserPersonaNotifier.jeremiahId ||
+          talent.name == 'Jeremiah Green') {
+        matchingPosts.addAll([
+          TalentDirectory.jeremiahPost,
+          TalentDirectory.jeremiahPost2,
+        ]);
+      } else if (talent.id == UserPersonaNotifier.filmfareId ||
+          talent.name == 'FilmFare') {
+        matchingPosts.addAll([
+          TalentDirectory.filmfarePost,
+          TalentDirectory.filmfarePost2,
+        ]);
+      } else if (isOwnProfile) {
+        matchingPosts.add(
+          PostItem(
+            id: 'post_debut_${talent.id}',
+            authorId: talent.id,
+            authorName: displayName,
+            authorAvatar: displayAvatar,
+            authorRole: talent.roles.isNotEmpty ? talent.roles : 'Actor',
+            caption:
+                'Excited to join You2Art! Exploring new auditions, casting opportunities, and creative collaborations.\n#You2Art #Debut #Creative #Audition',
+            mediaUrl: talent.workPortfolio.isNotEmpty
+                ? talent.workPortfolio.first
+                : null,
+            createdAt: DateTime.now().subtract(const Duration(hours: 4)),
+            likeCount: 48,
+            commentCount: 6,
+          ),
+        );
+      } else {
+        matchingPosts.add(_buildTailoredArtistPost(talent));
+      }
+    }
+
     return Column(
       children: [
-        _buildActivityPost(
-          name: displayName,
-          avatarUrl: displayAvatar,
-          time: '2 Days Ago',
-          caption:
-              'Hi Guys! Something interesting is on it\'s way! 3 Days to Go.',
-          tags: '#Reveal #Audition #FawadKhan',
-          imageUrl:
-              'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=800&q=80',
-          likes: '141.2K',
-          comments: '14K',
-          shares: '14K',
-        ),
-        const Divider(height: 1, thickness: 1, color: Color(0xFFF0F0F0)),
-        _buildActivityPost(
-          name: displayName,
-          avatarUrl: displayAvatar,
-          time: '2 Days Ago',
-          caption:
-              'Hi Guys! Something interesting is on it\'s way! 3 Days to Go.',
-          tags: '#Reveal #Audition #FawadKhan',
-          imageUrl:
-              'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=800&q=80',
-          likes: '141.2K',
-          comments: '14K',
-          shares: '14K',
-        ),
+        for (int i = 0; i < matchingPosts.length; i++) ...[
+          PostCard(post: matchingPosts[i]),
+          if (i < matchingPosts.length - 1)
+            const Divider(height: 1, thickness: 1, color: Color(0xFFF0F0F0)),
+        ],
         const SizedBox(height: 80),
       ],
     );
   }
 
-  Widget _buildActivityPost({
-    required String name,
-    required String? avatarUrl,
-    required String time,
-    required String caption,
-    required String tags,
-    required String imageUrl,
-    required String likes,
-    required String comments,
-    required String shares,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: const Color(0xFFEEEEEE),
-                backgroundImage: (avatarUrl != null && avatarUrl.isNotEmpty)
-                    ? NetworkImage(avatarUrl)
-                    : null,
-                child: (avatarUrl == null || avatarUrl.isEmpty)
-                    ? const Icon(Icons.person, size: 20, color: Colors.grey)
-                    : null,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF1A1A2E),
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      time,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: Color(0xFF9E9E9E),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border:
-                      Border.all(color: const Color(0xFFEAEAEA), width: 0.8),
-                ),
-                child: const Icon(
-                  Icons.more_vert_rounded,
-                  size: 16,
-                  color: Color(0xFF757575),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
+  PostItem _buildTailoredArtistPost(TalentModel talent) {
+    final lowerRole = talent.roles.toLowerCase();
+    String caption;
+    if (lowerRole.contains('sing') || lowerRole.contains('dance')) {
+      caption =
+          'Rehearsing for our upcoming stage production opening soon! Grateful for this amazing ensemble team.\n#Theater #Rehearsal #LivePerformance #Stage';
+    } else if (lowerRole.contains('director') ||
+        lowerRole.contains('cinematograph')) {
+      caption =
+          'Location scouting in progress for our next quarter feature shoot. Looking for dramatic architecture and lighting.\n#Cinematography #Director #FilmSet #Scouting';
+    } else if (lowerRole.contains('model') || lowerRole.contains('fashion')) {
+      caption =
+          'Autumn editorial campaign previews are in! Excited to share the full spreads with everyone soon.\n#Fashion #Editorial #ModelLife #Runway';
+    } else {
+      caption =
+          'Working on exciting new performance material and creative projects. Stay tuned for showreels!\n#Acting #Showreel #Audition #Creatives';
+    }
 
-          // Caption & Tags
-          Text(
-            caption,
-            style: const TextStyle(
-              fontSize: 14,
-              color: Color(0xFF1A1A2E),
-              height: 1.35,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            tags,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF3899F3),
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // Large Media Photo
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Image.network(
-              imageUrl,
-              height: 320,
-              width: double.infinity,
-              fit: BoxFit.cover,
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // Reactions row
-          Row(
-            children: [
-              _buildReactionButton(
-                icon: Icons.favorite_border_rounded,
-                count: likes,
-              ),
-              const SizedBox(width: 20),
-              _buildReactionButton(
-                icon: Icons.chat_bubble_outline_rounded,
-                count: comments,
-              ),
-              const SizedBox(width: 20),
-              _buildReactionButton(
-                icon: Icons.send_outlined,
-                count: shares,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildReactionButton({
-    required IconData icon,
-    required String count,
-  }) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 20, color: const Color(0xFF3899F3)),
-        const SizedBox(width: 6),
-        Text(
-          count,
-          style: const TextStyle(
-            fontSize: 12.5,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF1A1A2E),
-          ),
-        ),
-      ],
+    return PostItem(
+      id: 'post_artist_${talent.id}',
+      authorId: talent.id,
+      authorName: talent.name,
+      authorAvatar: talent.avatarUrl,
+      authorRole: talent.roles,
+      caption: caption,
+      mediaUrl: talent.workPortfolio.isNotEmpty
+          ? talent.workPortfolio.first
+          : talent.avatarUrl,
+      createdAt: DateTime.now().subtract(const Duration(days: 2)),
+      likeCount: 184,
+      commentCount: 16,
     );
   }
 }

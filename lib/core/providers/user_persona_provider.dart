@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:you_too_art/core/providers/shared_preferences_provider.dart';
+import 'package:you_too_art/core/services/app_persistence_service.dart';
 
 class UserPersona {
   final String id;
@@ -21,11 +22,10 @@ class UserPersona {
     required this.role,
     required this.avatarUrl,
     this.isProductionHouse = false,
-    this.bio =
-        'Netus vel neque vulputate nam nam sit amet a pulvinar. Vitae consequat sed sit interdum nulla. Libero viverra facilisis.',
-    this.website = 'www.be.net/WajahatUIUX',
-    this.experience = '5+ Years',
-    this.location = 'Islamabad, Pakistan',
+    this.bio = '',
+    this.website = '',
+    this.experience = '',
+    this.location = '',
   });
 
   UserPersona copyWith({
@@ -53,15 +53,58 @@ class UserPersona {
       location: location ?? this.location,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'email': email,
+        'role': role,
+        'avatarUrl': avatarUrl,
+        'isProductionHouse': isProductionHouse,
+        'bio': bio,
+        'website': website,
+        'experience': experience,
+        'location': location,
+      };
+
+  factory UserPersona.fromJson(Map<String, dynamic> json) {
+    return UserPersona(
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      email: json['email'] as String? ?? '',
+      role: json['role'] as String? ?? '',
+      avatarUrl: json['avatarUrl'] as String? ?? '',
+      isProductionHouse: json['isProductionHouse'] as bool? ?? false,
+      bio: json['bio'] as String? ?? '',
+      website: json['website'] as String? ?? '',
+      experience: json['experience'] as String? ?? '',
+      location: json['location'] as String? ?? '',
+    );
+  }
 }
 
 class UserPersonaNotifier extends Notifier<UserPersona> {
-  static const String _personaPrefKey = 'active_user_persona_id';
+  static SharedPreferences? globalPrefs;
 
-  static const String actorDefaultId = '00000000-0000-0000-0000-000000000001';
-  static const String alexanderId = 'a1111111-1111-1111-1111-111111111111';
-  static const String filmfareId = 'b2222222-2222-2222-2222-222222222222';
-  static const String jeremiahId = 'c3333333-3333-3333-3333-333333333333';
+  static const String actorDefaultId = AppPersistenceService.actorDefaultId;
+  static const String alexanderId = AppPersistenceService.alexanderId;
+  static const String filmfareId = AppPersistenceService.filmfareId;
+  static const String jeremiahId = AppPersistenceService.jeremiahId;
+
+  static const personaActor = UserPersona(
+    id: actorDefaultId,
+    name: 'Muhammad Wajahat',
+    email: 'wajahat@youtooart.test',
+    role: 'Actor, Director',
+    avatarUrl:
+        'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',
+    isProductionHouse: false,
+    bio:
+        'Award-winning performing artist and indie filmmaker focusing on dramatic monologues, character studies, and cinematic narratives.',
+    website: 'www.be.net/WajahatUIUX',
+    experience: '5+ Years',
+    location: 'Islamabad, Pakistan',
+  );
 
   static const personaAlexander = UserPersona(
     id: alexanderId,
@@ -69,8 +112,13 @@ class UserPersonaNotifier extends Notifier<UserPersona> {
     email: 'alexander.cole@youtooart.test',
     role: 'Actor | Director | Producer',
     avatarUrl:
-        'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',
+        'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=400&q=80',
     isProductionHouse: false,
+    bio:
+        'Award-winning actor and indie film director with extensive experience across feature drama, festival shorts, and modern theatrical storytelling.',
+    website: 'www.alexandercole.art',
+    experience: '8+ Years',
+    location: 'New York, NY',
   );
 
   static const personaFilmFare = UserPersona(
@@ -81,6 +129,11 @@ class UserPersonaNotifier extends Notifier<UserPersona> {
     avatarUrl:
         'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=400&q=80',
     isProductionHouse: true,
+    bio:
+        'FilmFare is a premier entertainment studio producing groundbreaking feature films, digital web series, and high-impact commercial cinema. We connect bold emerging talent with top industry directors.',
+    website: 'www.filmfare-studios.com',
+    experience: '12+ Years',
+    location: 'Hollywood, CA',
   );
 
   static const personaJeremiah = UserPersona(
@@ -91,77 +144,59 @@ class UserPersonaNotifier extends Notifier<UserPersona> {
     avatarUrl:
         'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80',
     isProductionHouse: false,
+    bio:
+        'Passionate actor, runway model, and aspiring film director based in Los Angeles. Experienced in leading roles across independent cinema, international commercials, and theatrical performances.',
+    website: 'www.jeremiahgreen.com',
+    experience: '6+ Years',
+    location: 'Los Angeles, CA',
   );
 
-  static UserPersona buildActorPersona() {
-    try {
-      final user = Supabase.instance.client.auth.currentUser;
-      if (user != null) {
-        final metaName = user.userMetadata?['name'] as String?;
-        return UserPersona(
-          id: user.id,
-          name: (metaName != null && metaName.trim().isNotEmpty)
-              ? metaName
-              : 'You (Actor)',
-          email: user.email ?? 'actor@youtooart.test',
-          role: (user.userMetadata?['role'] as String?) ?? 'Actor | Performing Artist',
-          avatarUrl:
-              'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
-          isProductionHouse: false,
-        );
-      }
-    } catch (_) {}
+  static bool isActorId(String id) =>
+      AppPersistenceService.instance.isActorId(id);
 
-    return const UserPersona(
-      id: actorDefaultId,
-      name: 'You (Actor)',
-      email: 'actor@youtooart.test',
-      role: 'Actor | Performing Artist',
-      avatarUrl:
-          'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
-      isProductionHouse: false,
-    );
-  }
+  static bool isSamePersona(String id1, String id2) =>
+      AppPersistenceService.instance.isSamePersona(id1, id2);
 
-  static List<UserPersona> get allPersonas => [
-        buildActorPersona(),
-        personaAlexander,
-        personaFilmFare,
-        personaJeremiah,
-      ];
+  static UserPersona getActorPersona([SharedPreferences? prefs]) =>
+      AppPersistenceService.instance.getActorPersona();
+
+  static UserPersona buildActorPersona() =>
+      AppPersistenceService.instance.getActorPersona();
+
+  static bool hasPersona(String id) =>
+      AppPersistenceService.instance.hasPersona(id);
+
+  static UserPersona getPersonaById(String id, [SharedPreferences? prefs]) =>
+      AppPersistenceService.instance.getPersona(id);
+
+  static List<UserPersona> get allPersonas =>
+      AppPersistenceService.instance.allPersonas;
 
   @override
   UserPersona build() {
-    _loadSavedPersona();
-    return buildActorPersona();
+    ref.watch(sharedPreferencesProvider);
+    void listener() {
+      state = AppPersistenceService.instance.getActivePersona();
+    }
+    AppPersistenceService.instance.addListener(listener);
+    ref.onDispose(() => AppPersistenceService.instance.removeListener(listener));
+    return AppPersistenceService.instance.getActivePersona();
   }
 
-  Future<void> _loadSavedPersona() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final savedId = prefs.getString(_personaPrefKey);
-      if (savedId != null) {
-        final found = allPersonas.firstWhere(
-          (p) => p.id == savedId,
-          orElse: () => buildActorPersona(),
-        );
-        state = found;
-      }
-    } catch (_) {}
+  Future<void> updateProfile(UserPersona updated) async {
+    AppPersistenceService.instance.savePersona(updated);
+    state = updated;
   }
 
   Future<void> switchPersona(UserPersona newPersona) async {
-    state = newPersona;
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_personaPrefKey, newPersona.id);
-    } catch (_) {}
+    AppPersistenceService.instance.setActivePersonaId(newPersona.id);
+    state = AppPersistenceService.instance.getActivePersona();
   }
 
   Future<void> switchById(String id) async {
     final match = allPersonas.firstWhere(
-      (p) => p.id == id,
-      orElse: () => buildActorPersona(),
+      (p) => isSamePersona(p.id, id),
+      orElse: () => getActorPersona(),
     );
     await switchPersona(match);
   }

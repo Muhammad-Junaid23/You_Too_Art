@@ -6,8 +6,11 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:you_too_art/app/config/routes.dart';
 import 'package:you_too_art/app/theme/theme.dart';
 import 'package:you_too_art/core/providers/theme_provider.dart';
+import 'package:you_too_art/core/providers/user_persona_provider.dart';
 import 'package:you_too_art/core/widgets/web_responsive_wrapper.dart';
 import 'package:you_too_art/features/auth/providers/auth_provider.dart';
+import 'package:you_too_art/core/services/app_persistence_service.dart';
+import 'package:you_too_art/features/profile/providers/user_portfolio_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,6 +21,9 @@ void main() async {
   );
 
   final sharedPreferences = await SharedPreferences.getInstance();
+  await AppPersistenceService.initialize(sharedPreferences);
+  UserPersonaNotifier.globalPrefs = sharedPreferences;
+  UserPortfolioNotifier.globalPrefs = sharedPreferences;
 
   runApp(
     ProviderScope(

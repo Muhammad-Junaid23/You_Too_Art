@@ -1,4 +1,5 @@
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
+import 'package:you_too_art/core/services/app_persistence_service.dart';
 import 'package:you_too_art/features/home/models/post_item.dart';
 import 'package:you_too_art/features/talent/models/talent_model.dart';
 
@@ -22,7 +23,7 @@ class TalentDirectory {
   static const String muhammadAliId = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee';
   static const String ranveerSinghId = 'ffffffff-ffff-ffff-ffff-ffffffffffff';
 
-  // Sample post for Jeremiah Green strictly matching Figma Image 1 & 2
+  // Sample posts for Jeremiah Green strictly matching Figma
   static final jeremiahPost = PostItem(
     id: 'post-jeremiah-1',
     authorId: UserPersonaNotifier.jeremiahId,
@@ -38,7 +39,23 @@ class TalentDirectory {
     commentCount: 28,
   );
 
-  // Sample post for FilmFare strictly matching Figma Image 3 & 4
+  static final jeremiahPost2 = PostItem(
+    id: 'post-jeremiah-2',
+    authorId: UserPersonaNotifier.jeremiahId,
+    authorName: 'Jeremiah Green',
+    authorRole: 'Actor | Model | Director',
+    authorAvatar:
+        'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80',
+    caption:
+        'Behind the scenes from yesterday\'s editorial campaign shoot in downtown LA. Grateful for this creative team!\n#Editorial #ModelLife #LosAngeles',
+    mediaUrl:
+        'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=1200&q=80',
+    createdAt: DateTime.now().subtract(const Duration(days: 4)),
+    likeCount: 512,
+    commentCount: 37,
+  );
+
+  // Sample posts for FilmFare strictly matching Figma
   static final filmfarePost = PostItem(
     id: 'post-filmfare-1',
     authorId: UserPersonaNotifier.filmfareId,
@@ -55,14 +72,30 @@ class TalentDirectory {
     commentCount: 114,
   );
 
-  // Sample post for Alexander Cole
+  static final filmfarePost2 = PostItem(
+    id: 'post-filmfare-2',
+    authorId: UserPersonaNotifier.filmfareId,
+    authorName: 'FilmFare',
+    authorRole: 'Production House',
+    authorAvatar:
+        'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=400&q=80',
+    caption:
+        'Now Casting: Lead & supporting roles for our upcoming dramatic web series slate. Submit showreels through You2Art!\n#CastingCall #Audition #FilmFareStudio',
+    mediaUrl:
+        'https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&fit=crop&w=1200&q=80',
+    createdAt: DateTime.now().subtract(const Duration(days: 4)),
+    likeCount: 2340,
+    commentCount: 189,
+  );
+
+  // Sample posts for Alexander Cole
   static final alexanderPost = PostItem(
     id: 'post-alexander-1',
     authorId: UserPersonaNotifier.alexanderId,
     authorName: 'Alexander Cole',
     authorRole: 'Actor | Director | Producer',
     authorAvatar:
-        'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',
+        'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=400&q=80',
     caption:
         'Wrapping up the final shoot for our upcoming indie project. Huge thanks to the brilliant crew!\n#Director #SetLife #Cinema',
     mediaUrl:
@@ -70,6 +103,22 @@ class TalentDirectory {
     createdAt: DateTime.now().subtract(const Duration(days: 1)),
     likeCount: 685,
     commentCount: 42,
+  );
+
+  static final alexanderPost2 = PostItem(
+    id: 'post-alexander-2',
+    authorId: UserPersonaNotifier.alexanderId,
+    authorName: 'Alexander Cole',
+    authorRole: 'Actor | Director | Producer',
+    authorAvatar:
+        'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=400&q=80',
+    caption:
+        'In post-production for Brooklyn Noir. Festival submissions opening next month! Thrilled to share the cut soon.\n#BrooklynNoir #IndieFilm #Director',
+    mediaUrl:
+        'https://images.unsplash.com/photo-1478760329108-5c3ed9d495a0?auto=format&fit=crop&w=1200&q=80',
+    createdAt: DateTime.now().subtract(const Duration(days: 3)),
+    likeCount: 892,
+    commentCount: 64,
   );
 
   static final jeremiahGreen = TalentModel(
@@ -85,7 +134,7 @@ class TalentDirectory {
         'Passionate actor, runway model, and aspiring film director based in Los Angeles. Experienced in leading roles across independent cinema, international commercials, and theatrical performances.',
     location: 'Los Angeles, CA',
     email: 'jeremiah.green@youtooart.test',
-    posts: [jeremiahPost],
+    posts: [jeremiahPost, jeremiahPost2],
     aboutInfo: const {
       'Category': 'Performing Arts & Modeling',
       'Experience': '6+ Years Experience',
@@ -98,10 +147,10 @@ class TalentDirectory {
       'Languages': 'English, French, Spanish',
     },
     workPortfolio: const [
+      'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=600&q=80',
       'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=600&q=80',
       'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80',
-      'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&w=600&q=80',
-      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1426604966848-d7adac402bff?auto=format&fit=crop&w=600&q=80',
       'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=600&q=80',
       'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=600&q=80',
     ],
@@ -120,7 +169,7 @@ class TalentDirectory {
         'FilmFare is a premier entertainment studio producing groundbreaking feature films, digital web series, and high-impact commercial cinema. We connect bold emerging talent with top industry directors.',
     location: 'Hollywood, CA',
     email: 'filmfare.studio@youtooart.test',
-    posts: [filmfarePost],
+    posts: [filmfarePost, filmfarePost2],
     aboutInfo: const {
       'Category': 'Production House & Studio',
       'Established': '2012',
@@ -137,7 +186,7 @@ class TalentDirectory {
     name: 'Alexander Cole',
     roles: 'Actor | Director | Producer',
     avatarUrl:
-        'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',
+        'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=400&q=80',
     connectsCount: '98.4K',
     postsCount: '189',
     isProductionHouse: false,
@@ -145,7 +194,7 @@ class TalentDirectory {
         'Award-winning actor and indie film director with extensive experience across feature drama, festival shorts, and modern theatrical storytelling.',
     location: 'New York, NY',
     email: 'alexander.cole@youtooart.test',
-    posts: [alexanderPost],
+    posts: [alexanderPost, alexanderPost2],
     aboutInfo: const {
       'Category': 'Acting & Directing',
       'Experience': '8+ Years Experience',
@@ -154,8 +203,10 @@ class TalentDirectory {
       'Languages': 'English, Italian',
     },
     workPortfolio: const [
-      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=600&q=80',
       'https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1478760329108-5c3ed9d495a0?auto=format&fit=crop&w=600&q=80',
     ],
   );
 
@@ -323,9 +374,23 @@ class TalentDirectory {
   );
 
   static List<TalentModel> get allCuratedTalents => [
-        jeremiahGreen,
-        filmfare,
-        alexanderCole,
+        findById(UserPersonaNotifier.jeremiahId) ?? jeremiahGreen,
+        findById(UserPersonaNotifier.filmfareId) ?? filmfare,
+        findById(UserPersonaNotifier.alexanderId) ?? alexanderCole,
+        sophiaVance,
+        marcusChen,
+        elenaRostova,
+        davidKalu,
+        lucasScott,
+        jamesPhillips,
+        barbaraGordon,
+        samuelMoore,
+        dianaPrince,
+        loisLane,
+        kadenFane,
+        wandaMaximoff,
+        muhammadAli,
+        ranveerSingh,
       ];
 
   static final Map<String, TalentModel> _byId = {
@@ -351,5 +416,32 @@ class TalentDirectory {
       t.id: t,
   };
 
-  static TalentModel? findById(String id) => _byId[id];
+  static TalentModel? findById(String id) {
+    if (UserPersonaNotifier.isActorId(id)) {
+      final persona = UserPersonaNotifier.getActorPersona();
+      final portfolio = AppPersistenceService.instance.getPortfolio('actor');
+      final photos = portfolio.photos.map((p) => p.mediaUrl).toList();
+      return TalentModel.fromPersona(
+        persona,
+        connectsCount: '124.7K',
+        postsCount: '${portfolio.videos.length + portfolio.photos.length}',
+        workPortfolio: photos,
+      );
+    }
+    if (UserPersonaNotifier.hasPersona(id)) {
+      final persona = UserPersonaNotifier.getPersonaById(id);
+      final base = _byId[id] ?? _byId[persona.id];
+      final portfolio = AppPersistenceService.instance.getPortfolio(id);
+      final photos = portfolio.photos.map((p) => p.mediaUrl).toList();
+      return TalentModel.fromPersona(
+        persona,
+        connectsCount: base?.connectsCount ?? '124.7K',
+        postsCount: '${portfolio.videos.length + portfolio.photos.length}',
+        posts: base?.posts ?? [],
+        aboutInfo: base?.aboutInfo,
+        workPortfolio: photos,
+      );
+    }
+    return _byId[id];
+  }
 }
