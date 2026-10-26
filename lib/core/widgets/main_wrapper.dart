@@ -66,126 +66,109 @@ class MainWrapper extends ConsumerWidget {
         ),
         child: SafeArea(
           top: false,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Navigation Items Row
-              Container(
-                height: 56,
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: List.generate(_items.length, (index) {
-                    final item = _items[index];
-                    final isSelected = index == currentIndex;
+          child: Container(
+            height: 58,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: List.generate(_items.length, (index) {
+                final item = _items[index];
+                final isSelected = index == currentIndex;
 
-                    Widget iconWidget = SvgPicture.asset(
-                      item.svgPath,
-                      width: isSelected ? 20 : 22,
-                      height: isSelected ? 20 : 22,
-                      colorFilter: ColorFilter.mode(
-                        isSelected
-                            ? const Color(0xFF3899F3)
-                            : const Color(0xFF474B51),
-                        BlendMode.srcIn,
-                      ),
-                    );
+                Widget iconWidget = SvgPicture.asset(
+                  item.svgPath,
+                  width: isSelected ? 20 : 22,
+                  height: isSelected ? 20 : 22,
+                  colorFilter: ColorFilter.mode(
+                    isSelected
+                        ? const Color(0xFF3899F3)
+                        : const Color(0xFF474B51),
+                    BlendMode.srcIn,
+                  ),
+                );
 
-                    if (item.label == 'Chat' && unreadChatCount > 0) {
-                      iconWidget = Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          iconWidget,
-                          Positioned(
-                            top: -4,
-                            right: -6,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 4,
-                                vertical: 1.5,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF3899F3),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              constraints: const BoxConstraints(
-                                minWidth: 15,
-                                minHeight: 15,
-                              ),
-                              child: Center(
-                                child: Text(
-                                  unreadChatCount > 99 ? '99+' : '$unreadChatCount',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.bold,
-                                    height: 1.0,
-                                  ),
-                                ),
+                if (item.label == 'Chat' && unreadChatCount > 0) {
+                  iconWidget = Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      iconWidget,
+                      Positioned(
+                        top: -4,
+                        right: -6,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 1.5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF3899F3),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          constraints: const BoxConstraints(
+                            minWidth: 15,
+                            minHeight: 15,
+                          ),
+                          child: Center(
+                            child: Text(
+                              unreadChatCount > 99 ? '99+' : '$unreadChatCount',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                                height: 1.0,
                               ),
                             ),
                           ),
-                        ],
-                      );
-                    }
-
-                    return GestureDetector(
-                      onTap: () {
-                        navigationShell.goBranch(
-                          index,
-                          initialLocation: index == currentIndex,
-                        );
-                      },
-                      behavior: HitTestBehavior.opaque,
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        curve: Curves.easeInOut,
-                        padding: isSelected
-                            ? const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 7,
-                              )
-                            : const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? const Color(0xFFE7F3FE)
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            iconWidget,
-                            if (isSelected) ...[
-                              const SizedBox(width: 6),
-                              Text(
-                                item.label,
-                                style: const TextStyle(
-                                  color: Color(0xFF3899F3),
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ],
-                          ],
                         ),
                       ),
-                    );
-                  }),
-                ),
-              ),
+                    ],
+                  );
+                }
 
-              // Bottom Home Indicator Bar matching Figma
-              Container(
-                margin: const EdgeInsets.only(top: 2, bottom: 6),
-                width: 134,
-                height: 4.5,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFB8BFC8),
-                  borderRadius: BorderRadius.circular(3),
-                ),
-              ),
-            ],
+                return GestureDetector(
+                  onTap: () {
+                    navigationShell.goBranch(
+                      index,
+                      initialLocation: index == currentIndex,
+                    );
+                  },
+                  behavior: HitTestBehavior.opaque,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeInOut,
+                    padding: isSelected
+                        ? const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 7,
+                          )
+                        : const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? const Color(0xFFE7F3FE)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        iconWidget,
+                        if (isSelected) ...[
+                          const SizedBox(width: 6),
+                          Text(
+                            item.label,
+                            style: const TextStyle(
+                              color: Color(0xFF3899F3),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                );
+              }),
+            ),
           ),
         ),
       ),

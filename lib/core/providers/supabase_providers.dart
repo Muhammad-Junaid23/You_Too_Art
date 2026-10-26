@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:you_too_art/core/repositories/casting_repository.dart';
 import 'package:you_too_art/core/repositories/chat_repository.dart';
 import 'package:you_too_art/core/repositories/connection_repository.dart';
 import 'package:you_too_art/core/repositories/notification_repository.dart';
@@ -37,6 +38,12 @@ final chatRepositoryProvider = Provider<ChatRepository>((ref) {
 final postRepositoryProvider = Provider<PostRepository>((ref) {
   final client = ref.watch(supabaseClientProvider);
   return PostRepository(client);
+});
+
+/// Provides the [CastingRepository] for casting calls and applications.
+final castingRepositoryProvider = Provider<CastingRepository>((ref) {
+  final client = ref.watch(supabaseClientProvider);
+  return CastingRepository(client);
 });
 
 /// Provides the [StorageRepository] for Cloudinary uploads.
