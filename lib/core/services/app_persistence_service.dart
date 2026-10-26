@@ -6,6 +6,8 @@ import 'package:you_too_art/core/constants/talent_directory.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
 import 'package:you_too_art/core/services/app_persistence_driver.dart';
 import 'package:you_too_art/features/profile/providers/user_portfolio_provider.dart';
+import 'package:you_too_art/features/casting/models/casting_application_model.dart';
+import 'package:you_too_art/features/casting/models/casting_call_model.dart';
 import 'package:you_too_art/features/talent/models/talent_model.dart';
 
 /// Centralized, multi-engine persistence service that guarantees user data,
@@ -38,6 +40,8 @@ class AppPersistenceService {
   final SharedPreferences _prefs;
   final Map<String, UserPersona> _personas = {};
   final Map<String, UserPortfolioState> _portfolios = {};
+  final List<CastingCallModel> _castingCalls = [];
+  final List<CastingApplicationModel> _castingApplications = [];
   String _activePersonaId = actorDefaultId;
 
   /// Callback fired when persistent state updates (e.g. from cloud or edit)
@@ -255,6 +259,32 @@ class AppPersistenceService {
     notifyListeners();
   }
 
+  // ─── Casting Calls & Applications Queries ──────────────────
+
+  List<CastingCallModel> getCastingCalls() {
+    return List.unmodifiable(_castingCalls);
+  }
+
+  void saveCastingCalls(List<CastingCallModel> calls) {
+    _castingCalls
+      ..clear()
+      ..addAll(calls);
+    _flush();
+    notifyListeners();
+  }
+
+  List<CastingApplicationModel> getCastingApplications() {
+    return List.unmodifiable(_castingApplications);
+  }
+
+  void saveCastingApplications(List<CastingApplicationModel> apps) {
+    _castingApplications
+      ..clear()
+      ..addAll(apps);
+    _flush();
+    notifyListeners();
+  }
+
   // ─── Multi-Engine Persistence Logic ─────────────────────────
 
   Future<void> _loadAll() async {
@@ -312,6 +342,32 @@ class AppPersistenceService {
             } catch (_) {}
           }
         }
+
+        // Casting Calls
+        if (decoded['casting_calls'] is List) {
+          final cList = decoded['casting_calls'] as List<dynamic>;
+          _castingCalls.clear();
+          for (final item in cList) {
+            try {
+              _castingCalls.add(
+                CastingCallModel.fromJson(item as Map<String, dynamic>),
+              );
+            } catch (_) {}
+          }
+        }
+
+        // Casting Applications
+        if (decoded['casting_applications'] is List) {
+          final aList = decoded['casting_applications'] as List<dynamic>;
+          _castingApplications.clear();
+          for (final item in aList) {
+            try {
+              _castingApplications.add(
+                CastingApplicationModel.fromJson(item as Map<String, dynamic>),
+              );
+            } catch (_) {}
+          }
+        }
       } catch (e) {
         if (kDebugMode) debugPrint('AppPersistenceService._loadAll parse error: $e');
       }
@@ -350,6 +406,60 @@ class AppPersistenceService {
       }
     }
 
+    final callsStr = _prefs.getString('you_too_art_casting_calls_v2');
+    if (callsStr != null && callsStr.trim().isNotEmpty) {
+      try {
+        final decoded = jsonDecode(callsStr) as List<dynamic>;
+        final prefCalls = <CastingCallModel>[];
+        for (final item in decoded) {
+          try {
+            prefCalls.add(
+              CastingCallModel.fromJson(item as Map<String, dynamic>),
+            );
+          } catch (_) {}
+        }
+        if (prefCalls.isNotEmpty) {
+          final Map<String, CastingCallModel> callMap = {};
+          for (final c in prefCalls) {
+            callMap[c.id] = c;
+          }
+          for (final c in _castingCalls) {
+            callMap.putIfAbsent(c.id, () => c);
+          }
+          _castingCalls
+            ..clear()
+            ..addAll(callMap.values);
+        }
+      } catch (_) {}
+    }
+
+    final appsStr = _prefs.getString('you_too_art_casting_apps_v2');
+    if (appsStr != null && appsStr.trim().isNotEmpty) {
+      try {
+        final decoded = jsonDecode(appsStr) as List<dynamic>;
+        final prefApps = <CastingApplicationModel>[];
+        for (final item in decoded) {
+          try {
+            prefApps.add(
+              CastingApplicationModel.fromJson(item as Map<String, dynamic>),
+            );
+          } catch (_) {}
+        }
+        if (prefApps.isNotEmpty) {
+          final Map<String, CastingApplicationModel> appMap = {};
+          for (final a in prefApps) {
+            appMap[a.id] = a;
+          }
+          for (final a in _castingApplications) {
+            appMap.putIfAbsent(a.id, () => a);
+          }
+          _castingApplications
+            ..clear()
+            ..addAll(appMap.values);
+        }
+      } catch (_) {}
+    }
+
     final savedId = _prefs.getString('active_user_persona_id');
     if (savedId != null && hasPersona(savedId)) {
       _activePersonaId = savedId;
@@ -386,6 +496,13 @@ class AppPersistenceService {
         alexanderId, () => _buildDefaultAlexanderPortfolio());
     _portfolios.putIfAbsent(filmfareId, () => _buildDefaultFilmFarePortfolio());
     _portfolios.putIfAbsent(jeremiahId, () => _buildDefaultJeremiahPortfolio());
+
+    if (_castingCalls.isEmpty) {
+      _castingCalls.addAll(_buildDefaultCastingCalls());
+    }
+    if (_castingApplications.isEmpty) {
+      _castingApplications.addAll(_buildDefaultCastingApplications());
+    }
   }
 
 
@@ -400,6 +517,9 @@ class AppPersistenceService {
         'portfolios': {
           for (final e in _portfolios.entries) e.key: e.value.toJson(),
         },
+        'casting_calls': _castingCalls.map((c) => c.toJson()).toList(),
+        'casting_applications':
+            _castingApplications.map((a) => a.toJson()).toList(),
       };
 
       final encoded = jsonEncode(data);
@@ -410,7 +530,7 @@ class AppPersistenceService {
       // 2. Write to SharedPreferences master snapshot
       _prefs.setString(_masterKey, encoded);
 
-      // 3. Write individual keys for every persona and portfolio
+      // 3. Write individual keys for every persona, portfolio, calls and apps
       for (final e in _personas.entries) {
         _prefs.setString(
           'persona_profile_${e.key}',
@@ -424,6 +544,14 @@ class AppPersistenceService {
         );
       }
       _prefs.setString('active_user_persona_id', _activePersonaId);
+      _prefs.setString(
+        'you_too_art_casting_calls_v2',
+        jsonEncode(_castingCalls.map((c) => c.toJson()).toList()),
+      );
+      _prefs.setString(
+        'you_too_art_casting_apps_v2',
+        jsonEncode(_castingApplications.map((a) => a.toJson()).toList()),
+      );
     } catch (e) {
       if (kDebugMode) debugPrint('AppPersistenceService._flush error: $e');
     }
@@ -455,6 +583,34 @@ class AppPersistenceService {
                   entry.value as Map<String, dynamic>,
                 ),
               );
+            }
+          }
+          if (decoded['casting_calls'] is List) {
+            final cList = decoded['casting_calls'] as List<dynamic>;
+            final existingIds = _castingCalls.map((c) => c.id).toSet();
+            for (final item in cList) {
+              try {
+                final call =
+                    CastingCallModel.fromJson(item as Map<String, dynamic>);
+                if (!existingIds.contains(call.id)) {
+                  _castingCalls.add(call);
+                  existingIds.add(call.id);
+                }
+              } catch (_) {}
+            }
+          }
+          if (decoded['casting_applications'] is List) {
+            final aList = decoded['casting_applications'] as List<dynamic>;
+            final existingIds = _castingApplications.map((a) => a.id).toSet();
+            for (final item in aList) {
+              try {
+                final app = CastingApplicationModel.fromJson(
+                    item as Map<String, dynamic>);
+                if (!existingIds.contains(app.id)) {
+                  _castingApplications.add(app);
+                  existingIds.add(app.id);
+                }
+              } catch (_) {}
             }
           }
         } catch (_) {}
@@ -655,6 +811,10 @@ class AppPersistenceService {
             'location': actor.location,
             'avatar_url': actor.avatarUrl,
             'mock_personas_snapshot': mockPersonasSnapshot,
+            'casting_calls_snapshot':
+                jsonEncode(_castingCalls.map((c) => c.toJson()).toList()),
+            'casting_apps_snapshot':
+                jsonEncode(_castingApplications.map((a) => a.toJson()).toList()),
           },
         ),
       );
@@ -1181,5 +1341,236 @@ class AppPersistenceService {
               ),
             ],
     );
+  }
+
+  static List<CastingCallModel> _buildDefaultCastingCalls() {
+    return [
+      CastingCallModel(
+        id: 'call_1',
+        projectTitle: 'The Next Short Film',
+        authorId: 'james_geidt',
+        authorName: 'James Geidt',
+        authorAvatar:
+            'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=400&q=80',
+        publishedDateStr: '24th April, 2023',
+        publishedAt: DateTime(2023, 4, 24),
+        description: 'A story of 6 young software engineers at Islamabad.',
+        location: 'Islamabad, Pakistan',
+        locationDisplay: 'Islamabad',
+        type: 'Short Film',
+        shootDuration: '25 Days',
+        budget: '\$20K',
+        budgetFull: '\$20,000',
+        crewRequired: '1',
+        shootDetails:
+            'Shoot will be of 30 days at the Centaurus Mall Islamabad.',
+        position: 'A Software Engineer in Islamabad',
+        ageRequired: '23 Years',
+        heightRequired: '5.9 Feet',
+        gender: 'Male Only',
+        contactEmail: 'james.geidt@production.test',
+        contactNumber: '+92 332 02522110',
+        applicantsCount: 520,
+        isApplied: true,
+        appliedAt: '2 Days Ago',
+      ),
+      CastingCallModel(
+        id: 'call_2',
+        projectTitle: 'The Next Short Film',
+        authorId: 'angel_culhane',
+        authorName: 'Angel Culhane',
+        authorAvatar:
+            'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80',
+        publishedDateStr: '20th April, 2023',
+        publishedAt: DateTime(2023, 4, 20),
+        description:
+            'Exciting indie drama looking for dynamic character actors.',
+        location: 'Islamabad, Pakistan',
+        locationDisplay: 'Islamabad',
+        type: 'Short Film',
+        shootDuration: '25 Days',
+        budget: '\$20K',
+        budgetFull: '\$20,000',
+        crewRequired: '2',
+        shootDetails:
+            'Filming in natural lighting across Islamabad outdoor locations.',
+        position: 'Supporting Actor',
+        ageRequired: '24 Years',
+        heightRequired: '5.10 Feet',
+        gender: 'Male Only',
+        contactEmail: 'angel.culhane@production.test',
+        contactNumber: '+92 300 1234567',
+        applicantsCount: 310,
+        isApplied: false,
+      ),
+      CastingCallModel(
+        id: 'call_3',
+        projectTitle: 'The Next Short Film',
+        authorId: 'angel_culhane_2',
+        authorName: 'Angel Culhane',
+        authorAvatar:
+            'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80',
+        publishedDateStr: '18th April, 2023',
+        publishedAt: DateTime(2023, 4, 18),
+        description:
+            'Contemporary web series pilot seeking expressive new faces.',
+        location: 'Islamabad, Pakistan',
+        locationDisplay: 'Islamabad',
+        type: 'Short Film',
+        shootDuration: '25 Days',
+        budget: '\$20K',
+        budgetFull: '\$20,000',
+        crewRequired: '1',
+        shootDetails: 'Studio lot soundstage filming in Islamabad.',
+        position: 'Secondary Actor',
+        ageRequired: '22 Years',
+        heightRequired: '5.9 Feet',
+        gender: 'Any',
+        contactEmail: 'angel.culhane@production.test',
+        contactNumber: '+92 300 9876543',
+        applicantsCount: 184,
+        isApplied: false,
+      ),
+      CastingCallModel(
+        id: 'my_call_1',
+        projectTitle: 'The Next Short Film',
+        authorId: 'filmfare',
+        authorName: 'FilmFare',
+        authorAvatar:
+            'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=400&q=80',
+        publishedDateStr: '2 Days Ago',
+        publishedAt: DateTime.now().subtract(const Duration(days: 2)),
+        description: 'A story of 6 young software engineers at Islamabad.',
+        location: 'Islamabad, Pakistan',
+        locationDisplay: 'Islamabad',
+        type: 'Short Film',
+        shootDuration: '25 Days',
+        budget: '\$20K',
+        budgetFull: '\$20,000',
+        crewRequired: '1',
+        shootDetails:
+            'Shoot will be of 30 days at the Centaurus Mall Islamabad.',
+        position: 'A Software Engineer in Islamabad',
+        ageRequired: '23 Years',
+        heightRequired: '5.9 Feet',
+        gender: 'Male Only',
+        contactEmail: 'filmfare.studio@youtooart.test',
+        contactNumber: '+92 332 02522110',
+        roleTitle: 'Software Engineer Lead',
+        roleDescription: 'Protagonist working on disruptive AI startup.',
+        applicantsCount: 520,
+        isApplied: false,
+      ),
+    ];
+  }
+
+  static List<CastingApplicationModel> _buildDefaultCastingApplications() {
+    return [
+      CastingApplicationModel(
+        id: 'app_seed_call1',
+        castingCallId: 'call_1',
+        projectTitle: 'The Next Short Film',
+        applicantId: 'actor',
+        applicantName: 'Muhammad Ali Nizami',
+        applicantAvatar:
+            'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',
+        appliedAt: '2 Days Ago',
+        appliedDateTime: DateTime.now().subtract(const Duration(days: 2)),
+        contactNumber: '+92 332 02522110',
+        contactEmail: 'muhammadali@gmail.com',
+        age: '23',
+        height: '5.9 Feet',
+        gender: 'Male',
+        experience: '5 Years',
+        location: 'Islamabad, Pakistan',
+        note: 'Shoot will be of 30 days at the Centaurus Mall Islamabad.',
+        status: ApplicationStatus.received,
+        isWishlisted: false,
+      ),
+      CastingApplicationModel(
+        id: 'app_1',
+        castingCallId: 'my_call_1',
+        projectTitle: 'The Next Short Film',
+        applicantId: 'muhammad_ali',
+        applicantName: 'Muhammad Ali Nizami',
+        applicantAvatar:
+            'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',
+        appliedAt: '1 Day Ago',
+        appliedDateTime: DateTime.now().subtract(const Duration(days: 1)),
+        contactNumber: '+92 332 02522110',
+        contactEmail: 'muhammadali@gmail.com',
+        age: '23',
+        height: '5.9 Feet',
+        gender: 'Male',
+        experience: '5 Years',
+        location: 'Islamabad, Pakistan',
+        note: 'Shoot will be of 30 days at the Centaurus Mall Islamabad.',
+        status: ApplicationStatus.received,
+        isWishlisted: false,
+      ),
+      CastingApplicationModel(
+        id: 'app_2',
+        castingCallId: 'my_call_1',
+        projectTitle: 'The Next Short Film',
+        applicantId: 'hamza_tariq',
+        applicantName: 'Hamza Tariq',
+        applicantAvatar:
+            'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80',
+        appliedAt: '2 Days Ago',
+        appliedDateTime: DateTime.now().subtract(const Duration(days: 2)),
+        contactNumber: '+92 300 1234567',
+        contactEmail: 'hamza.tariq@gmail.com',
+        age: '24',
+        height: '5.10 Feet',
+        gender: 'Male',
+        experience: '3 Years',
+        location: 'Lahore, Pakistan',
+        note: 'Ready for audition reel submission anytime.',
+        status: ApplicationStatus.received,
+        isWishlisted: false,
+      ),
+      CastingApplicationModel(
+        id: 'app_3',
+        castingCallId: 'my_call_1',
+        projectTitle: 'The Next Short Film',
+        applicantId: 'zainab_khan',
+        applicantName: 'Zainab Khan',
+        applicantAvatar:
+            'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
+        appliedAt: '3 Days Ago',
+        appliedDateTime: DateTime.now().subtract(const Duration(days: 3)),
+        contactNumber: '+92 312 9876543',
+        contactEmail: 'zainab.k@gmail.com',
+        age: '22',
+        height: '5.6 Feet',
+        gender: 'Female',
+        experience: '2 Years',
+        location: 'Islamabad, Pakistan',
+        note: 'Passionate theater artist interested in lead role.',
+        status: ApplicationStatus.rejected,
+        isWishlisted: false,
+      ),
+      CastingApplicationModel(
+        id: 'app_4',
+        castingCallId: 'my_call_1',
+        projectTitle: 'The Next Short Film',
+        applicantId: 'daniyal_raza',
+        applicantName: 'Daniyal Raza',
+        applicantAvatar:
+            'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=400&q=80',
+        appliedAt: '4 Days Ago',
+        appliedDateTime: DateTime.now().subtract(const Duration(days: 4)),
+        contactNumber: '+92 333 4567890',
+        contactEmail: 'daniyal.raza@gmail.com',
+        age: '25',
+        height: '6.0 Feet',
+        gender: 'Male',
+        experience: '4 Years',
+        location: 'Islamabad, Pakistan',
+        note: 'Strong character actor with commercial and drama experience.',
+        status: ApplicationStatus.wishlisted,
+        isWishlisted: true,
+      ),
+    ];
   }
 }

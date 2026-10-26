@@ -1,3 +1,4 @@
+import 'dart:convert';
 // ignore: avoid_web_libraries_in_flutter, deprecated_member_use
 import 'dart:html' as html;
 
@@ -11,10 +12,14 @@ class PlatformStorageDriver {
   static String? readRawData() {
     try {
       // 1. Check window.localStorage
-      final local = html.window.localStorage[_key] ??
-          html.window.localStorage['you_too_art_local_state_v3'];
+      final local = html.window.localStorage[_key];
       if (local != null && local.trim().isNotEmpty) {
-        return local;
+        try {
+          final test = jsonDecode(local);
+          if (test is Map<String, dynamic>) {
+            return local;
+          }
+        } catch (_) {}
       }
     } catch (_) {}
 
@@ -22,12 +27,17 @@ class PlatformStorageDriver {
       // 2. Check window.sessionStorage
       final session = html.window.sessionStorage[_key];
       if (session != null && session.trim().isNotEmpty) {
-        return session;
+        try {
+          final test = jsonDecode(session);
+          if (test is Map<String, dynamic>) {
+            return session;
+          }
+        } catch (_) {}
       }
     } catch (_) {}
 
     try {
-      // 2. Check chunked cookies (shared across localhost ports)
+      // 3. Check chunked cookies (shared across localhost ports)
       final cookieHeader = html.document.cookie ?? '';
       final cookieMap = <String, String>{};
       for (final cookie in cookieHeader.split(';')) {
@@ -40,23 +50,31 @@ class PlatformStorageDriver {
       final countStr = cookieMap['you_too_art_ccount'];
       if (countStr != null) {
         final count = int.tryParse(countStr) ?? 0;
-        if (count > 0) {
+        if (count > 0 && count < 30) {
           final buffer = StringBuffer();
+          bool allFound = true;
           for (int i = 0; i < count; i++) {
             final chunk = cookieMap['you_too_art_c$i'];
             if (chunk != null) {
               buffer.write(chunk);
+            } else {
+              allFound = false;
+              break;
             }
           }
-          final combined = buffer.toString();
-          if (combined.isNotEmpty) {
-            final decoded = Uri.decodeComponent(combined);
-            if (decoded.trim().isNotEmpty) {
-              try {
-                // Populate localStorage so subsequent reads in this session are instantaneous
-                html.window.localStorage[_key] = decoded;
-              } catch (_) {}
-              return decoded;
+          if (allFound) {
+            final combined = buffer.toString();
+            if (combined.isNotEmpty) {
+              final decoded = Uri.decodeComponent(combined);
+              if (decoded.trim().isNotEmpty) {
+                try {
+                  final test = jsonDecode(decoded);
+                  if (test is Map<String, dynamic>) {
+                    html.window.localStorage[_key] = decoded;
+                    return decoded;
+                  }
+                } catch (_) {}
+              }
             }
           }
         }
@@ -74,28 +92,30 @@ class PlatformStorageDriver {
     } catch (_) {}
 
     try {
-      // 2. Write to chunked cookies for permanent cross-port localhost sharing
+      // 2. Write to chunked cookies only if within safe browser cookie budget (< 3800 bytes)
       final encoded = Uri.encodeComponent(data);
-      final totalChunks = (encoded.length / _chunkSize).ceil();
+      if (encoded.length <= 3800) {
+        final totalChunks = (encoded.length / _chunkSize).ceil();
 
-      for (int i = 0; i < totalChunks; i++) {
-        final start = i * _chunkSize;
-        final end = (start + _chunkSize < encoded.length)
-            ? start + _chunkSize
-            : encoded.length;
-        final chunk = encoded.substring(start, end);
+        for (int i = 0; i < totalChunks; i++) {
+          final start = i * _chunkSize;
+          final end = (start + _chunkSize < encoded.length)
+              ? start + _chunkSize
+              : encoded.length;
+          final chunk = encoded.substring(start, end);
+          html.document.cookie =
+              'you_too_art_c$i=$chunk; path=/; max-age=31536000; SameSite=Lax';
+        }
+
+        // Clear any older excess chunks
+        for (int i = totalChunks; i < totalChunks + 10; i++) {
+          html.document.cookie =
+              'you_too_art_c$i=; path=/; max-age=0; SameSite=Lax';
+        }
+
         html.document.cookie =
-            'you_too_art_c$i=$chunk; path=/; max-age=31536000; SameSite=Lax';
+            'you_too_art_ccount=$totalChunks; path=/; max-age=31536000; SameSite=Lax';
       }
-
-      // Clear any older excess chunks
-      for (int i = totalChunks; i < totalChunks + 10; i++) {
-        html.document.cookie =
-            'you_too_art_c$i=; path=/; max-age=0; SameSite=Lax';
-      }
-
-      html.document.cookie =
-          'you_too_art_ccount=$totalChunks; path=/; max-age=31536000; SameSite=Lax';
     } catch (_) {}
   }
 }
