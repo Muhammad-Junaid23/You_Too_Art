@@ -81,6 +81,38 @@ class PlatformStorageDriver {
       }
     } catch (_) {}
 
+    // 4. Check dedicated casting calls cookie if raw data wasn't found or was incomplete
+    try {
+      final cookieHeader = html.document.cookie ?? '';
+      final cookieMap = <String, String>{};
+      for (final cookie in cookieHeader.split(';')) {
+        final parts = cookie.trim().split('=');
+        if (parts.length >= 2) {
+          cookieMap[parts[0].trim()] = parts.sublist(1).join('=').trim();
+        }
+      }
+
+      final callsCookie = cookieMap['you_too_art_ccalls'];
+      final appsCookie = cookieMap['you_too_art_capps'];
+
+      if (callsCookie != null && callsCookie.isNotEmpty) {
+        final decodedCalls = Uri.decodeComponent(callsCookie);
+        final callsList = jsonDecode(decodedCalls);
+        if (callsList is List && callsList.isNotEmpty) {
+          final fallbackState = {
+            'active_persona_id': '00000000-0000-0000-0000-000000000001',
+            'personas': {},
+            'portfolios': {},
+            'casting_calls': callsList,
+            'casting_applications': appsCookie != null
+                ? jsonDecode(Uri.decodeComponent(appsCookie))
+                : [],
+          };
+          return jsonEncode(fallbackState);
+        }
+      }
+    } catch (_) {}
+
     return null;
   }
 
@@ -89,6 +121,29 @@ class PlatformStorageDriver {
       // 1. Write to localStorage and sessionStorage
       html.window.localStorage[_key] = data;
       html.window.sessionStorage[_key] = data;
+
+      // Extract casting calls & applications for isolated backup
+      try {
+        final decoded = jsonDecode(data) as Map<String, dynamic>;
+        if (decoded.containsKey('casting_calls')) {
+          final callsJson = jsonEncode(decoded['casting_calls']);
+          html.window.localStorage['you_too_art_casting_calls_v2'] = callsJson;
+          final encodedCalls = Uri.encodeComponent(callsJson);
+          if (encodedCalls.length <= 3800) {
+            html.document.cookie =
+                'you_too_art_ccalls=$encodedCalls; path=/; max-age=31536000; SameSite=Lax';
+          }
+        }
+        if (decoded.containsKey('casting_applications')) {
+          final appsJson = jsonEncode(decoded['casting_applications']);
+          html.window.localStorage['you_too_art_casting_apps_v2'] = appsJson;
+          final encodedApps = Uri.encodeComponent(appsJson);
+          if (encodedApps.length <= 3800) {
+            html.document.cookie =
+                'you_too_art_capps=$encodedApps; path=/; max-age=31536000; SameSite=Lax';
+          }
+        }
+      } catch (_) {}
     } catch (_) {}
 
     try {
