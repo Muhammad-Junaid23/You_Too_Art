@@ -113,7 +113,8 @@ class CastingNotifier extends Notifier<CastingState> {
         return c.copyWith(isApplied: true);
       }
       return c;
-    }).toList();
+    }).toList()
+      ..sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
 
     _saveCalls(calls, prefs);
     _saveApps(apps, prefs);
@@ -190,7 +191,8 @@ class CastingNotifier extends Notifier<CastingState> {
             return c.copyWith(isApplied: true);
           }
           return c;
-        }).toList();
+        }).toList()
+          ..sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
 
         final mergedApps = appMap.values.toList();
 

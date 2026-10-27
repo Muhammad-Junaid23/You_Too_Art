@@ -46,7 +46,6 @@ class CastingRepository {
 
   /// Create a new casting call on Supabase.
   Future<void> createCastingCall(CastingCallModel call) async {
-    if (_isSupabaseTableAvailable == false) return;
     try {
       await _calls.upsert({
         'id': call.id,
@@ -81,7 +80,6 @@ class CastingRepository {
 
   /// Mark casting call as deleted in Supabase.
   Future<void> deleteCastingCall(String id) async {
-    if (_isSupabaseTableAvailable == false) return;
     try {
       await _calls.update({'is_deleted': true}).eq('id', id);
     } catch (e) {
@@ -107,7 +105,6 @@ class CastingRepository {
 
   /// Submit a casting application to Supabase.
   Future<void> submitApplication(CastingApplicationModel application) async {
-    if (_isSupabaseTableAvailable == false) return;
     try {
       await _applications.upsert({
         'id': application.id,
@@ -141,7 +138,6 @@ class CastingRepository {
     String status, {
     bool? isWishlisted,
   }) async {
-    if (_isSupabaseTableAvailable == false) return;
     try {
       final updates = <String, dynamic>{'status': status};
       if (isWishlisted != null) {

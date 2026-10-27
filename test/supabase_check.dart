@@ -9,23 +9,9 @@ void main() async {
 
   print('Testing Supabase connection...');
   try {
-    final users = await client.from('users').select().limit(5);
-    print('Users table count: ${users.length}');
-    if (users.isNotEmpty) {
-      print('First user keys: ${users.first.keys}');
-      print('First user sample: ${users.first}');
-    }
+    final users = await client.from('users').select().limit(1);
+    print('Users table reachable, rows: ${users.length}');
   } catch (e) {
     print('Users table error: $e');
-  }
-
-  try {
-    final port = await client.from('portfolio_items').select().limit(5);
-    print('Portfolio_items table count: ${port.length}');
-    if (port.isNotEmpty) {
-      print('First port item: ${port.first}');
-    }
-  } catch (e) {
-    print('Portfolio_items table error: $e');
   }
 }
