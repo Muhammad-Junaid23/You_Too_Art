@@ -129,15 +129,11 @@ class CastingNotifier extends Notifier<CastingState> {
       apps = _buildDefaultApplications();
     }
 
-    // Link application states so isApplied is always accurate
-    final appliedCallIds = apps.map((a) => a.castingCallId).toSet();
-    calls = calls.map((c) {
-      if (c.isApplied) return c;
-      if (appliedCallIds.contains(c.id)) {
-        return c.copyWith(isApplied: true);
-      }
-      return c;
-    }).toList()
+    // Clean up any globally stamped isApplied flags from stored calls.
+    // Application status is user-specific and evaluated dynamically per persona!
+    calls = calls
+        .map((c) => c.copyWith(isApplied: false, appliedAt: null))
+        .toList()
       ..sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
 
     _saveCalls(calls, prefs);
@@ -181,10 +177,9 @@ class CastingNotifier extends Notifier<CastingState> {
         for (final rc in remoteCalls) {
           final existing = callMap[rc.id];
           if (existing != null) {
-            // Intelligent merge: NEVER lose locally applied status or higher local applicant count!
             callMap[rc.id] = rc.copyWith(
-              isApplied: existing.isApplied || rc.isApplied,
-              appliedAt: existing.appliedAt ?? rc.appliedAt,
+              isApplied: false,
+              appliedAt: null,
               applicantsCount: existing.applicantsCount > rc.applicantsCount
                   ? existing.applicantsCount
                   : rc.applicantsCount,
@@ -207,15 +202,10 @@ class CastingNotifier extends Notifier<CastingState> {
           }
         }
 
-        // Cross-verify application existence with call's isApplied flag
-        final appliedCallIds = appMap.values.map((a) => a.castingCallId).toSet();
-        final mergedCalls = callMap.values.where((c) => !c.isDeleted).map((c) {
-          if (c.isApplied) return c;
-          if (appliedCallIds.contains(c.id)) {
-            return c.copyWith(isApplied: true);
-          }
-          return c;
-        }).toList()
+        final mergedCalls = callMap.values
+            .where((c) => !c.isDeleted)
+            .map((c) => c.copyWith(isApplied: false, appliedAt: null))
+            .toList()
           ..sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
 
         final mergedApps = appMap.values.toList();
@@ -247,12 +237,11 @@ class CastingNotifier extends Notifier<CastingState> {
     final activePersona = ref.read(userPersonaProvider);
     final now = DateTime.now();
 
-    // 1. Update casting call
+    // 1. Update casting call applicant count (application status is stored per applicant in applications)
     final updatedCalls = state.calls.map((call) {
       if (call.id == callId) {
         return call.copyWith(
-          isApplied: true,
-          appliedAt: 'Just Now',
+          isApplied: false,
           applicantsCount: call.applicantsCount + 1,
         );
       }
@@ -410,35 +399,68 @@ class CastingNotifier extends Notifier<CastingState> {
   /// Check whether a call was applied by a specific user persona
   bool isCallAppliedBy(String callId, String userId) {
     return state.applications.any(
-      (a) => a.castingCallId == callId && a.applicantId == userId,
+      (a) =>
+          a.castingCallId == callId &&
+          (a.applicantId == userId ||
+              AppPersistenceService.instance.isSamePersona(a.applicantId, userId)),
     );
+  }
+
+  /// Get the applied date string for a specific user persona
+  String? getAppliedAt(String callId, String userId) {
+    try {
+      final app = state.applications.firstWhere(
+        (a) =>
+            a.castingCallId == callId &&
+            (a.applicantId == userId ||
+                AppPersistenceService.instance.isSamePersona(a.applicantId, userId)),
+      );
+      return app.appliedAt;
+    } catch (_) {
+      return null;
+    }
   }
 
   List<CastingCallModel> get allCalls =>
       state.calls.where((c) => !c.isDeleted).toList();
 
-  List<CastingCallModel> get appliedCalls =>
-      state.calls.where((c) => !c.isDeleted && c.isApplied).toList();
+  /// Retrieve calls applied by a specific user persona
+  List<CastingCallModel> getAppliedCalls(String userId) {
+    final userAppliedMap = <String, String>{};
+    for (final a in state.applications) {
+      if (a.applicantId == userId ||
+          AppPersistenceService.instance.isSamePersona(a.applicantId, userId)) {
+        userAppliedMap[a.castingCallId] = a.appliedAt;
+      }
+    }
 
-  /// Retrieve calls created by current user or defaults
+    return state.calls
+        .where((c) => !c.isDeleted && userAppliedMap.containsKey(c.id))
+        .map((c) => c.copyWith(
+              isApplied: true,
+              appliedAt: userAppliedMap[c.id],
+            ))
+        .toList();
+  }
+
+  /// Active persona applied calls
+  List<CastingCallModel> get appliedCalls {
+    final activePersona = ref.read(userPersonaProvider);
+    return getAppliedCalls(activePersona.id);
+  }
+
+  /// Retrieve calls created by current user
   List<CastingCallModel> getMyCalls(String currentUserId) {
     final activePersona = ref.read(userPersonaProvider);
-    final authored = state.calls
+    return state.calls
         .where((c) =>
             !c.isDeleted &&
             (c.authorId == currentUserId ||
                 c.authorId == activePersona.id ||
                 c.authorName == activePersona.name ||
                 AppPersistenceService.instance.isSamePersona(c.authorId, currentUserId) ||
-                AppPersistenceService.instance.isSamePersona(c.authorId, activePersona.id) ||
-                c.authorName == 'FilmFare' ||
-                c.authorId == 'my_call_1' ||
-                c.id.startsWith('my_call_') ||
-                c.authorId == 'current_user'))
+                AppPersistenceService.instance.isSamePersona(c.authorId, activePersona.id)))
         .toList();
-    return authored.isNotEmpty
-        ? authored
-        : state.calls.where((c) => !c.isDeleted).take(2).toList();
   }
 
   /// Retrieve applications for a specific call with optional status filter
@@ -531,8 +553,7 @@ class CastingNotifier extends Notifier<CastingState> {
         contactEmail: 'production@youtooart.com',
         contactNumber: '+92 51 8899001',
         applicantsCount: 14,
-        isApplied: true,
-        appliedAt: 'Yesterday',
+        isApplied: false,
       ),
       CastingCallModel(
         id: 'call_skypulse_2',

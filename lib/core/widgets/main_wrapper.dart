@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:you_too_art/app/config/routes.dart';
 import 'package:you_too_art/features/chats/providers/chat_provider.dart';
 
 class _NavItem {
@@ -127,9 +128,15 @@ class MainWrapper extends ConsumerWidget {
 
                 return GestureDetector(
                   onTap: () {
+                    if (index < AppRoutes.branchNavKeys.length) {
+                      final targetNavKey = AppRoutes.branchNavKeys[index];
+                      if (targetNavKey.currentState?.canPop() == true) {
+                        targetNavKey.currentState?.popUntil((route) => route.isFirst);
+                      }
+                    }
                     navigationShell.goBranch(
                       index,
-                      initialLocation: index == currentIndex,
+                      initialLocation: true,
                     );
                   },
                   behavior: HitTestBehavior.opaque,
