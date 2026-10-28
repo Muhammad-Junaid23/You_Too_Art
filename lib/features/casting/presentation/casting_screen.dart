@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
+import 'package:you_too_art/core/services/app_persistence_service.dart';
 import 'package:you_too_art/features/casting/models/casting_call_model.dart';
 import 'package:you_too_art/features/casting/presentation/apply_casting_screen.dart';
 import 'package:you_too_art/features/casting/presentation/casting_applications_screen.dart';
@@ -42,15 +43,27 @@ class _CastingScreenState extends ConsumerState<CastingScreen> {
     final castingState = ref.watch(castingProvider);
     final userPersona = ref.watch(userPersonaProvider);
 
-    // Calculate feed calls with search and filter applied
-    final filteredCalls = ref.read(castingProvider.notifier).searchAndFilterCalls(
+    final castingNotifier = ref.read(castingProvider.notifier);
+
+    // Calculate feed calls with search and filter applied,
+    // dynamically enriched with user-specific application status!
+    final rawFilteredCalls = castingNotifier.searchAndFilterCalls(
           query: _searchQuery,
           selectedCity: _selectedCity,
           selectedType: _selectedType,
         );
 
-    final appliedCalls = ref.read(castingProvider.notifier).appliedCalls;
-    final myCalls = ref.read(castingProvider.notifier).getMyCalls(userPersona.id);
+    final filteredCalls = rawFilteredCalls.map((call) {
+      final isApplied = castingNotifier.isCallAppliedBy(call.id, userPersona.id);
+      final appliedAt = castingNotifier.getAppliedAt(call.id, userPersona.id);
+      return call.copyWith(
+        isApplied: isApplied,
+        appliedAt: appliedAt,
+      );
+    }).toList();
+
+    final appliedCalls = castingNotifier.getAppliedCalls(userPersona.id);
+    final myCalls = castingNotifier.getMyCalls(userPersona.id);
 
     return Scaffold(
       backgroundColor: const Color(0xFFFAFAFA),
@@ -377,10 +390,14 @@ class _CastingScreenState extends ConsumerState<CastingScreen> {
         itemCount: filteredCalls.length,
         itemBuilder: (ctx, idx) {
           final call = filteredCalls[idx];
+          final isMyCall = call.authorId == userPersonaId ||
+              AppPersistenceService.instance.isSamePersona(call.authorId, userPersonaId);
           return CastingCallCard(
             call: call,
+            isMyCall: isMyCall,
             onTap: () => _openDetail(call),
             onApply: () => _openApply(call),
+            onViewApplications: isMyCall ? () => _openApplications(call) : null,
           );
         },
       );

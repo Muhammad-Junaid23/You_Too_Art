@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:you_too_art/core/providers/user_persona_provider.dart';
+import 'package:you_too_art/core/services/app_persistence_service.dart';
 import 'package:you_too_art/features/casting/models/casting_call_model.dart';
 import 'package:you_too_art/features/casting/presentation/apply_casting_screen.dart';
+import 'package:you_too_art/features/casting/presentation/casting_applications_screen.dart';
 import 'package:you_too_art/features/casting/providers/casting_provider.dart';
 
 /// Casting Call details screen matching Figma Image 1 (middle screen).
@@ -17,9 +20,25 @@ class CastingDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // Watch latest state to reflect application status dynamically
     final state = ref.watch(castingProvider);
-    final activeCall = state.calls.firstWhere(
+    final userPersona = ref.watch(userPersonaProvider);
+    final castingNotifier = ref.read(castingProvider.notifier);
+
+    final rawCall = state.calls.firstWhere(
       (c) => c.id == call.id,
       orElse: () => call,
+    );
+
+    final isApplied =
+        castingNotifier.isCallAppliedBy(rawCall.id, userPersona.id);
+    final appliedAt =
+        castingNotifier.getAppliedAt(rawCall.id, userPersona.id);
+    final isMyCall = rawCall.authorId == userPersona.id ||
+        AppPersistenceService.instance
+            .isSamePersona(rawCall.authorId, userPersona.id);
+
+    final activeCall = rawCall.copyWith(
+      isApplied: isApplied,
+      appliedAt: appliedAt,
     );
 
     return Scaffold(
@@ -271,37 +290,14 @@ class CastingDetailScreen extends ConsumerWidget {
                 child: SizedBox(
                   width: double.infinity,
                   height: 52,
-                  child: activeCall.isApplied
-                      ? Container(
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFE8F8F3),
-                            borderRadius: BorderRadius.circular(26),
-                          ),
-                          alignment: Alignment.center,
-                          child: const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.check_circle_rounded,
-                                  color: Color(0xFF00C48C), size: 20),
-                              SizedBox(width: 8),
-                              Text(
-                                'Applied',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFF00C48C),
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
-                      : ElevatedButton(
+                  child: isMyCall
+                      ? ElevatedButton(
                           onPressed: () {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
                                 builder: (_) =>
-                                    ApplyCastingScreen(call: activeCall),
+                                    CastingApplicationsScreen(call: activeCall),
                               ),
                             );
                           },
@@ -312,15 +308,67 @@ class CastingDetailScreen extends ConsumerWidget {
                             ),
                             elevation: 0,
                           ),
-                          child: const Text(
-                            'Apply Now',
-                            style: TextStyle(
+                          child: Text(
+                            'View Applications (${activeCall.applicantsCount})',
+                            style: const TextStyle(
                               fontSize: 15.5,
                               fontWeight: FontWeight.w700,
                               color: Colors.white,
                             ),
                           ),
-                        ),
+                        )
+                      : activeCall.isApplied
+                          ? Container(
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE8F8F3),
+                                borderRadius: BorderRadius.circular(26),
+                              ),
+                              alignment: Alignment.center,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.check_circle_rounded,
+                                      color: Color(0xFF00C48C), size: 20),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    activeCall.appliedAt != null
+                                        ? 'Applied, ${activeCall.appliedAt}'
+                                        : 'Applied',
+                                    style: const TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF00C48C),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : ElevatedButton(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        ApplyCastingScreen(call: activeCall),
+                                  ),
+                                );
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.black,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(26),
+                                ),
+                                elevation: 0,
+                              ),
+                              child: const Text(
+                                'Apply Now',
+                                style: TextStyle(
+                                  fontSize: 15.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
                 ),
               ),
             ),

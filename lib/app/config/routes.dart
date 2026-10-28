@@ -52,9 +52,31 @@ class AppRoutes {
   static const String chatRoom = '/chat-room';
   static const String notifications = '/notifications';
 
-  // ─── Navigator Key ────────────────────────────────
+  // ─── Navigator Keys ──────────────────────────────
   static final GlobalKey<NavigatorState> rootNavigatorKey =
       GlobalKey<NavigatorState>(debugLabel: 'root');
+
+  static final GlobalKey<NavigatorState> talentNavKey =
+      GlobalKey<NavigatorState>(debugLabel: 'talentNav');
+  static final GlobalKey<NavigatorState> networkNavKey =
+      GlobalKey<NavigatorState>(debugLabel: 'networkNav');
+  static final GlobalKey<NavigatorState> chatsNavKey =
+      GlobalKey<NavigatorState>(debugLabel: 'chatsNav');
+  static final GlobalKey<NavigatorState> homeNavKey =
+      GlobalKey<NavigatorState>(debugLabel: 'homeNav');
+  static final GlobalKey<NavigatorState> castingNavKey =
+      GlobalKey<NavigatorState>(debugLabel: 'castingNav');
+  static final GlobalKey<NavigatorState> accountNavKey =
+      GlobalKey<NavigatorState>(debugLabel: 'accountNav');
+
+  static final List<GlobalKey<NavigatorState>> branchNavKeys = [
+    talentNavKey,
+    networkNavKey,
+    chatsNavKey,
+    homeNavKey,
+    castingNavKey,
+    accountNavKey,
+  ];
 
   // Screens to bounce a logged-in user away from (true auth entry screens)
 
@@ -164,6 +186,7 @@ class AppRoutes {
           branches: [
             // 0 — Talent
             StatefulShellBranch(
+              navigatorKey: talentNavKey,
               routes: [
                 GoRoute(
                   path: talent,
@@ -173,6 +196,7 @@ class AppRoutes {
             ),
             // 1 — Network
             StatefulShellBranch(
+              navigatorKey: networkNavKey,
               routes: [
                 GoRoute(
                   path: network,
@@ -182,6 +206,7 @@ class AppRoutes {
             ),
             // 2 — Chats
             StatefulShellBranch(
+              navigatorKey: chatsNavKey,
               routes: [
                 GoRoute(
                   path: chats,
@@ -191,6 +216,7 @@ class AppRoutes {
             ),
             // 3 — Home
             StatefulShellBranch(
+              navigatorKey: homeNavKey,
               routes: [
                 GoRoute(
                   path: home,
@@ -200,6 +226,7 @@ class AppRoutes {
             ),
             // 4 — Casting
             StatefulShellBranch(
+              navigatorKey: castingNavKey,
               routes: [
                 GoRoute(
                   path: casting,
@@ -209,6 +236,7 @@ class AppRoutes {
             ),
             // 5 — Account
             StatefulShellBranch(
+              navigatorKey: accountNavKey,
               routes: [
                 GoRoute(
                   path: account,
