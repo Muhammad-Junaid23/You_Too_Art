@@ -90,65 +90,81 @@ class UserPersonaNotifier extends Notifier<UserPersona> {
   static const String alexanderId = AppPersistenceService.alexanderId;
   static const String filmfareId = AppPersistenceService.filmfareId;
   static const String jeremiahId = AppPersistenceService.jeremiahId;
+  static const String singerId = AppPersistenceService.singerId;
 
   static const personaActor = UserPersona(
     id: actorDefaultId,
-    name: 'Muhammad Wajahat',
-    email: 'wajahat@youtooart.test',
-    role: 'Actor, Director',
+    name: 'Hamza Ali',
+    email: 'actor@youtooart.com',
+    role: 'Actor | Performing Artist',
     avatarUrl:
         'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',
     isProductionHouse: false,
     bio:
-        'Award-winning performing artist and indie filmmaker focusing on dramatic monologues, character studies, and cinematic narratives.',
-    website: 'www.be.net/WajahatUIUX',
+        'Trained theater and screen actor specializing in dramatic monologues, character studies, and cinematic narratives.',
+    website: 'www.hamzaali.art',
     experience: '5+ Years',
     location: 'Islamabad, Pakistan',
   );
 
   static const personaAlexander = UserPersona(
     id: alexanderId,
-    name: 'Alexander Cole',
-    email: 'alexander.cole@youtooart.test',
-    role: 'Actor | Director | Producer',
+    name: 'Zaid Khan',
+    email: 'director@youtooart.com',
+    role: 'Director | Filmmaker',
     avatarUrl:
         'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=400&q=80',
     isProductionHouse: false,
     bio:
-        'Award-winning actor and indie film director with extensive experience across feature drama, festival shorts, and modern theatrical storytelling.',
-    website: 'www.alexandercole.art',
-    experience: '8+ Years',
-    location: 'New York, NY',
+        'Award-winning independent filmmaker and commercial director with a passion for authentic storytelling, festival cinema, and discovering new talent.',
+    website: 'www.zaidkhanfilms.com',
+    experience: '7+ Years',
+    location: 'Lahore, Pakistan',
   );
 
   static const personaFilmFare = UserPersona(
     id: filmfareId,
-    name: 'FilmFare',
-    email: 'filmfare.studio@youtooart.test',
+    name: 'SkyPulse Studios',
+    email: 'production@youtooart.com',
     role: 'Production House',
     avatarUrl:
         'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=400&q=80',
     isProductionHouse: true,
     bio:
-        'FilmFare is a premier entertainment studio producing groundbreaking feature films, digital web series, and high-impact commercial cinema. We connect bold emerging talent with top industry directors.',
-    website: 'www.filmfare-studios.com',
-    experience: '12+ Years',
-    location: 'Hollywood, CA',
+        'Leading digital film studio producing groundbreaking feature films, digital web series, and high-impact commercial cinema. We connect bold emerging talent with top industry directors.',
+    website: 'www.skypulsestudios.com',
+    experience: '8+ Years',
+    location: 'Islamabad, Pakistan',
   );
 
   static const personaJeremiah = UserPersona(
     id: jeremiahId,
-    name: 'Jeremiah Green',
-    email: 'jeremiah.green@youtooart.test',
-    role: 'Actor | Model | Director',
+    name: 'Sara Ahmed',
+    email: 'crew@youtooart.com',
+    role: 'Cinematographer | DoP',
+    avatarUrl:
+        'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
+    isProductionHouse: false,
+    bio:
+        'Cinematographer and camera operator specializing in Arri & RED camera workflows, anamorphic lighting design, and cinematic commercial aesthetics.',
+    website: 'www.sara-cinematography.com',
+    experience: '6+ Years',
+    location: 'Karachi, Pakistan',
+  );
+
+  static const personaSinger = UserPersona(
+    id: singerId,
+    name: 'Bilal Tariq',
+    email: 'singer@youtooart.com',
+    role: 'Singer | Composer',
     avatarUrl:
         'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80',
     isProductionHouse: false,
     bio:
-        'Passionate actor, runway model, and aspiring film director based in Los Angeles. Experienced in leading roles across independent cinema, international commercials, and theatrical performances.',
-    website: 'www.jeremiahgreen.com',
-    experience: '6+ Years',
-    location: 'Los Angeles, CA',
+        'Vocalist, playback singer, and music composer for independent films and drama soundtracks. Open for film scores and original collaborations.',
+    website: 'www.bilaltariqmusic.com',
+    experience: '4+ Years',
+    location: 'Islamabad, Pakistan',
   );
 
   static bool isActorId(String id) =>

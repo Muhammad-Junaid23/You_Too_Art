@@ -23,190 +23,180 @@ class TalentDirectory {
   static const String muhammadAliId = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee';
   static const String ranveerSinghId = 'ffffffff-ffff-ffff-ffff-ffffffffffff';
 
-  // Sample posts for Jeremiah Green strictly matching Figma
+  // Sample posts for Sara Ahmed
   static final jeremiahPost = PostItem(
-    id: 'post-jeremiah-1',
+    id: 'post-sara-1',
     authorId: UserPersonaNotifier.jeremiahId,
-    authorName: 'Jeremiah Green',
-    authorRole: 'Actor | Model | Director',
+    authorName: 'Sara Ahmed',
+    authorRole: 'Cinematographer | DoP',
     authorAvatar:
-        'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80',
-    caption: 'New Click!\n#Poster #Click #Nature',
+        'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
+    caption: 'New Camera Rigging Click!\n#Cinematography #SetLife #DoP',
     mediaUrl:
-        'https://images.unsplash.com/photo-1426604966848-d7adac402bff?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=1200&q=80',
     createdAt: DateTime.now().subtract(const Duration(days: 2)),
-    likeCount: 342,
-    commentCount: 28,
+    likeCount: 412,
+    commentCount: 38,
   );
 
   static final jeremiahPost2 = PostItem(
-    id: 'post-jeremiah-2',
+    id: 'post-sara-2',
     authorId: UserPersonaNotifier.jeremiahId,
-    authorName: 'Jeremiah Green',
-    authorRole: 'Actor | Model | Director',
+    authorName: 'Sara Ahmed',
+    authorRole: 'Cinematographer | DoP',
     authorAvatar:
-        'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80',
+        'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
     caption:
-        'Behind the scenes from yesterday\'s editorial campaign shoot in downtown LA. Grateful for this creative team!\n#Editorial #ModelLife #LosAngeles',
+        'Behind the scenes from yesterday\'s anamorphic camera tests. Atmospheric diffusion adds pure cinematic texture!\n#Cinematography #ArriMini #Lighting',
     mediaUrl:
         'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=1200&q=80',
     createdAt: DateTime.now().subtract(const Duration(days: 4)),
-    likeCount: 512,
-    commentCount: 37,
+    likeCount: 620,
+    commentCount: 45,
   );
 
-  // Sample posts for FilmFare strictly matching Figma
+  // Sample posts for SkyPulse Studios
   static final filmfarePost = PostItem(
-    id: 'post-filmfare-1',
+    id: 'post-skypulse-1',
     authorId: UserPersonaNotifier.filmfareId,
-    authorName: 'FilmFare',
+    authorName: 'SkyPulse Studios',
     authorRole: 'Production House',
     authorAvatar:
         'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=400&q=80',
     caption:
-        'Guys! We have an announcement. We are going to launch Cast for our new upcoming short film soon.\n#Poster #Click #Nature',
+        'We have an announcement! SkyPulse Studios is opening casting for our new upcoming drama feature \'Echoes of Rawal\'. Apply now!\n#EchoesOfRawal #CastingCall #SkyPulse',
     mediaUrl:
-        'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1200&q=80',
     createdAt: DateTime.now().subtract(const Duration(days: 2)),
-    likeCount: 1420,
-    commentCount: 114,
+    likeCount: 2140,
+    commentCount: 164,
   );
 
   static final filmfarePost2 = PostItem(
-    id: 'post-filmfare-2',
+    id: 'post-skypulse-2',
     authorId: UserPersonaNotifier.filmfareId,
-    authorName: 'FilmFare',
+    authorName: 'SkyPulse Studios',
     authorRole: 'Production House',
     authorAvatar:
         'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=400&q=80',
     caption:
-        'Now Casting: Lead & supporting roles for our upcoming dramatic web series slate. Submit showreels through You2Art!\n#CastingCall #Audition #FilmFareStudio',
+        'Now Casting: Supporting roles for \'Midnight Sun\' psychological thriller short. Submit showreels through YouTooArt!\n#CastingCall #Audition #SkyPulseStudios',
     mediaUrl:
         'https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&fit=crop&w=1200&q=80',
     createdAt: DateTime.now().subtract(const Duration(days: 4)),
-    likeCount: 2340,
-    commentCount: 189,
+    likeCount: 2890,
+    commentCount: 215,
   );
 
-  // Sample posts for Alexander Cole
+  // Sample posts for Zaid Khan
   static final alexanderPost = PostItem(
-    id: 'post-alexander-1',
+    id: 'post-zaid-1',
     authorId: UserPersonaNotifier.alexanderId,
-    authorName: 'Alexander Cole',
-    authorRole: 'Actor | Director | Producer',
+    authorName: 'Zaid Khan',
+    authorRole: 'Director | Filmmaker',
     authorAvatar:
         'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=400&q=80',
     caption:
-        'Wrapping up the final shoot for our upcoming indie project. Huge thanks to the brilliant crew!\n#Director #SetLife #Cinema',
+        'Wrapping up location scouting for \'Lahore Tales\'. Huge thanks to the local art and architecture teams!\n#Director #SetLife #Cinema #LahoreTales',
     mediaUrl:
         'https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&w=1200&q=80',
     createdAt: DateTime.now().subtract(const Duration(days: 1)),
-    likeCount: 685,
-    commentCount: 42,
+    likeCount: 845,
+    commentCount: 52,
   );
 
   static final alexanderPost2 = PostItem(
-    id: 'post-alexander-2',
+    id: 'post-zaid-2',
     authorId: UserPersonaNotifier.alexanderId,
-    authorName: 'Alexander Cole',
-    authorRole: 'Actor | Director | Producer',
+    authorName: 'Zaid Khan',
+    authorRole: 'Director | Filmmaker',
     authorAvatar:
         'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=400&q=80',
     caption:
-        'In post-production for Brooklyn Noir. Festival submissions opening next month! Thrilled to share the cut soon.\n#BrooklynNoir #IndieFilm #Director',
+        'Pre-production rehearsals underway. Excited to direct this brilliant ensemble cast!\n#IndieFilm #DirectorLife #Cinema',
     mediaUrl:
         'https://images.unsplash.com/photo-1478760329108-5c3ed9d495a0?auto=format&fit=crop&w=1200&q=80',
     createdAt: DateTime.now().subtract(const Duration(days: 3)),
-    likeCount: 892,
-    commentCount: 64,
+    likeCount: 960,
+    commentCount: 71,
   );
 
   static final jeremiahGreen = TalentModel(
     id: UserPersonaNotifier.jeremiahId,
-    name: 'Jeremiah Green',
-    roles: 'Actor | Model | Director',
+    name: 'Sara Ahmed',
+    roles: 'Cinematographer | DoP',
     avatarUrl:
-        'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80',
-    connectsCount: '124.7K',
-    postsCount: '252',
+        'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
+    connectsCount: '84.2K',
+    postsCount: '194',
     isProductionHouse: false,
     bio:
-        'Passionate actor, runway model, and aspiring film director based in Los Angeles. Experienced in leading roles across independent cinema, international commercials, and theatrical performances.',
-    location: 'Los Angeles, CA',
-    email: 'jeremiah.green@youtooart.test',
+        'Cinematographer and camera operator specializing in Arri & RED camera workflows, anamorphic lighting design, and cinematic commercial aesthetics.',
+    location: 'Karachi, Pakistan',
+    email: 'crew@youtooart.com',
     posts: [jeremiahPost, jeremiahPost2],
     aboutInfo: const {
-      'Category': 'Performing Arts & Modeling',
+      'Category': 'Cinematography & Camera',
       'Experience': '6+ Years Experience',
-      'Location': 'Los Angeles, California',
-      'Email': 'jeremiah.green@youtooart.test',
-      'Height': "6' 1\" (185 cm)",
-      'Weight': '74 kg',
-      'Hair Color': 'Dark Brown',
-      'Eye Color': 'Hazel',
-      'Languages': 'English, French, Spanish',
+      'Location': 'Karachi, Pakistan',
+      'Email': 'crew@youtooart.com',
+      'Specializations': 'Arri Alexa, Red Komodo, Anamorphic Primes',
     },
     workPortfolio: const [
-      'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=600&q=80',
-      'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=600&q=80',
       'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80',
-      'https://images.unsplash.com/photo-1426604966848-d7adac402bff?auto=format&fit=crop&w=600&q=80',
-      'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=600&q=80',
-      'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=600&q=80',
     ],
   );
 
   static final filmfare = TalentModel(
     id: UserPersonaNotifier.filmfareId,
-    name: 'FilmFare',
+    name: 'SkyPulse Studios',
     roles: 'Production House',
     avatarUrl:
         'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=400&q=80',
-    followersCount: '124.7K',
-    postsCount: '252',
+    followersCount: '184.2K',
+    postsCount: '312',
     isProductionHouse: true,
     bio:
-        'FilmFare is a premier entertainment studio producing groundbreaking feature films, digital web series, and high-impact commercial cinema. We connect bold emerging talent with top industry directors.',
-    location: 'Hollywood, CA',
-    email: 'filmfare.studio@youtooart.test',
+        'Leading digital film studio producing groundbreaking feature films, digital web series, and high-impact commercial cinema. We connect bold emerging talent with top industry directors.',
+    location: 'Islamabad, Pakistan',
+    email: 'production@youtooart.com',
     posts: [filmfarePost, filmfarePost2],
     aboutInfo: const {
       'Category': 'Production House & Studio',
-      'Established': '2012',
-      'Incorporation': 'FF-GLOBAL-77821',
-      'Address': 'Hollywood Boulevard, Studio City, CA',
-      'Email': 'filmfare.studio@youtooart.test',
-      'Location': 'Los Angeles & Mumbai',
-      'Specializations': 'Feature Films, Web Series, Commercials, Casting Calls',
+      'Established': '2019',
+      'Incorporation': 'PK-REG-84920',
+      'Address': 'Blue Area, Islamabad, Pakistan',
+      'Email': 'production@youtooart.com',
+      'Location': 'Islamabad, Pakistan',
+      'Specializations': 'Feature Films, Dramatic Series, Commercial Cinema',
     },
   );
 
   static final alexanderCole = TalentModel(
     id: UserPersonaNotifier.alexanderId,
-    name: 'Alexander Cole',
-    roles: 'Actor | Director | Producer',
+    name: 'Zaid Khan',
+    roles: 'Director | Filmmaker',
     avatarUrl:
         'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=400&q=80',
     connectsCount: '98.4K',
     postsCount: '189',
     isProductionHouse: false,
     bio:
-        'Award-winning actor and indie film director with extensive experience across feature drama, festival shorts, and modern theatrical storytelling.',
-    location: 'New York, NY',
-    email: 'alexander.cole@youtooart.test',
+        'Award-winning independent filmmaker and commercial director with a passion for authentic storytelling, festival cinema, and discovering new talent.',
+    location: 'Lahore, Pakistan',
+    email: 'director@youtooart.com',
     posts: [alexanderPost, alexanderPost2],
     aboutInfo: const {
-      'Category': 'Acting & Directing',
-      'Experience': '8+ Years Experience',
-      'Location': 'New York, NY',
-      'Email': 'alexander.cole@youtooart.test',
-      'Languages': 'English, Italian',
+      'Category': 'Directing & Filmmaking',
+      'Experience': '7+ Years Experience',
+      'Location': 'Lahore, Pakistan',
+      'Email': 'director@youtooart.com',
+      'Languages': 'Urdu, English, Punjabi',
     },
     workPortfolio: const [
       'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=600&q=80',
       'https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&w=600&q=80',
-      'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=600&q=80',
-      'https://images.unsplash.com/photo-1478760329108-5c3ed9d495a0?auto=format&fit=crop&w=600&q=80',
     ],
   );
 

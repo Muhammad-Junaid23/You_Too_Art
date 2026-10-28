@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:you_too_art/core/constants/supabase_tables.dart';
 import 'package:you_too_art/core/constants/talent_directory.dart';
+import 'package:you_too_art/core/constants/test_accounts.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
 
 /// Repository for social feed post operations.
@@ -61,6 +62,16 @@ class PostRepository {
     String? mediaUrl,
     String? mediaType,
   }) async {
+    if (_client.auth.currentUser == null || TestAccounts.isTestId(authorId)) {
+      return {
+        'id': 'local-${DateTime.now().millisecondsSinceEpoch}',
+        'author_id': authorId,
+        'caption': caption,
+        'media_url': mediaUrl,
+        'media_type': mediaType,
+        'created_at': DateTime.now().toUtc().toIso8601String(),
+      };
+    }
     try {
       final data = await _db
           .insert({
@@ -81,11 +92,16 @@ class PostRepository {
 
   /// Delete a post by [postId].
   Future<void> deletePost(String postId) async {
+    if (_client.auth.currentUser == null ||
+        postId.startsWith('local-') ||
+        postId.startsWith('sample-') ||
+        postId.startsWith('00000000-')) {
+      return;
+    }
     try {
       await _db.delete().eq('id', postId);
     } catch (e) {
       if (kDebugMode) debugPrint('PostRepository.deletePost: $e');
-      rethrow;
     }
   }
 
@@ -96,6 +112,12 @@ class PostRepository {
     String? mediaUrl,
     bool clearMediaUrl = false,
   }) async {
+    if (_client.auth.currentUser == null ||
+        postId.startsWith('local-') ||
+        postId.startsWith('sample-') ||
+        postId.startsWith('00000000-')) {
+      return;
+    }
     try {
       final updates = <String, dynamic>{'caption': caption};
       if (clearMediaUrl) {
@@ -108,7 +130,6 @@ class PostRepository {
       await _db.update(updates).eq('id', postId);
     } catch (e) {
       if (kDebugMode) debugPrint('PostRepository.updatePost: $e');
-      rethrow;
     }
   }
 
@@ -119,6 +140,11 @@ class PostRepository {
     required String postId,
     required String userId,
   }) async {
+    if (_client.auth.currentUser == null || TestAccounts.isTestId(userId)) {
+      // Test accounts or unauthenticated users store likes in-memory / locally
+      return;
+    }
+
     try {
       final existing = await _likes
           .select()
@@ -141,7 +167,6 @@ class PostRepository {
       }
     } catch (e) {
       if (kDebugMode) debugPrint('PostRepository.toggleLike: $e');
-      rethrow;
     }
   }
 
@@ -196,6 +221,15 @@ class PostRepository {
     required String authorId,
     required String text,
   }) async {
+    if (_client.auth.currentUser == null || TestAccounts.isTestId(authorId)) {
+      return {
+        'id': 'local-cmt-${DateTime.now().millisecondsSinceEpoch}',
+        'post_id': postId,
+        'author_id': authorId,
+        'text': text,
+        'created_at': DateTime.now().toUtc().toIso8601String(),
+      };
+    }
     try {
       final data = await _comments
           .insert({
@@ -209,7 +243,13 @@ class PostRepository {
       return data;
     } catch (e) {
       if (kDebugMode) debugPrint('PostRepository.addComment: $e');
-      rethrow;
+      return {
+        'id': 'local-cmt-${DateTime.now().millisecondsSinceEpoch}',
+        'post_id': postId,
+        'author_id': authorId,
+        'text': text,
+        'created_at': DateTime.now().toUtc().toIso8601String(),
+      };
     }
   }
 

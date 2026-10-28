@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:you_too_art/app/config/routes.dart';
 import 'package:you_too_art/app/constants/app_assets.dart';
 import 'package:you_too_art/app/constants/app_colors.dart';
+import 'package:you_too_art/core/constants/test_accounts.dart';
 import 'package:you_too_art/core/widgets/primary_button.dart';
 import 'package:you_too_art/features/auth/providers/auth_provider.dart';
 
@@ -133,7 +134,132 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   onPressed: isLoading ? null : _onSendOtp,
                 ),
 
-                const SizedBox(height: 16),
+                const SizedBox(height: 24),
+
+                // ─── Quick Test Role Logins ─────────────
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8F9FA),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFE9ECEF)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF3899F3).withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              Icons.speed_rounded,
+                              size: 18,
+                              color: Color(0xFF3899F3),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Quick Role Testing (1-Tap Login)',
+                            style: text.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: colors.textPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Tap any role to log in instantly, or use email with OTP: 123456',
+                        style: text.bodySmall?.copyWith(
+                          color: colors.textSecondary,
+                          fontSize: 11,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: TestAccounts.all.map((account) {
+                          return Material(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(12),
+                              onTap: isLoading
+                                  ? null
+                                  : () async {
+                                      await ref
+                                          .read(authProvider.notifier)
+                                          .loginAsTestRole(account);
+                                      if (context.mounted) {
+                                        context.go(AppRoutes.home);
+                                      }
+                                    },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: const Color(0xFFDEE2E6),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 12,
+                                      backgroundImage:
+                                          NetworkImage(account.avatarUrl),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          account.name,
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.black87,
+                                          ),
+                                        ),
+                                        Text(
+                                          account.roleDisplay,
+                                          style: const TextStyle(
+                                            fontSize: 10,
+                                            color: Color(0xFF6C757D),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(width: 4),
+                                    const Icon(
+                                      Icons.arrow_forward_ios_rounded,
+                                      size: 10,
+                                      color: Color(0xFF3899F3),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 20),
 
                 // ─── Terms ──────────────────────────────
                 Text.rich(

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:you_too_art/core/constants/supabase_tables.dart';
+import 'package:you_too_art/core/constants/test_accounts.dart';
 import 'package:you_too_art/features/casting/models/casting_application_model.dart';
 import 'package:you_too_art/features/casting/models/casting_call_model.dart';
 
@@ -46,6 +47,9 @@ class CastingRepository {
 
   /// Create a new casting call on Supabase.
   Future<void> createCastingCall(CastingCallModel call) async {
+    if (_client.auth.currentUser == null || TestAccounts.isTestId(call.authorId)) {
+      return;
+    }
     try {
       await _calls.upsert({
         'id': call.id,
@@ -105,6 +109,9 @@ class CastingRepository {
 
   /// Submit a casting application to Supabase.
   Future<void> submitApplication(CastingApplicationModel application) async {
+    if (_client.auth.currentUser == null || TestAccounts.isTestId(application.applicantId)) {
+      return;
+    }
     try {
       await _applications.upsert({
         'id': application.id,
