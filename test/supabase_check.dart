@@ -9,9 +9,16 @@ void main() async {
 
   print('Testing Supabase connection...');
   try {
-    final users = await client.from('users').select().limit(1);
-    print('Users table reachable, rows: ${users.length}');
+    final posts = await client.from('posts').select();
+    print('Posts table content: $posts');
   } catch (e) {
-    print('Users table error: $e');
+    print('Posts error: $e');
+  }
+
+  try {
+    final users = await client.from('users').select();
+    print('Users table content: $users');
+  } catch (e) {
+    print('Users error: $e');
   }
 }

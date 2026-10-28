@@ -26,6 +26,7 @@ class AppPersistenceService {
   static const String alexanderId = 'a1111111-1111-1111-1111-111111111111';
   static const String filmfareId = 'b2222222-2222-2222-2222-222222222222';
   static const String jeremiahId = 'c3333333-3333-3333-3333-333333333333';
+  static const String singerId = 'd4444444-4444-4444-4444-444444444444';
 
   static AppPersistenceService? _instance;
   static AppPersistenceService get instance {
@@ -146,13 +147,19 @@ class AppPersistenceService {
     if (id == alexanderId) return _buildDefaultAlexander();
     if (id == filmfareId) return _buildDefaultFilmFare();
     if (id == jeremiahId) return _buildDefaultJeremiah();
+    if (id == singerId) return _buildDefaultSinger();
     return getActorPersona();
   }
 
   bool hasPersona(String id) {
     if (isActorId(id)) return true;
     if (_personas.containsKey(id)) return true;
-    if (id == alexanderId || id == filmfareId || id == jeremiahId) return true;
+    if (id == alexanderId ||
+        id == filmfareId ||
+        id == jeremiahId ||
+        id == singerId) {
+      return true;
+    }
     return false;
   }
 
@@ -161,10 +168,11 @@ class AppPersistenceService {
   }
 
   List<UserPersona> get allPersonas => [
-        getPersona(actorDefaultId),
-        getPersona(alexanderId),
-        getPersona(filmfareId),
-        getPersona(jeremiahId),
+        getPersona(filmfareId), // Production House (SkyPulse)
+        getPersona(actorDefaultId), // Actor (Hamza Ali)
+        getPersona(alexanderId), // Director (Zaid Khan)
+        getPersona(jeremiahId), // Cinematographer (Sara Ahmed)
+        getPersona(singerId), // Singer (Bilal Tariq)
       ];
 
   void setActivePersonaId(String id) {
@@ -220,6 +228,7 @@ class AppPersistenceService {
     if (id == alexanderId) return _buildDefaultAlexanderPortfolio();
     if (id == filmfareId) return _buildDefaultFilmFarePortfolio();
     if (id == jeremiahId) return _buildDefaultJeremiahPortfolio();
+    if (id == singerId) return _buildDefaultSingerPortfolio();
 
     // Dynamically build artist portfolio from TalentDirectory if present
     final talent = TalentDirectory.findById(id);
@@ -469,26 +478,43 @@ class AppPersistenceService {
   }
 
   void _ensureDefaultsLoaded() {
-    final actor = getActorPersona();
-    _personas['actor'] = actor;
-    _personas[actorDefaultId] = actor;
-
-    _personas.putIfAbsent(alexanderId, () => _buildDefaultAlexander());
-    _personas.putIfAbsent(filmfareId, () => _buildDefaultFilmFare());
-    _personas.putIfAbsent(jeremiahId, () => _buildDefaultJeremiah());
-
-    // Ensure Alexander Cole is not corrupted by stale actor avatar in cache
-    final alex = _personas[alexanderId];
-    if (alex == null || alex.avatarUrl.contains('1507003211169-0a1dd7228f2d')) {
+    // 1. Purge legacy dummy personas and enforce real role test accounts
+    final pActor = _personas[actorDefaultId];
+    if (pActor == null ||
+        pActor.name == 'Muhammad Wajahat' ||
+        pActor.name.isEmpty) {
+      final realActor = _buildDefaultActor();
+      _personas['actor'] = realActor;
+      _personas[actorDefaultId] = realActor;
+    }
+    final pZaid = _personas[alexanderId];
+    if (pZaid == null ||
+        pZaid.name == 'Alexander Cole' ||
+        pZaid.avatarUrl.contains('1507003211169-0a1dd7228f2d')) {
       _personas[alexanderId] = _buildDefaultAlexander();
     }
-    final alexPort = _portfolios[alexanderId];
-    if (alexPort == null ||
-        alexPort.photos.any(
-            (p) => p.mediaUrl.contains('1507003211169-0a1dd7228f2d'))) {
-      _portfolios[alexanderId] = _buildDefaultAlexanderPortfolio();
+    final pSkyPulse = _personas[filmfareId];
+    if (pSkyPulse == null ||
+        pSkyPulse.name == 'FilmFare' ||
+        pSkyPulse.email.contains('filmfare')) {
+      _personas[filmfareId] = _buildDefaultFilmFare();
     }
+    final pSara = _personas[jeremiahId];
+    if (pSara == null ||
+        pSara.name == 'Jeremiah Green' ||
+        pSara.email.contains('jeremiah')) {
+      _personas[jeremiahId] = _buildDefaultJeremiah();
+    }
+    _personas.putIfAbsent(singerId, () => _buildDefaultSinger());
 
+    // 2. Purge legacy dummy portfolios (Gilgit-Baltistan seed video, etc.)
+    final actorPort = _portfolios[actorDefaultId];
+    if (actorPort == null ||
+        actorPort.videos.any((v) => v.title.contains('Gilgit-Baltistan'))) {
+      final realActorPort = _buildDefaultActorPortfolio();
+      _portfolios['actor'] = realActorPort;
+      _portfolios[actorDefaultId] = realActorPort;
+    }
     _portfolios.putIfAbsent('actor', () => _buildDefaultActorPortfolio());
     _portfolios.putIfAbsent(
         actorDefaultId, () => _buildDefaultActorPortfolio());
@@ -496,7 +522,34 @@ class AppPersistenceService {
         alexanderId, () => _buildDefaultAlexanderPortfolio());
     _portfolios.putIfAbsent(filmfareId, () => _buildDefaultFilmFarePortfolio());
     _portfolios.putIfAbsent(jeremiahId, () => _buildDefaultJeremiahPortfolio());
+    _portfolios.putIfAbsent(singerId, () => _buildDefaultSingerPortfolio());
 
+    // 3. Purge legacy dummy casting calls
+    _castingCalls.removeWhere((c) =>
+        c.id == 'call_1' ||
+        c.id == 'call_2' ||
+        c.id == 'call_3' ||
+        c.id == 'my_call_1' ||
+        c.projectTitle == 'The Next Short Film' ||
+        c.authorId == 'james_geidt' ||
+        c.authorId == 'angel_culhane' ||
+        c.authorId == 'angel_culhane_2' ||
+        c.authorId == 'filmfare');
+
+    // 4. Purge legacy dummy casting applications
+    _castingApplications.removeWhere((a) =>
+        a.id == 'app_seed_call1' ||
+        a.id == 'app_1' ||
+        a.id == 'app_2' ||
+        a.id == 'app_3' ||
+        a.id == 'app_4' ||
+        a.projectTitle == 'The Next Short Film' ||
+        a.castingCallId == 'call_1' ||
+        a.castingCallId == 'call_2' ||
+        a.castingCallId == 'call_3' ||
+        a.castingCallId == 'my_call_1');
+
+    // 5. Seed real casting calls & applications if empty
     if (_castingCalls.isEmpty) {
       _castingCalls.addAll(_buildDefaultCastingCalls());
     }
@@ -923,15 +976,15 @@ class AppPersistenceService {
   static UserPersona _buildDefaultActor() {
     return const UserPersona(
       id: actorDefaultId,
-      name: 'Muhammad Wajahat',
-      email: 'wajahat@youtooart.test',
-      role: 'Actor, Director',
+      name: 'Hamza Ali',
+      email: 'actor@youtooart.com',
+      role: 'Actor | Performing Artist',
       avatarUrl:
           'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',
       isProductionHouse: false,
       bio:
-          'Award-winning performing artist and indie filmmaker focusing on dramatic monologues, character studies, and cinematic narratives.',
-      website: 'www.be.net/WajahatUIUX',
+          'Trained theater and screen actor specializing in dramatic monologues, character studies, and cinematic narratives.',
+      website: 'www.hamzaali.art',
       experience: '5+ Years',
       location: 'Islamabad, Pakistan',
     );
@@ -940,51 +993,68 @@ class AppPersistenceService {
   static UserPersona _buildDefaultAlexander() {
     return const UserPersona(
       id: alexanderId,
-      name: 'Alexander Cole',
-      email: 'alexander.cole@youtooart.test',
-      role: 'Actor | Director | Producer',
+      name: 'Zaid Khan',
+      email: 'director@youtooart.com',
+      role: 'Director | Filmmaker',
       avatarUrl:
           'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=400&q=80',
       isProductionHouse: false,
       bio:
-          'Award-winning actor and indie film director with extensive experience across feature drama, festival shorts, and modern theatrical storytelling.',
-      website: 'www.alexandercole.art',
-      experience: '8+ Years',
-      location: 'New York, NY',
+          'Award-winning independent filmmaker and commercial director with a passion for authentic storytelling, festival cinema, and discovering new talent.',
+      website: 'www.zaidkhanfilms.com',
+      experience: '7+ Years',
+      location: 'Lahore, Pakistan',
     );
   }
 
   static UserPersona _buildDefaultFilmFare() {
     return const UserPersona(
       id: filmfareId,
-      name: 'FilmFare',
-      email: 'filmfare.studio@youtooart.test',
+      name: 'SkyPulse Studios',
+      email: 'production@youtooart.com',
       role: 'Production House',
       avatarUrl:
           'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=400&q=80',
       isProductionHouse: true,
       bio:
-          'FilmFare is a premier entertainment studio producing groundbreaking feature films, digital web series, and high-impact commercial cinema. We connect bold emerging talent with top industry directors.',
-      website: 'www.filmfare-studios.com',
-      experience: '12+ Years',
-      location: 'Hollywood, CA',
+          'Leading digital film studio producing groundbreaking feature films, digital web series, and high-impact commercial cinema. We connect bold emerging talent with top industry directors.',
+      website: 'www.skypulsestudios.com',
+      experience: '8+ Years',
+      location: 'Islamabad, Pakistan',
     );
   }
 
   static UserPersona _buildDefaultJeremiah() {
     return const UserPersona(
       id: jeremiahId,
-      name: 'Jeremiah Green',
-      email: 'jeremiah.green@youtooart.test',
-      role: 'Actor | Model | Director',
+      name: 'Sara Ahmed',
+      email: 'crew@youtooart.com',
+      role: 'Cinematographer | DoP',
+      avatarUrl:
+          'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
+      isProductionHouse: false,
+      bio:
+          'Cinematographer and camera operator specializing in Arri & RED camera workflows, anamorphic lighting design, and cinematic commercial aesthetics.',
+      website: 'www.sara-cinematography.com',
+      experience: '6+ Years',
+      location: 'Karachi, Pakistan',
+    );
+  }
+
+  static UserPersona _buildDefaultSinger() {
+    return const UserPersona(
+      id: singerId,
+      name: 'Bilal Tariq',
+      email: 'singer@youtooart.com',
+      role: 'Singer | Composer',
       avatarUrl:
           'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80',
       isProductionHouse: false,
       bio:
-          'Passionate actor, runway model, and aspiring film director based in Los Angeles. Experienced in leading roles across independent cinema, international commercials, and theatrical performances.',
-      website: 'www.jeremiahgreen.com',
-      experience: '6+ Years',
-      location: 'Los Angeles, CA',
+          'Vocalist, playback singer, and music composer for independent films and drama soundtracks. Open for film scores and original collaborations.',
+      website: 'www.bilaltariqmusic.com',
+      experience: '4+ Years',
+      location: 'Islamabad, Pakistan',
     );
   }
 
@@ -992,22 +1062,31 @@ class AppPersistenceService {
     return const UserPortfolioState(
       videos: [
         WorkMediaItem(
-          id: 'vid_1',
-          title: 'SPECIAL REPORT: What\'s the Trouble in Gilgit-Baltistan?',
+          id: 'vid_hamza_1',
+          title: 'Dramatic Monologue Audition — "The Architect"',
           url: 'https://youtu.be/JXCRWxBA0fE',
           mediaUrl:
-              'https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&fit=crop&w=800&q=80',
+              'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=800&q=80',
           isVideo: true,
           lastUpdated: 'Just Now',
+        ),
+        WorkMediaItem(
+          id: 'vid_hamza_2',
+          title: 'Official Acting Showreel 2026',
+          url: 'https://youtu.be/JXCRWxBA0fE',
+          mediaUrl:
+              'https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&w=800&q=80',
+          isVideo: true,
+          lastUpdated: '3 days ago',
         ),
       ],
       photos: [
         WorkMediaItem(
-          id: 'photo_1',
-          title: 'Short Film on Teen Age Side Hustles',
-          url: 'https://drive.google.com/u/1/a3tc',
+          id: 'photo_hamza_1',
+          title: 'Dramatic Headshot — Studio Noir',
+          url: 'https://drive.google.com/u/1/h1',
           mediaUrl:
-              'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80',
+              'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=800&q=80',
           isVideo: false,
           lastUpdated: '2 days ago',
         ),
@@ -1118,8 +1197,8 @@ class AppPersistenceService {
     return const UserPortfolioState(
       videos: [
         WorkMediaItem(
-          id: 'vid_alex_1',
-          title: 'Short Film Festival Trailer - Brooklyn Noir',
+          id: 'vid_zaid_1',
+          title: 'Festival Short Film Trailer — "Lahore Tales"',
           url: 'https://youtu.be/JXCRWxBA0fE',
           mediaUrl:
               'https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&w=800&q=80',
@@ -1127,8 +1206,8 @@ class AppPersistenceService {
           lastUpdated: 'Yesterday',
         ),
         WorkMediaItem(
-          id: 'vid_alex_2',
-          title: 'Dramatic Scene Monologue - Feature Audition',
+          id: 'vid_zaid_2',
+          title: 'Directing Showreel & Festival Highlights',
           url: 'https://youtu.be/JXCRWxBA0fE',
           mediaUrl:
               'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=800&q=80',
@@ -1138,40 +1217,31 @@ class AppPersistenceService {
       ],
       photos: [
         WorkMediaItem(
-          id: 'photo_alex_1',
-          title: 'Alexander Cole Editorial Portfolio Stills',
-          url: 'https://drive.google.com/u/1/alex1',
+          id: 'photo_zaid_1',
+          title: 'Director Zaid Khan On-Set Directing',
+          url: 'https://drive.google.com/u/1/z1',
           mediaUrl:
               'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=800&q=80',
           isVideo: false,
           lastUpdated: '1 day ago',
         ),
         WorkMediaItem(
-          id: 'photo_alex_2',
-          title: 'On-Set Direction - Indie Feature Drama',
-          url: 'https://drive.google.com/u/1/alex2',
+          id: 'photo_zaid_2',
+          title: 'Historic Walled City Lahore Shoot Location',
+          url: 'https://drive.google.com/u/1/z2',
           mediaUrl:
               'https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&w=800&q=80',
           isVideo: false,
           lastUpdated: '5 days ago',
         ),
         WorkMediaItem(
-          id: 'photo_alex_3',
-          title: 'Monochrome Character Arc - New York',
-          url: 'https://drive.google.com/u/1/alex3',
+          id: 'photo_zaid_3',
+          title: 'Scene Blocking & Rehearsal Session',
+          url: 'https://drive.google.com/u/1/z3',
           mediaUrl:
               'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=800&q=80',
           isVideo: false,
           lastUpdated: '1 week ago',
-        ),
-        WorkMediaItem(
-          id: 'photo_alex_4',
-          title: 'Rehearsal Lighting & Silhouette',
-          url: 'https://drive.google.com/u/1/alex4',
-          mediaUrl:
-              'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=800&q=80',
-          isVideo: false,
-          lastUpdated: '2 weeks ago',
         ),
       ],
     );
@@ -1181,8 +1251,8 @@ class AppPersistenceService {
     return const UserPortfolioState(
       videos: [
         WorkMediaItem(
-          id: 'vid_ff_1',
-          title: 'FilmFare Studio Upcoming Slate 2026',
+          id: 'vid_skypulse_1',
+          title: 'SkyPulse Studios Official Film Slate 2026',
           url: 'https://youtu.be/JXCRWxBA0fE',
           mediaUrl:
               'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?auto=format&fit=crop&w=800&q=80',
@@ -1190,8 +1260,8 @@ class AppPersistenceService {
           lastUpdated: 'Just Now',
         ),
         WorkMediaItem(
-          id: 'vid_ff_2',
-          title: 'Open Casting Call Teaser - Commercial Project',
+          id: 'vid_skypulse_2',
+          title: 'Open Casting Reel — "Echoes of Rawal"',
           url: 'https://youtu.be/JXCRWxBA0fE',
           mediaUrl:
               'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=800&q=80',
@@ -1201,40 +1271,31 @@ class AppPersistenceService {
       ],
       photos: [
         WorkMediaItem(
-          id: 'photo_ff_1',
-          title: 'FilmFare Studio Production Lot & Soundstages',
-          url: 'https://drive.google.com/u/1/ff1',
+          id: 'photo_skypulse_1',
+          title: 'SkyPulse Studios Main Lot & Production Soundstages',
+          url: 'https://drive.google.com/u/1/sp1',
           mediaUrl:
               'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=800&q=80',
           isVideo: false,
           lastUpdated: '2 days ago',
         ),
         WorkMediaItem(
-          id: 'photo_ff_2',
-          title: 'Feature Film Concept Art & Moodboard',
-          url: 'https://drive.google.com/u/1/ff2',
+          id: 'photo_skypulse_2',
+          title: 'Feature Film Concept Art & Production Design',
+          url: 'https://drive.google.com/u/1/sp2',
           mediaUrl:
               'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?auto=format&fit=crop&w=800&q=80',
           isVideo: false,
           lastUpdated: '5 days ago',
         ),
         WorkMediaItem(
-          id: 'photo_ff_3',
-          title: 'Cast Table Read - Period Short Film',
-          url: 'https://drive.google.com/u/1/ff3',
+          id: 'photo_skypulse_3',
+          title: 'Cast Table Read — "Echoes of Rawal"',
+          url: 'https://drive.google.com/u/1/sp3',
           mediaUrl:
               'https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&fit=crop&w=800&q=80',
           isVideo: false,
           lastUpdated: '1 week ago',
-        ),
-        WorkMediaItem(
-          id: 'photo_ff_4',
-          title: 'Post-Production Grading Suite Stills',
-          url: 'https://drive.google.com/u/1/ff4',
-          mediaUrl:
-              'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80',
-          isVideo: false,
-          lastUpdated: '2 weeks ago',
         ),
       ],
     );
@@ -1244,17 +1305,17 @@ class AppPersistenceService {
     return const UserPortfolioState(
       videos: [
         WorkMediaItem(
-          id: 'vid_jer_1',
-          title: 'Jeremiah Green Dramatic Reel - Los Angeles',
+          id: 'vid_sara_1',
+          title: 'Sara Ahmed Cinematography Showreel (Arri Alexa Mini)',
           url: 'https://youtu.be/JXCRWxBA0fE',
           mediaUrl:
-              'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=800&q=80',
+              'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80',
           isVideo: true,
           lastUpdated: 'Just Now',
         ),
         WorkMediaItem(
-          id: 'vid_jer_2',
-          title: 'Runway Showcase - Paris & Milan Commercial Reel',
+          id: 'vid_sara_2',
+          title: 'Anamorphic Lighting & Moodboard Masterclass Reel',
           url: 'https://youtu.be/JXCRWxBA0fE',
           mediaUrl:
               'https://images.unsplash.com/photo-1426604966848-d7adac402bff?auto=format&fit=crop&w=800&q=80',
@@ -1264,38 +1325,65 @@ class AppPersistenceService {
       ],
       photos: [
         WorkMediaItem(
-          id: 'photo_jer_1',
-          title: 'Editorial Character Headshots - LA Studio',
-          url: 'https://drive.google.com/u/1/jer1',
+          id: 'photo_sara_1',
+          title: 'On-Set Camera Rigging & Anamorphic Primes',
+          url: 'https://drive.google.com/u/1/sr1',
           mediaUrl:
-              'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=800&q=80',
+              'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80',
           isVideo: false,
           lastUpdated: '1 day ago',
         ),
         WorkMediaItem(
-          id: 'photo_jer_2',
-          title: 'Cinematic Moodboard - Golden Hour',
-          url: 'https://drive.google.com/u/1/jer2',
+          id: 'photo_sara_2',
+          title: 'Cinematic Moodboard — Blue Twilight Studio',
+          url: 'https://drive.google.com/u/1/sr2',
           mediaUrl:
               'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=800&q=80',
           isVideo: false,
           lastUpdated: '3 days ago',
         ),
+      ],
+    );
+  }
+
+  static UserPortfolioState _buildDefaultSingerPortfolio() {
+    return const UserPortfolioState(
+      videos: [
         WorkMediaItem(
-          id: 'photo_jer_3',
-          title: 'Runway Movement & Silhouettes',
-          url: 'https://drive.google.com/u/1/jer3',
+          id: 'vid_bilal_1',
+          title: 'Live Acoustic Performance — "Echoes of Rawal OST"',
+          url: 'https://youtu.be/JXCRWxBA0fE',
           mediaUrl:
-              'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80',
-          isVideo: false,
-          lastUpdated: '6 days ago',
+              'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=800&q=80',
+          isVideo: true,
+          lastUpdated: 'Just Now',
         ),
         WorkMediaItem(
-          id: 'photo_jer_4',
-          title: 'Theatre Monologue Production Stills',
-          url: 'https://drive.google.com/u/1/jer4',
+          id: 'vid_bilal_2',
+          title: 'Film Score Recording Studio Session',
+          url: 'https://youtu.be/JXCRWxBA0fE',
           mediaUrl:
-              'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&w=800&q=80',
+              'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=800&q=80',
+          isVideo: true,
+          lastUpdated: '4 days ago',
+        ),
+      ],
+      photos: [
+        WorkMediaItem(
+          id: 'photo_bilal_1',
+          title: 'Studio Recording Session with Neumann U87',
+          url: 'https://drive.google.com/u/1/bl1',
+          mediaUrl:
+              'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=800&q=80',
+          isVideo: false,
+          lastUpdated: '2 days ago',
+        ),
+        WorkMediaItem(
+          id: 'photo_bilal_2',
+          title: 'Music Composition & Grand Piano Session',
+          url: 'https://drive.google.com/u/1/bl2',
+          mediaUrl:
+              'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=800&q=80',
           isVideo: false,
           lastUpdated: '1 week ago',
         ),
@@ -1346,119 +1434,100 @@ class AppPersistenceService {
   static List<CastingCallModel> _buildDefaultCastingCalls() {
     return [
       CastingCallModel(
-        id: 'call_1',
-        projectTitle: 'The Next Short Film',
-        authorId: 'james_geidt',
-        authorName: 'James Geidt',
-        authorAvatar:
-            'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=400&q=80',
-        publishedDateStr: '24th April, 2023',
-        publishedAt: DateTime(2023, 4, 24),
-        description: 'A story of 6 young software engineers at Islamabad.',
-        location: 'Islamabad, Pakistan',
-        locationDisplay: 'Islamabad',
-        type: 'Short Film',
-        shootDuration: '25 Days',
-        budget: '\$20K',
-        budgetFull: '\$20,000',
-        crewRequired: '1',
-        shootDetails:
-            'Shoot will be of 30 days at the Centaurus Mall Islamabad.',
-        position: 'A Software Engineer in Islamabad',
-        ageRequired: '23 Years',
-        heightRequired: '5.9 Feet',
-        gender: 'Male Only',
-        contactEmail: 'james.geidt@production.test',
-        contactNumber: '+92 332 02522110',
-        applicantsCount: 520,
-        isApplied: true,
-        appliedAt: '2 Days Ago',
-      ),
-      CastingCallModel(
-        id: 'call_2',
-        projectTitle: 'The Next Short Film',
-        authorId: 'angel_culhane',
-        authorName: 'Angel Culhane',
-        authorAvatar:
-            'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80',
-        publishedDateStr: '20th April, 2023',
-        publishedAt: DateTime(2023, 4, 20),
-        description:
-            'Exciting indie drama looking for dynamic character actors.',
-        location: 'Islamabad, Pakistan',
-        locationDisplay: 'Islamabad',
-        type: 'Short Film',
-        shootDuration: '25 Days',
-        budget: '\$20K',
-        budgetFull: '\$20,000',
-        crewRequired: '2',
-        shootDetails:
-            'Filming in natural lighting across Islamabad outdoor locations.',
-        position: 'Supporting Actor',
-        ageRequired: '24 Years',
-        heightRequired: '5.10 Feet',
-        gender: 'Male Only',
-        contactEmail: 'angel.culhane@production.test',
-        contactNumber: '+92 300 1234567',
-        applicantsCount: 310,
-        isApplied: false,
-      ),
-      CastingCallModel(
-        id: 'call_3',
-        projectTitle: 'The Next Short Film',
-        authorId: 'angel_culhane_2',
-        authorName: 'Angel Culhane',
-        authorAvatar:
-            'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80',
-        publishedDateStr: '18th April, 2023',
-        publishedAt: DateTime(2023, 4, 18),
-        description:
-            'Contemporary web series pilot seeking expressive new faces.',
-        location: 'Islamabad, Pakistan',
-        locationDisplay: 'Islamabad',
-        type: 'Short Film',
-        shootDuration: '25 Days',
-        budget: '\$20K',
-        budgetFull: '\$20,000',
-        crewRequired: '1',
-        shootDetails: 'Studio lot soundstage filming in Islamabad.',
-        position: 'Secondary Actor',
-        ageRequired: '22 Years',
-        heightRequired: '5.9 Feet',
-        gender: 'Any',
-        contactEmail: 'angel.culhane@production.test',
-        contactNumber: '+92 300 9876543',
-        applicantsCount: 184,
-        isApplied: false,
-      ),
-      CastingCallModel(
-        id: 'my_call_1',
-        projectTitle: 'The Next Short Film',
-        authorId: 'filmfare',
-        authorName: 'FilmFare',
+        id: 'call_skypulse_1',
+        projectTitle: 'Echoes of Rawal',
+        authorId: filmfareId,
+        authorName: 'SkyPulse Studios',
         authorAvatar:
             'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=400&q=80',
         publishedDateStr: '2 Days Ago',
         publishedAt: DateTime.now().subtract(const Duration(days: 2)),
-        description: 'A story of 6 young software engineers at Islamabad.',
+        description:
+            'An upcoming investigative political drama feature following a determined journalist uncovering systemic truths in the capital.',
+        location: 'Islamabad, Pakistan',
+        locationDisplay: 'Islamabad',
+        type: 'Feature Film',
+        shootDuration: '45 Days',
+        budget: '\$45K',
+        budgetFull: '\$45,000',
+        crewRequired: '4',
+        shootDetails:
+            'Location shoots across Islamabad F-sectors, Margalla hills, and raw Rawalpindi heritage quarters.',
+        position: 'Lead Male Actor',
+        roleTitle: 'Lead Actor — Feature Drama',
+        roleDescription:
+            'Protagonist portraying an ambitious investigative journalist with intense emotional depth.',
+        ageRequired: '24-30 Years',
+        heightRequired: '5.10+ Feet',
+        gender: 'Male Only',
+        contactEmail: 'production@youtooart.com',
+        contactNumber: '+92 51 8899001',
+        applicantsCount: 14,
+        isApplied: true,
+        appliedAt: 'Yesterday',
+      ),
+      CastingCallModel(
+        id: 'call_skypulse_2',
+        projectTitle: 'Midnight Sun',
+        authorId: filmfareId,
+        authorName: 'SkyPulse Studios',
+        authorAvatar:
+            'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=400&q=80',
+        publishedDateStr: '4 Days Ago',
+        publishedAt: DateTime.now().subtract(const Duration(days: 4)),
+        description:
+            'Festival short film exploring memory and reconciliation through evocative visual storytelling.',
         location: 'Islamabad, Pakistan',
         locationDisplay: 'Islamabad',
         type: 'Short Film',
-        shootDuration: '25 Days',
-        budget: '\$20K',
-        budgetFull: '\$20,000',
-        crewRequired: '1',
+        shootDuration: '18 Days',
+        budget: '\$15K',
+        budgetFull: '\$15,000',
+        crewRequired: '2',
         shootDetails:
-            'Shoot will be of 30 days at the Centaurus Mall Islamabad.',
-        position: 'A Software Engineer in Islamabad',
-        ageRequired: '23 Years',
-        heightRequired: '5.9 Feet',
-        gender: 'Male Only',
-        contactEmail: 'filmfare.studio@youtooart.test',
-        contactNumber: '+92 332 02522110',
-        roleTitle: 'Software Engineer Lead',
-        roleDescription: 'Protagonist working on disruptive AI startup.',
-        applicantsCount: 520,
+            'Indoor soundstage and atmospheric twilight photography.',
+        position: 'Supporting Actress',
+        roleTitle: 'Supporting Actress — Psychological Drama',
+        roleDescription:
+            'Nuanced supporting character with a strong emotional arc.',
+        ageRequired: '22-28 Years',
+        heightRequired: '5.5+ Feet',
+        gender: 'Female Only',
+        contactEmail: 'production@youtooart.com',
+        contactNumber: '+92 51 8899001',
+        applicantsCount: 8,
+        isApplied: false,
+      ),
+      CastingCallModel(
+        id: 'call_zaid_1',
+        projectTitle: 'Lahore Tales',
+        authorId: alexanderId,
+        authorName: 'Zaid Khan',
+        authorAvatar:
+            'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=400&q=80',
+        publishedDateStr: '1 Week Ago',
+        publishedAt: DateTime.now().subtract(const Duration(days: 7)),
+        description:
+            'An authentic independent feature exploring intertwined lives and cultural heritage in Old Lahore.',
+        location: 'Lahore, Pakistan',
+        locationDisplay: 'Lahore',
+        type: 'Indie Feature',
+        shootDuration: '30 Days',
+        budget: '\$25K',
+        budgetFull: '\$25,000',
+        crewRequired: '3',
+        shootDetails:
+            'Historic architectural locations in Walled City Lahore and modern Gulberg districts.',
+        position: 'Director of Photography',
+        roleTitle: 'Cinematographer / DoP',
+        roleDescription:
+            'Seeking a camera visionary proficient with anamorphic glass and naturalistic lighting design.',
+        ageRequired: 'Any',
+        heightRequired: 'N/A',
+        gender: 'Any',
+        contactEmail: 'director@youtooart.com',
+        contactNumber: '+92 42 35789123',
+        applicantsCount: 6,
         isApplied: false,
       ),
     ];
@@ -1467,73 +1536,54 @@ class AppPersistenceService {
   static List<CastingApplicationModel> _buildDefaultCastingApplications() {
     return [
       CastingApplicationModel(
-        id: 'app_seed_call1',
-        castingCallId: 'call_1',
-        projectTitle: 'The Next Short Film',
-        applicantId: 'actor',
-        applicantName: 'Muhammad Ali Nizami',
+        id: 'app_hamza_call_skypulse_1',
+        castingCallId: 'call_skypulse_1',
+        projectTitle: 'Echoes of Rawal',
+        applicantId: actorDefaultId,
+        applicantName: 'Hamza Ali',
         applicantAvatar:
             'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',
-        appliedAt: '2 Days Ago',
-        appliedDateTime: DateTime.now().subtract(const Duration(days: 2)),
-        contactNumber: '+92 332 02522110',
-        contactEmail: 'muhammadali@gmail.com',
-        age: '23',
-        height: '5.9 Feet',
-        gender: 'Male',
-        experience: '5 Years',
-        location: 'Islamabad, Pakistan',
-        note: 'Shoot will be of 30 days at the Centaurus Mall Islamabad.',
-        status: ApplicationStatus.received,
-        isWishlisted: false,
-      ),
-      CastingApplicationModel(
-        id: 'app_1',
-        castingCallId: 'my_call_1',
-        projectTitle: 'The Next Short Film',
-        applicantId: 'muhammad_ali',
-        applicantName: 'Muhammad Ali Nizami',
-        applicantAvatar:
-            'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',
-        appliedAt: '1 Day Ago',
+        appliedAt: 'Yesterday',
         appliedDateTime: DateTime.now().subtract(const Duration(days: 1)),
-        contactNumber: '+92 332 02522110',
-        contactEmail: 'muhammadali@gmail.com',
-        age: '23',
-        height: '5.9 Feet',
+        contactNumber: '+92 301 5551234',
+        contactEmail: 'actor@youtooart.com',
+        age: '26',
+        height: '5.11 Feet',
         gender: 'Male',
-        experience: '5 Years',
+        experience: '5+ Years',
         location: 'Islamabad, Pakistan',
-        note: 'Shoot will be of 30 days at the Centaurus Mall Islamabad.',
+        note:
+            'Trained dramatic actor with lead experience in indie shorts and theatre. Showreel and monologue attached.',
         status: ApplicationStatus.received,
         isWishlisted: false,
       ),
       CastingApplicationModel(
-        id: 'app_2',
-        castingCallId: 'my_call_1',
-        projectTitle: 'The Next Short Film',
-        applicantId: 'hamza_tariq',
-        applicantName: 'Hamza Tariq',
+        id: 'app_daniyal_call_skypulse_1',
+        castingCallId: 'call_skypulse_1',
+        projectTitle: 'Echoes of Rawal',
+        applicantId: 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
+        applicantName: 'Daniyal Raza',
         applicantAvatar:
-            'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80',
+            'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=400&q=80',
         appliedAt: '2 Days Ago',
         appliedDateTime: DateTime.now().subtract(const Duration(days: 2)),
-        contactNumber: '+92 300 1234567',
-        contactEmail: 'hamza.tariq@gmail.com',
-        age: '24',
-        height: '5.10 Feet',
+        contactNumber: '+92 333 4567890',
+        contactEmail: 'daniyal.raza@gmail.com',
+        age: '27',
+        height: '6.0 Feet',
         gender: 'Male',
-        experience: '3 Years',
-        location: 'Lahore, Pakistan',
-        note: 'Ready for audition reel submission anytime.',
-        status: ApplicationStatus.received,
-        isWishlisted: false,
+        experience: '4 Years',
+        location: 'Islamabad, Pakistan',
+        note:
+            'Passionate screen actor with strong monologue delivery and commercial background.',
+        status: ApplicationStatus.wishlisted,
+        isWishlisted: true,
       ),
       CastingApplicationModel(
-        id: 'app_3',
-        castingCallId: 'my_call_1',
-        projectTitle: 'The Next Short Film',
-        applicantId: 'zainab_khan',
+        id: 'app_zainab_call_skypulse_2',
+        castingCallId: 'call_skypulse_2',
+        projectTitle: 'Midnight Sun',
+        applicantId: '44444444-4444-4444-4444-444444444444',
         applicantName: 'Zainab Khan',
         applicantAvatar:
             'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
@@ -1541,35 +1591,15 @@ class AppPersistenceService {
         appliedDateTime: DateTime.now().subtract(const Duration(days: 3)),
         contactNumber: '+92 312 9876543',
         contactEmail: 'zainab.k@gmail.com',
-        age: '22',
+        age: '24',
         height: '5.6 Feet',
         gender: 'Female',
-        experience: '2 Years',
+        experience: '3 Years',
         location: 'Islamabad, Pakistan',
-        note: 'Passionate theater artist interested in lead role.',
-        status: ApplicationStatus.rejected,
+        note:
+            'Theatre graduate interested in supporting drama role. Portfolio reel submitted.',
+        status: ApplicationStatus.received,
         isWishlisted: false,
-      ),
-      CastingApplicationModel(
-        id: 'app_4',
-        castingCallId: 'my_call_1',
-        projectTitle: 'The Next Short Film',
-        applicantId: 'daniyal_raza',
-        applicantName: 'Daniyal Raza',
-        applicantAvatar:
-            'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=400&q=80',
-        appliedAt: '4 Days Ago',
-        appliedDateTime: DateTime.now().subtract(const Duration(days: 4)),
-        contactNumber: '+92 333 4567890',
-        contactEmail: 'daniyal.raza@gmail.com',
-        age: '25',
-        height: '6.0 Feet',
-        gender: 'Male',
-        experience: '4 Years',
-        location: 'Islamabad, Pakistan',
-        note: 'Strong character actor with commercial and drama experience.',
-        status: ApplicationStatus.wishlisted,
-        isWishlisted: true,
       ),
     ];
   }
