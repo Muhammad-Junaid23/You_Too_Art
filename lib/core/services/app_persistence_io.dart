@@ -61,4 +61,24 @@ class PlatformStorageDriver {
       tempFile.writeAsStringSync(data, flush: true);
     } catch (_) {}
   }
+
+  static void clearRawData() {
+    try {
+      final f1 = File(_fileName);
+      if (f1.existsSync()) f1.deleteSync();
+    } catch (_) {}
+    try {
+      final homeDir = Platform.environment['USERPROFILE'] ??
+          Platform.environment['HOME'] ??
+          Platform.environment['APPDATA'];
+      if (homeDir != null) {
+        final homeFile = File('$homeDir${Platform.pathSeparator}.$_fileName');
+        if (homeFile.existsSync()) homeFile.deleteSync();
+      }
+    } catch (_) {}
+    try {
+      final tempFile = File('${Directory.systemTemp.path}${Platform.pathSeparator}$_fileName');
+      if (tempFile.existsSync()) tempFile.deleteSync();
+    } catch (_) {}
+  }
 }

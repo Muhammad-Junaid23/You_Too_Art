@@ -1630,47 +1630,42 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
       }
     }
 
-    // Predefined posts for primary personas if matching list is still empty
     if (matchingPosts.isEmpty) {
-      if (talent.id == UserPersonaNotifier.alexanderId ||
-          talent.name == 'Alexander Cole') {
-        matchingPosts.addAll([
-          TalentDirectory.alexanderPost,
-          TalentDirectory.alexanderPost2,
-        ]);
-      } else if (talent.id == UserPersonaNotifier.jeremiahId ||
-          talent.name == 'Jeremiah Green') {
-        matchingPosts.addAll([
-          TalentDirectory.jeremiahPost,
-          TalentDirectory.jeremiahPost2,
-        ]);
-      } else if (talent.id == UserPersonaNotifier.filmfareId ||
-          talent.name == 'FilmFare') {
-        matchingPosts.addAll([
-          TalentDirectory.filmfarePost,
-          TalentDirectory.filmfarePost2,
-        ]);
-      } else if (isOwnProfile) {
-        matchingPosts.add(
-          PostItem(
-            id: 'post_debut_${talent.id}',
-            authorId: talent.id,
-            authorName: displayName,
-            authorAvatar: displayAvatar,
-            authorRole: talent.roles.isNotEmpty ? talent.roles : 'Actor',
-            caption:
-                'Excited to join You2Art! Exploring new auditions, casting opportunities, and creative collaborations.\n#You2Art #Debut #Creative #Audition',
-            mediaUrl: talent.workPortfolio.isNotEmpty
-                ? talent.workPortfolio.first
-                : null,
-            createdAt: DateTime.now().subtract(const Duration(hours: 4)),
-            likeCount: 48,
-            commentCount: 6,
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.grid_on_outlined,
+                size: 48,
+                color: Colors.grey.shade400,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'No posts yet',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey.shade700,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                isOwnProfile
+                    ? 'Share photos, updates, or reels to showcase your work'
+                    : 'This user has not posted any updates yet',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.grey.shade500,
+                ),
+              ),
+            ],
           ),
-        );
-      } else {
-        matchingPosts.add(_buildTailoredArtistPost(talent));
-      }
+        ),
+      );
     }
 
     return Column(
@@ -1682,40 +1677,6 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
         ],
         const SizedBox(height: 80),
       ],
-    );
-  }
-
-  PostItem _buildTailoredArtistPost(TalentModel talent) {
-    final lowerRole = talent.roles.toLowerCase();
-    String caption;
-    if (lowerRole.contains('sing') || lowerRole.contains('dance')) {
-      caption =
-          'Rehearsing for our upcoming stage production opening soon! Grateful for this amazing ensemble team.\n#Theater #Rehearsal #LivePerformance #Stage';
-    } else if (lowerRole.contains('director') ||
-        lowerRole.contains('cinematograph')) {
-      caption =
-          'Location scouting in progress for our next quarter feature shoot. Looking for dramatic architecture and lighting.\n#Cinematography #Director #FilmSet #Scouting';
-    } else if (lowerRole.contains('model') || lowerRole.contains('fashion')) {
-      caption =
-          'Autumn editorial campaign previews are in! Excited to share the full spreads with everyone soon.\n#Fashion #Editorial #ModelLife #Runway';
-    } else {
-      caption =
-          'Working on exciting new performance material and creative projects. Stay tuned for showreels!\n#Acting #Showreel #Audition #Creatives';
-    }
-
-    return PostItem(
-      id: 'post_artist_${talent.id}',
-      authorId: talent.id,
-      authorName: talent.name,
-      authorAvatar: talent.avatarUrl,
-      authorRole: talent.roles,
-      caption: caption,
-      mediaUrl: talent.workPortfolio.isNotEmpty
-          ? talent.workPortfolio.first
-          : talent.avatarUrl,
-      createdAt: DateTime.now().subtract(const Duration(days: 2)),
-      likeCount: 184,
-      commentCount: 16,
     );
   }
 }

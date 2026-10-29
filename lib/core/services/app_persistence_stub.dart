@@ -2,4 +2,5 @@
 class PlatformStorageDriver {
   static String? readRawData() => null;
   static void writeRawData(String data) {}
+  static void clearRawData() {}
 }

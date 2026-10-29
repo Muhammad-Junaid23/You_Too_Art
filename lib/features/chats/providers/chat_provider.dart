@@ -224,18 +224,7 @@ class ChatListNotifier extends Notifier<ChatListState> {
         }
       }
 
-      // If active persona is a Production House (e.g. Filmfare), they can initiate casting messages with any talent
-      final currentPersona = ref.read(userPersonaProvider);
-      if (currentPersona.isProductionHouse) {
-        for (final talent in TalentDirectory.allCuratedTalents) {
-          if (!talent.isProductionHouse &&
-              talent.id != activeUserId &&
-              !connectedList.any((t) => t.id == talent.id)) {
-            connectedList.add(talent);
-          }
-        }
-      }
-
+      // Connected talents list
       state = state.copyWith(connectedTalents: connectedList);
     } catch (_) {}
   }

@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,7 +7,6 @@ import 'package:go_router/go_router.dart';
 
 import 'package:you_too_art/app/config/routes.dart';
 import 'package:you_too_art/app/constants/app_colors.dart';
-import 'package:you_too_art/core/constants/test_accounts.dart';
 import 'package:you_too_art/core/widgets/primary_button.dart';
 import 'package:you_too_art/features/auth/providers/auth_provider.dart';
 
@@ -23,8 +24,57 @@ class _VerifyOtpScreenState extends ConsumerState<VerifyOtpScreen> {
   final _controller = TextEditingController();
   final _focusNode = FocusNode();
 
+  int _resendCountdown = 30;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _startTimer();
+  }
+
+  void _startTimer() {
+    _timer?.cancel();
+    setState(() => _resendCountdown = 30);
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_resendCountdown > 0) {
+        setState(() => _resendCountdown--);
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
+  Future<void> _onResend() async {
+    if (_resendCountdown > 0) return;
+    _startTimer();
+    final ok = await ref
+        .read(authProvider.notifier)
+        .sendEmailOtp(email: widget.email);
+    if (!mounted) return;
+    if (ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Verification code resent to ${widget.email}'),
+          backgroundColor: const Color(0xFF3899F3),
+        ),
+      );
+    } else {
+      final err =
+          ref.read(authProvider).errorMessage ?? 'Failed to resend code';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(err)),
+      );
+    }
+  }
+
   @override
   void dispose() {
+    _timer?.cancel();
     _controller.dispose();
     _focusNode.dispose();
     super.dispose();
@@ -56,14 +106,20 @@ class _VerifyOtpScreenState extends ConsumerState<VerifyOtpScreen> {
 
     // 2. Decide route based on profile state.
     final String next;
-    if (user.role == 'unset') {
+    if (user.role == 'unset' || user.role.isEmpty) {
       next = AppRoutes.chooseCategory;
-    } else if (user.firstName.isEmpty) {
+    } else if (user.firstName.isEmpty && user.name.isEmpty) {
       next = user.role == 'production_house'
           ? AppRoutes.completeProfileProduction
           : AppRoutes.completeProfileIndividual;
     } else {
       next = AppRoutes.home;
+    }
+
+    if (kDebugMode) {
+      debugPrint(
+        'VerifyOtp: role=${user.role}, firstName=${user.firstName}, name=${user.name} -> routing to $next',
+      );
     }
 
     // 3. Flip state and navigate in the same tick.
@@ -158,88 +214,41 @@ class _VerifyOtpScreenState extends ConsumerState<VerifyOtpScreen> {
                       ),
                     ),
 
-                    if (TestAccounts.isTestEmail(widget.email)) ...[
-                      const SizedBox(height: 18),
-                      Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF0F7FF),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: const Color(0xFF3899F3).withValues(alpha: 0.35),
+                    const SizedBox(height: 28),
+
+                    // ─── Resend Code Section ────────────────
+                    Row(
+                      children: [
+                        Text(
+                          "Didn't receive code? ",
+                          style: text.bodyMedium?.copyWith(
+                            color: colors.textSecondary,
+                            fontSize: 13,
                           ),
                         ),
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF3899F3).withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Icon(
-                                Icons.key_rounded,
+                        if (_resendCountdown > 0)
+                          Text(
+                            'Resend in ${_resendCountdown}s',
+                            style: TextStyle(
+                              color: colors.textSecondary,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          )
+                        else
+                          GestureDetector(
+                            onTap: isLoading ? null : _onResend,
+                            child: const Text(
+                              'Resend Code',
+                              style: TextStyle(
                                 color: Color(0xFF3899F3),
-                                size: 18,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
                               ),
                             ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Test Role: ${TestAccounts.findByEmail(widget.email)?.name ?? "Account"}',
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w700,
-                                      color: Color(0xFF1E3A8A),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  const Text(
-                                    'Use master test OTP: 123456',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: Color(0xFF475569),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            TextButton(
-                              onPressed: isLoading
-                                  ? null
-                                  : () {
-                                      _controller.text =
-                                          TestAccounts.masterTestOtp;
-                                      _onVerify();
-                                    },
-                              style: TextButton.styleFrom(
-                                backgroundColor: const Color(0xFF3899F3),
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 6,
-                                ),
-                                minimumSize: Size.zero,
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                              child: const Text(
-                                'Auto-Fill',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                          ),
+                      ],
+                    ),
                   ],
                 ),
               ),

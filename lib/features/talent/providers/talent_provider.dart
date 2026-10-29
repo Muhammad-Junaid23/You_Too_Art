@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:you_too_art/core/constants/supabase_tables.dart';
-import 'package:you_too_art/core/constants/talent_directory.dart';
 import 'package:you_too_art/core/models/user_model.dart';
 import 'package:you_too_art/core/providers/supabase_providers.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
@@ -103,7 +102,7 @@ class TalentNotifier extends Notifier<TalentState> {
         }
       } catch (_) {}
 
-      // Combine with curated sample talents from TalentDirectory
+      // Pure real talents directory from registered users
       final combined = <TalentModel>[];
       for (final fetched in fetchedList) {
         if (UserPersonaNotifier.hasPersona(fetched.id)) {
@@ -112,19 +111,6 @@ class TalentNotifier extends Notifier<TalentState> {
         } else {
           combined.add(fetched);
         }
-      }
-
-      for (final sample in TalentDirectory.allCuratedTalents) {
-        if (!combined.any((t) => t.id == sample.id)) {
-          combined.add(sample);
-        }
-      }
-
-      // Add Actor persona so if another persona is active, Actor is visible to connect with
-      final currentActor = UserPersonaNotifier.getActorPersona();
-      if (!combined.any(
-          (t) => UserPersonaNotifier.isSamePersona(t.id, currentActor.id))) {
-        combined.add(TalentModel.fromPersona(currentActor));
       }
 
       // Filter out active persona (cannot discover yourself)
@@ -171,9 +157,7 @@ class TalentNotifier extends Notifier<TalentState> {
       );
     } catch (e) {
       state = state.copyWith(
-        talents: TalentDirectory.allCuratedTalents
-            .where((t) => t.id != _activePersona.id)
-            .toList(),
+        talents: [],
         isLoading: false,
         errorMessage: e.toString(),
       );

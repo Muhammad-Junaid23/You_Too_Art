@@ -46,8 +46,8 @@ class HomeFeedNotifier extends AsyncNotifier<List<PostItem>> {
       if (kDebugMode) debugPrint('HomeFeedNotifier._fetchFeed error: $e');
     }
 
-    // Default sample posts matching the Figma design to ensure immediate rich aesthetics
-    return _samplePosts.map((p) => p.copyWith(isSaved: savedIds.contains(p.id))).toList();
+    // Clean feed: only display real user-created posts
+    return [];
   }
 
   /// Pull-to-refresh the feed.
@@ -252,76 +252,6 @@ class HomeFeedNotifier extends AsyncNotifier<List<PostItem>> {
     }
   }
 
-  static final List<PostItem> _samplePosts = [
-    PostItem(
-      id: '00000000-0000-4000-8000-000000000001',
-      authorId: 'b2222222-2222-2222-2222-222222222222',
-      authorName: 'SkyPulse Studios',
-      authorAvatar:
-          'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=150',
-      authorRole: 'Production House',
-      caption:
-          "Official Announcement: SkyPulse Studios is thrilled to begin principal casting for 'Echoes of Rawal'! Check out the Casting section to apply for Lead & Supporting roles. 🎬🎥\n#EchoesOfRawal #CastingCall #SkyPulseStudios #PakistaniCinema",
-      mediaUrl:
-          'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800',
-      createdAt: DateTime.now().subtract(const Duration(hours: 4)),
-      likeCount: 2480,
-      isLiked: false,
-      commentCount: 142,
-      shareCount: 68,
-    ),
-    PostItem(
-      id: '00000000-0000-4000-8000-000000000002',
-      authorId: '00000000-0000-0000-0000-000000000001',
-      authorName: 'Hamza Ali',
-      authorAvatar:
-          'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
-      authorRole: 'Actor',
-      caption:
-          "Rehearsal wrapped for today's dramatic monologue sequence. Loving the script and character depth! Can't wait to share the final cut soon. 🎭\n#ActorLife #CharacterStudy #AuditionTape #Theater",
-      mediaUrl:
-          'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800',
-      createdAt: DateTime.now().subtract(const Duration(days: 1)),
-      likeCount: 1820,
-      isLiked: false,
-      commentCount: 96,
-      shareCount: 34,
-    ),
-    PostItem(
-      id: '00000000-0000-4000-8000-000000000003',
-      authorId: 'a1111111-1111-1111-1111-111111111111',
-      authorName: 'Zaid Khan',
-      authorAvatar:
-          'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=150',
-      authorRole: 'Director',
-      caption:
-          "Location scouting across the historic alleys of Old Lahore for 'Lahore Tales'. The natural ambient lighting at magic hour is breathtaking. 📽️\n#Filmmaking #DirectorDiaries #IndieFilm #LahoreTales",
-      mediaUrl:
-          'https://images.unsplash.com/photo-1485846234645-a62644f84728?w=800',
-      createdAt: DateTime.now().subtract(const Duration(days: 2)),
-      likeCount: 940,
-      isLiked: false,
-      commentCount: 48,
-      shareCount: 22,
-    ),
-    PostItem(
-      id: '00000000-0000-4000-8000-000000000004',
-      authorId: 'c3333333-3333-3333-3333-333333333333',
-      authorName: 'Sara Ahmed',
-      authorAvatar:
-          'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-      authorRole: 'Cinematographer',
-      caption:
-          "Rigging the anamorphic prime package on our soundstage today. Soft atmospheric diffusion paired with high-contrast keys creates that pure cinema feel. 🎥⚡\n#Cinematography #DoP #ArriMini #LightingDesign",
-      mediaUrl:
-          'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800',
-      createdAt: DateTime.now().subtract(const Duration(days: 3)),
-      likeCount: 760,
-      isLiked: false,
-      commentCount: 31,
-      shareCount: 15,
-    ),
-  ];
 }
 
 final homeFeedProvider =

@@ -272,6 +272,24 @@ class AuthNotifier extends Notifier<AppAuthState> {
           updatedAt: DateTime.now(),
         ),
       );
+
+      // Bind persona immediately to the authenticated user (no fallback to dummy mock personas)
+      final emailPrefix = email.contains('@') ? email.split('@').first : 'User';
+      final persona = UserPersona(
+        id: response.user!.id,
+        name: user.name.isNotEmpty
+            ? user.name
+            : (user.firstName.isNotEmpty
+                ? '${user.firstName} ${user.lastName}'.trim()
+                : emailPrefix),
+        email: email,
+        role: user.role != 'unset' ? user.role : '',
+        avatarUrl: user.profileImagePath ?? '',
+      );
+      AppPersistenceService.instance.savePersona(persona);
+      AppPersistenceService.instance.setActivePersonaId(persona.id);
+      await ref.read(userPersonaProvider.notifier).switchPersona(persona);
+
       state = state.copyWith(isLoading: false);
       return user;
     } catch (e) {

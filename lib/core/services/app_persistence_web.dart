@@ -173,4 +173,25 @@ class PlatformStorageDriver {
       }
     } catch (_) {}
   }
+
+  static void clearRawData() {
+    try {
+      html.window.localStorage.remove(_key);
+      html.window.localStorage.remove('you_too_art_local_state_v3');
+      html.window.localStorage.remove('you_too_art_master_state_v4');
+      html.window.localStorage.remove('you_too_art_master_state_v3');
+      html.window.localStorage.remove('you_too_art_casting_calls_v2');
+      html.window.localStorage.remove('you_too_art_casting_apps_v2');
+      html.window.sessionStorage.remove(_key);
+      html.window.sessionStorage.remove('you_too_art_local_state_v3');
+      html.window.sessionStorage.remove('you_too_art_master_state_v4');
+
+      for (int i = 0; i < 30; i++) {
+        html.document.cookie = 'you_too_art_c$i=; path=/; max-age=0; SameSite=Lax';
+      }
+      html.document.cookie = 'you_too_art_ccount=; path=/; max-age=0; SameSite=Lax';
+      html.document.cookie = 'you_too_art_ccalls=; path=/; max-age=0; SameSite=Lax';
+      html.document.cookie = 'you_too_art_capps=; path=/; max-age=0; SameSite=Lax';
+    } catch (_) {}
+  }
 }
