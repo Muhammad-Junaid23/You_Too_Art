@@ -2,13 +2,11 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:you_too_art/core/constants/talent_directory.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
 import 'package:you_too_art/core/services/app_persistence_driver.dart';
 import 'package:you_too_art/features/profile/providers/user_portfolio_provider.dart';
 import 'package:you_too_art/features/casting/models/casting_application_model.dart';
 import 'package:you_too_art/features/casting/models/casting_call_model.dart';
-import 'package:you_too_art/features/talent/models/talent_model.dart';
 
 /// Centralized, multi-engine persistence service that guarantees user data,
 /// profile edits, and portfolio additions/deletions survive app restarts,
@@ -74,6 +72,34 @@ class AppPersistenceService {
   static Future<AppPersistenceService> initialize(
     SharedPreferences prefs,
   ) async {
+    final hasPurgedV5 = prefs.getBool('purged_seed_personas_v5') ?? false;
+    if (!hasPurgedV5) {
+      PlatformStorageDriver.clearRawData();
+      prefs.remove('active_user_persona_id');
+      prefs.remove('is_test_role_logged_in');
+      prefs.remove(_masterKey);
+      prefs.remove('you_too_art_master_state_v3');
+      for (final k in prefs.getKeys().where((k) => k.startsWith('persona_profile_') || k.startsWith('user_work_portfolio_')).toList()) {
+        prefs.remove(k);
+      }
+      prefs.setBool('purged_seed_personas_v5', true);
+    }
+    final hasPurgedV4 = prefs.getBool('purged_seed_personas_v4') ?? false;
+    if (!hasPurgedV4) {
+      prefs.remove('active_user_persona_id');
+      prefs.remove('is_test_role_logged_in');
+      for (final k in prefs.getKeys().where((k) => k.startsWith('persona_profile_') || k.startsWith('user_work_portfolio_')).toList()) {
+        prefs.remove(k);
+      }
+      prefs.setBool('purged_seed_personas_v4', true);
+    }
+    final hasPurgedV3 = prefs.getBool('purged_seed_data_v3') ?? false;
+    if (!hasPurgedV3) {
+      prefs.remove('you_too_art_casting_calls_v2');
+      prefs.remove('you_too_art_casting_apps_v2');
+      prefs.remove('saved_post_ids');
+      prefs.setBool('purged_seed_data_v3', true);
+    }
     final service = AppPersistenceService._(prefs);
     await service._loadAll();
     _instance = service;
@@ -102,10 +128,7 @@ class AppPersistenceService {
   // ─── Persona Queries ────────────────────────────────────────
 
   bool isActorId(String id) {
-    if (id == 'actor' || id == actorDefaultId) return true;
-    final user = Supabase.instance.client.auth.currentUser;
-    if (user != null && id == user.id) return true;
-    return false;
+    return id == 'actor' || id == actorDefaultId;
   }
 
   bool isSamePersona(String id1, String id2) {
@@ -117,63 +140,59 @@ class AppPersistenceService {
     final user = Supabase.instance.client.auth.currentUser;
     if (user != null && _personas.containsKey(user.id)) {
       final p = _personas[user.id]!;
-      if (p.name.trim().isNotEmpty && p.name != 'Muhammad Wajahat') {
+      if (p.name.trim().isNotEmpty && p.name != 'Hamza Ali' && p.name != 'Muhammad Wajahat') {
         return p;
       }
     }
-    if (_personas.containsKey('actor')) {
-      final p = _personas['actor']!;
-      if (p.name.trim().isNotEmpty && p.name != 'Muhammad Wajahat') {
-        return p;
-      }
+    if (user != null) {
+      final handle = user.email != null && user.email!.contains('@')
+          ? user.email!.split('@').first
+          : 'User';
+      final p = UserPersona(
+        id: user.id,
+        name: user.userMetadata?['name'] as String? ?? handle,
+        email: user.email ?? '',
+        role: user.userMetadata?['role'] as String? ?? '',
+        avatarUrl: user.userMetadata?['avatar_url'] as String? ?? '',
+      );
+      _personas[user.id] = p;
+      return p;
     }
-    if (_personas.containsKey(actorDefaultId)) {
-      final p = _personas[actorDefaultId]!;
-      if (p.name.trim().isNotEmpty && p.name != 'Muhammad Wajahat') {
-        return p;
-      }
-    }
-    if (user != null && _personas.containsKey(user.id)) {
-      return _personas[user.id]!;
-    }
-    if (_personas.containsKey('actor')) return _personas['actor']!;
-    if (_personas.containsKey(actorDefaultId)) return _personas[actorDefaultId]!;
-    return _buildDefaultActor();
+    return const UserPersona(
+      id: '',
+      name: '',
+      email: '',
+      role: '',
+      avatarUrl: '',
+    );
   }
 
   UserPersona getPersona(String id) {
     if (isActorId(id)) return getActorPersona();
     if (_personas.containsKey(id)) return _personas[id]!;
-    if (id == alexanderId) return _buildDefaultAlexander();
-    if (id == filmfareId) return _buildDefaultFilmFare();
-    if (id == jeremiahId) return _buildDefaultJeremiah();
-    if (id == singerId) return _buildDefaultSinger();
     return getActorPersona();
   }
 
   bool hasPersona(String id) {
-    if (isActorId(id)) return true;
-    if (_personas.containsKey(id)) return true;
-    if (id == alexanderId ||
-        id == filmfareId ||
-        id == jeremiahId ||
-        id == singerId) {
-      return true;
-    }
-    return false;
+    return _personas.containsKey(id);
   }
 
   UserPersona getActivePersona() {
-    return getPersona(_activePersonaId);
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user != null) {
+      return getActorPersona();
+    }
+    if (_personas.containsKey(_activePersonaId)) {
+      return _personas[_activePersonaId]!;
+    }
+    return getActorPersona();
   }
 
-  List<UserPersona> get allPersonas => [
-        getPersona(filmfareId), // Production House (SkyPulse)
-        getPersona(actorDefaultId), // Actor (Hamza Ali)
-        getPersona(alexanderId), // Director (Zaid Khan)
-        getPersona(jeremiahId), // Cinematographer (Sara Ahmed)
-        getPersona(singerId), // Singer (Bilal Tariq)
-      ];
+  List<UserPersona> get allPersonas {
+    final active = getActivePersona();
+    if (active.id.isEmpty) return [];
+    return [active];
+  }
 
   void setActivePersonaId(String id) {
     _activePersonaId = id;
@@ -211,31 +230,12 @@ class AppPersistenceService {
   // ─── Portfolio Queries ──────────────────────────────────────
 
   UserPortfolioState getPortfolio(String id) {
-    final isActor = isActorId(id);
-    if (isActor) {
-      final user = Supabase.instance.client.auth.currentUser;
-      if (user != null && _portfolios.containsKey(user.id)) {
-        return _portfolios[user.id]!;
-      }
-      if (_portfolios.containsKey('actor')) return _portfolios['actor']!;
-      if (_portfolios.containsKey(actorDefaultId)) {
-        return _portfolios[actorDefaultId]!;
-      }
-      return _buildDefaultActorPortfolio();
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user != null && _portfolios.containsKey(user.id)) {
+      return _portfolios[user.id]!;
     }
-
     if (_portfolios.containsKey(id)) return _portfolios[id]!;
-    if (id == alexanderId) return _buildDefaultAlexanderPortfolio();
-    if (id == filmfareId) return _buildDefaultFilmFarePortfolio();
-    if (id == jeremiahId) return _buildDefaultJeremiahPortfolio();
-    if (id == singerId) return _buildDefaultSingerPortfolio();
-
-    // Dynamically build artist portfolio from TalentDirectory if present
-    final talent = TalentDirectory.findById(id);
-    if (talent != null) {
-      return _buildTalentPortfolio(talent);
-    }
-    return _buildDefaultActorPortfolio();
+    return const UserPortfolioState(videos: [], photos: []);
   }
 
   void savePortfolio(String id, UserPortfolioState updated) {
@@ -333,9 +333,27 @@ class AppPersistenceService {
           final pMap = decoded['personas'] as Map<String, dynamic>;
           for (final entry in pMap.entries) {
             try {
-              _personas[entry.key] = UserPersona.fromJson(
+              final p = UserPersona.fromJson(
                 entry.value as Map<String, dynamic>,
               );
+              if (p.name == 'Hamza Ali' ||
+                  p.name == 'Muhammad Wajahat' ||
+                  p.name == 'Zaid Khan' ||
+                  p.name == 'Alexander Vance' ||
+                  p.name == 'Sara Ahmed' ||
+                  p.name == 'Jeremiah Cole' ||
+                  p.name == 'Bilal Tariq' ||
+                  p.name == 'Aria Montgomery' ||
+                  p.name == 'Filmfare Productions' ||
+                  p.email.contains('@youtooart.com') ||
+                  p.id == actorDefaultId ||
+                  p.id == alexanderId ||
+                  p.id == filmfareId ||
+                  p.id == jeremiahId ||
+                  p.id == singerId) {
+                continue;
+              }
+              _personas[entry.key] = p;
             } catch (_) {}
           }
         }
@@ -358,9 +376,11 @@ class AppPersistenceService {
           _castingCalls.clear();
           for (final item in cList) {
             try {
-              _castingCalls.add(
-                CastingCallModel.fromJson(item as Map<String, dynamic>),
-              );
+              final c =
+                  CastingCallModel.fromJson(item as Map<String, dynamic>);
+              if (!isSeedCall(c.id, c.projectTitle, c.authorId)) {
+                _castingCalls.add(c);
+              }
             } catch (_) {}
           }
         }
@@ -371,9 +391,11 @@ class AppPersistenceService {
           _castingApplications.clear();
           for (final item in aList) {
             try {
-              _castingApplications.add(
-                CastingApplicationModel.fromJson(item as Map<String, dynamic>),
-              );
+              final a = CastingApplicationModel.fromJson(
+                  item as Map<String, dynamic>);
+              if (!isSeedApp(a.id, a.castingCallId, a.projectTitle)) {
+                _castingApplications.add(a);
+              }
             } catch (_) {}
           }
         }
@@ -422,9 +444,11 @@ class AppPersistenceService {
         final prefCalls = <CastingCallModel>[];
         for (final item in decoded) {
           try {
-            prefCalls.add(
-              CastingCallModel.fromJson(item as Map<String, dynamic>),
-            );
+            final c =
+                CastingCallModel.fromJson(item as Map<String, dynamic>);
+            if (!isSeedCall(c.id, c.projectTitle, c.authorId)) {
+              prefCalls.add(c);
+            }
           } catch (_) {}
         }
         if (prefCalls.isNotEmpty) {
@@ -449,9 +473,11 @@ class AppPersistenceService {
         final prefApps = <CastingApplicationModel>[];
         for (final item in decoded) {
           try {
-            prefApps.add(
-              CastingApplicationModel.fromJson(item as Map<String, dynamic>),
-            );
+            final a =
+                CastingApplicationModel.fromJson(item as Map<String, dynamic>);
+            if (!isSeedApp(a.id, a.castingCallId, a.projectTitle)) {
+              prefApps.add(a);
+            }
           } catch (_) {}
         }
         if (prefApps.isNotEmpty) {
@@ -478,84 +504,36 @@ class AppPersistenceService {
   }
 
   void _ensureDefaultsLoaded() {
-    // 1. Purge legacy dummy personas and enforce real role test accounts
-    final pActor = _personas[actorDefaultId];
-    if (pActor == null ||
-        pActor.name == 'Muhammad Wajahat' ||
-        pActor.name.isEmpty) {
-      final realActor = _buildDefaultActor();
-      _personas['actor'] = realActor;
-      _personas[actorDefaultId] = realActor;
-    }
-    final pZaid = _personas[alexanderId];
-    if (pZaid == null ||
-        pZaid.name == 'Alexander Cole' ||
-        pZaid.avatarUrl.contains('1507003211169-0a1dd7228f2d')) {
-      _personas[alexanderId] = _buildDefaultAlexander();
-    }
-    final pSkyPulse = _personas[filmfareId];
-    if (pSkyPulse == null ||
-        pSkyPulse.name == 'FilmFare' ||
-        pSkyPulse.email.contains('filmfare')) {
-      _personas[filmfareId] = _buildDefaultFilmFare();
-    }
-    final pSara = _personas[jeremiahId];
-    if (pSara == null ||
-        pSara.name == 'Jeremiah Green' ||
-        pSara.email.contains('jeremiah')) {
-      _personas[jeremiahId] = _buildDefaultJeremiah();
-    }
-    _personas.putIfAbsent(singerId, () => _buildDefaultSinger());
+    // 1. Purge legacy dummy personas
+    _personas.removeWhere((key, p) =>
+        p.name == 'Hamza Ali' ||
+        p.name == 'Zaid Khan' ||
+        p.name == 'SkyPulse Studios' ||
+        p.name == 'Sara Ahmed' ||
+        p.name == 'Bilal Tariq' ||
+        p.name == 'Muhammad Wajahat' ||
+        p.email == 'actor@youtooart.com' ||
+        p.email == 'director@youtooart.com' ||
+        p.email == 'production@youtooart.com' ||
+        p.email == 'crew@youtooart.com' ||
+        p.email == 'singer@youtooart.com');
 
-    // 2. Purge legacy dummy portfolios (Gilgit-Baltistan seed video, etc.)
-    final actorPort = _portfolios[actorDefaultId];
-    if (actorPort == null ||
-        actorPort.videos.any((v) => v.title.contains('Gilgit-Baltistan'))) {
-      final realActorPort = _buildDefaultActorPortfolio();
-      _portfolios['actor'] = realActorPort;
-      _portfolios[actorDefaultId] = realActorPort;
-    }
-    _portfolios.putIfAbsent('actor', () => _buildDefaultActorPortfolio());
-    _portfolios.putIfAbsent(
-        actorDefaultId, () => _buildDefaultActorPortfolio());
-    _portfolios.putIfAbsent(
-        alexanderId, () => _buildDefaultAlexanderPortfolio());
-    _portfolios.putIfAbsent(filmfareId, () => _buildDefaultFilmFarePortfolio());
-    _portfolios.putIfAbsent(jeremiahId, () => _buildDefaultJeremiahPortfolio());
-    _portfolios.putIfAbsent(singerId, () => _buildDefaultSingerPortfolio());
+    // 2. Purge legacy dummy portfolios
+    _portfolios.removeWhere((key, port) =>
+        port.videos.any((v) => v.title.contains('Gilgit-Baltistan')) ||
+        port.videos.any((v) => v.title.contains('Dramatic Monologue')) ||
+        key == 'actor' ||
+        key == actorDefaultId ||
+        key == alexanderId ||
+        key == filmfareId ||
+        key == jeremiahId ||
+        key == singerId);
 
     // 3. Purge legacy dummy casting calls
-    _castingCalls.removeWhere((c) =>
-        c.id == 'call_1' ||
-        c.id == 'call_2' ||
-        c.id == 'call_3' ||
-        c.id == 'my_call_1' ||
-        c.projectTitle == 'The Next Short Film' ||
-        c.authorId == 'james_geidt' ||
-        c.authorId == 'angel_culhane' ||
-        c.authorId == 'angel_culhane_2' ||
-        c.authorId == 'filmfare');
+    _castingCalls.removeWhere((c) => isSeedCall(c.id, c.projectTitle, c.authorId));
 
     // 4. Purge legacy dummy casting applications
-    _castingApplications.removeWhere((a) =>
-        a.id == 'app_seed_call1' ||
-        a.id == 'app_1' ||
-        a.id == 'app_2' ||
-        a.id == 'app_3' ||
-        a.id == 'app_4' ||
-        a.projectTitle == 'The Next Short Film' ||
-        a.castingCallId == 'call_1' ||
-        a.castingCallId == 'call_2' ||
-        a.castingCallId == 'call_3' ||
-        a.castingCallId == 'my_call_1');
-
-    // 5. Seed real casting calls & applications if empty
-    if (_castingCalls.isEmpty) {
-      _castingCalls.addAll(_buildDefaultCastingCalls());
-    }
-    if (_castingApplications.isEmpty) {
-      _castingApplications.addAll(_buildDefaultCastingApplications());
-    }
+    _castingApplications.removeWhere((a) => isSeedApp(a.id, a.castingCallId, a.projectTitle));
   }
 
 
@@ -645,7 +623,8 @@ class AppPersistenceService {
               try {
                 final call =
                     CastingCallModel.fromJson(item as Map<String, dynamic>);
-                if (!existingIds.contains(call.id)) {
+                if (!isSeedCall(call.id, call.projectTitle, call.authorId) &&
+                    !existingIds.contains(call.id)) {
                   _castingCalls.add(call);
                   existingIds.add(call.id);
                 }
@@ -659,7 +638,8 @@ class AppPersistenceService {
               try {
                 final app = CastingApplicationModel.fromJson(
                     item as Map<String, dynamic>);
-                if (!existingIds.contains(app.id)) {
+                if (!isSeedApp(app.id, app.castingCallId, app.projectTitle) &&
+                    !existingIds.contains(app.id)) {
                   _castingApplications.add(app);
                   existingIds.add(app.id);
                 }
@@ -773,35 +753,33 @@ class AppPersistenceService {
       final metaExp = user.userMetadata?['experience'] as String?;
       final metaLoc = user.userMetadata?['location'] as String?;
 
-      final currentActor = getActorPersona();
-      final mergedActor = currentActor.copyWith(
+      _activePersonaId = user.id;
+
+      final emailHandle = user.email != null && user.email!.contains('@')
+          ? user.email!.split('@').first
+          : 'User';
+
+      var currentPersona = UserPersona(
         id: user.id,
         name: (metaName != null && metaName.trim().isNotEmpty)
             ? metaName
-            : currentActor.name,
+            : emailHandle,
+        email: user.email ?? '',
         role: (metaRole != null && metaRole.trim().isNotEmpty)
             ? metaRole
-            : currentActor.role,
+            : '',
         avatarUrl: (metaAvatar != null && metaAvatar.trim().isNotEmpty)
             ? metaAvatar
-            : currentActor.avatarUrl,
-        bio: (metaBio != null && metaBio.trim().isNotEmpty)
-            ? metaBio
-            : currentActor.bio,
-        website: (metaWebsite != null && metaWebsite.trim().isNotEmpty)
-            ? metaWebsite
-            : currentActor.website,
-        experience: (metaExp != null && metaExp.trim().isNotEmpty)
-            ? metaExp
-            : currentActor.experience,
-        location: (metaLoc != null && metaLoc.trim().isNotEmpty)
-            ? metaLoc
-            : currentActor.location,
+            : '',
+        bio: metaBio ?? '',
+        website: metaWebsite ?? '',
+        experience: metaExp ?? '',
+        location: metaLoc ?? '',
       );
 
-      _personas['actor'] = mergedActor;
-      _personas[actorDefaultId] = mergedActor;
-      _personas[user.id] = mergedActor;
+      _personas[user.id] = currentPersona;
+      _personas['actor'] = currentPersona;
+      _personas[actorDefaultId] = currentPersona;
 
       // 3. Check Supabase users table for persistent profile data
       try {
@@ -813,24 +791,24 @@ class AppPersistenceService {
           final lastName = row['last_name'] as String? ?? '';
           final combinedName =
               '$firstName $lastName'.trim().isNotEmpty ? '$firstName $lastName'.trim() : row['name'] as String? ?? '';
-          final updatedWithRow = mergedActor.copyWith(
-            name: combinedName.isNotEmpty ? combinedName : mergedActor.name,
+          final updatedWithRow = currentPersona.copyWith(
+            name: combinedName.isNotEmpty ? combinedName : currentPersona.name,
             role: (row['role'] as String? ?? '').isNotEmpty && row['role'] != 'unset'
                 ? row['role'] as String
-                : mergedActor.role,
+                : currentPersona.role,
             bio: (row['bio'] as String? ?? '').isNotEmpty
                 ? row['bio'] as String
-                : mergedActor.bio,
+                : currentPersona.bio,
             location: (row['location'] as String? ?? '').isNotEmpty
                 ? row['location'] as String
-                : mergedActor.location,
+                : currentPersona.location,
             avatarUrl: (row['profile_image_path'] as String? ?? '').isNotEmpty
                 ? row['profile_image_path'] as String
-                : mergedActor.avatarUrl,
+                : currentPersona.avatarUrl,
           );
+          _personas[user.id] = updatedWithRow;
           _personas['actor'] = updatedWithRow;
           _personas[actorDefaultId] = updatedWithRow;
-          _personas[user.id] = updatedWithRow;
         }
       } catch (_) {}
 
@@ -971,636 +949,43 @@ class AppPersistenceService {
     } catch (_) {}
   }
 
-  // ─── Default Generators ──────────────────────────────────────
-
-  static UserPersona _buildDefaultActor() {
-    return const UserPersona(
-      id: actorDefaultId,
-      name: 'Hamza Ali',
-      email: 'actor@youtooart.com',
-      role: 'Actor | Performing Artist',
-      avatarUrl:
-          'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',
-      isProductionHouse: false,
-      bio:
-          'Trained theater and screen actor specializing in dramatic monologues, character studies, and cinematic narratives.',
-      website: 'www.hamzaali.art',
-      experience: '5+ Years',
-      location: 'Islamabad, Pakistan',
-    );
+  static bool isSeedCall(String id, [String? title, String? authorId]) {
+    if (id.startsWith('call_') || id == 'my_call_1') {
+      return true;
+    }
+    if (title == 'Echoes of Rawal' ||
+        title == 'The Next Short Film' ||
+        title == 'Lahore Tales' ||
+        title == 'Melody in the Rain' ||
+        title == 'Shadows & Dust' ||
+        title == 'Midnight Sun') {
+      return true;
+    }
+    if (authorId == 'james_geidt' ||
+        authorId == 'angel_culhane' ||
+        authorId == 'angel_culhane_2' ||
+        authorId == 'filmfare' ||
+        authorId == filmfareId ||
+        authorId == alexanderId) {
+      return true;
+    }
+    return false;
   }
 
-  static UserPersona _buildDefaultAlexander() {
-    return const UserPersona(
-      id: alexanderId,
-      name: 'Zaid Khan',
-      email: 'director@youtooart.com',
-      role: 'Director | Filmmaker',
-      avatarUrl:
-          'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=400&q=80',
-      isProductionHouse: false,
-      bio:
-          'Award-winning independent filmmaker and commercial director with a passion for authentic storytelling, festival cinema, and discovering new talent.',
-      website: 'www.zaidkhanfilms.com',
-      experience: '7+ Years',
-      location: 'Lahore, Pakistan',
-    );
-  }
-
-  static UserPersona _buildDefaultFilmFare() {
-    return const UserPersona(
-      id: filmfareId,
-      name: 'SkyPulse Studios',
-      email: 'production@youtooart.com',
-      role: 'Production House',
-      avatarUrl:
-          'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=400&q=80',
-      isProductionHouse: true,
-      bio:
-          'Leading digital film studio producing groundbreaking feature films, digital web series, and high-impact commercial cinema. We connect bold emerging talent with top industry directors.',
-      website: 'www.skypulsestudios.com',
-      experience: '8+ Years',
-      location: 'Islamabad, Pakistan',
-    );
-  }
-
-  static UserPersona _buildDefaultJeremiah() {
-    return const UserPersona(
-      id: jeremiahId,
-      name: 'Sara Ahmed',
-      email: 'crew@youtooart.com',
-      role: 'Cinematographer | DoP',
-      avatarUrl:
-          'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
-      isProductionHouse: false,
-      bio:
-          'Cinematographer and camera operator specializing in Arri & RED camera workflows, anamorphic lighting design, and cinematic commercial aesthetics.',
-      website: 'www.sara-cinematography.com',
-      experience: '6+ Years',
-      location: 'Karachi, Pakistan',
-    );
-  }
-
-  static UserPersona _buildDefaultSinger() {
-    return const UserPersona(
-      id: singerId,
-      name: 'Bilal Tariq',
-      email: 'singer@youtooart.com',
-      role: 'Singer | Composer',
-      avatarUrl:
-          'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80',
-      isProductionHouse: false,
-      bio:
-          'Vocalist, playback singer, and music composer for independent films and drama soundtracks. Open for film scores and original collaborations.',
-      website: 'www.bilaltariqmusic.com',
-      experience: '4+ Years',
-      location: 'Islamabad, Pakistan',
-    );
-  }
-
-  static UserPortfolioState _buildDefaultActorPortfolio() {
-    return const UserPortfolioState(
-      videos: [
-        WorkMediaItem(
-          id: 'vid_hamza_1',
-          title: 'Dramatic Monologue Audition — "The Architect"',
-          url: 'https://youtu.be/JXCRWxBA0fE',
-          mediaUrl:
-              'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=800&q=80',
-          isVideo: true,
-          lastUpdated: 'Just Now',
-        ),
-        WorkMediaItem(
-          id: 'vid_hamza_2',
-          title: 'Official Acting Showreel 2026',
-          url: 'https://youtu.be/JXCRWxBA0fE',
-          mediaUrl:
-              'https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&w=800&q=80',
-          isVideo: true,
-          lastUpdated: '3 days ago',
-        ),
-      ],
-      photos: [
-        WorkMediaItem(
-          id: 'photo_hamza_1',
-          title: 'Dramatic Headshot — Studio Noir',
-          url: 'https://drive.google.com/u/1/h1',
-          mediaUrl:
-              'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=800&q=80',
-          isVideo: false,
-          lastUpdated: '2 days ago',
-        ),
-        WorkMediaItem(
-          id: 'photo_2',
-          title: 'Cinematic Moodboard - Red Studio',
-          url: 'https://drive.google.com/u/1/photo2',
-          mediaUrl:
-              'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=800&q=80',
-          isVideo: false,
-          lastUpdated: '3 days ago',
-        ),
-        WorkMediaItem(
-          id: 'photo_3',
-          title: 'Behind the Scenes - Indie Production',
-          url: 'https://drive.google.com/u/1/photo3',
-          mediaUrl:
-              'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=800&q=80',
-          isVideo: false,
-          lastUpdated: '5 days ago',
-        ),
-        WorkMediaItem(
-          id: 'photo_4',
-          title: 'Golden Hour Character Study',
-          url: 'https://drive.google.com/u/1/photo4',
-          mediaUrl:
-              'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=800&q=80',
-          isVideo: false,
-          lastUpdated: '1 week ago',
-        ),
-        WorkMediaItem(
-          id: 'photo_5',
-          title: 'Monochrome Dramatic Monologue',
-          url: 'https://drive.google.com/u/1/photo5',
-          mediaUrl:
-              'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=800&q=80',
-          isVideo: false,
-          lastUpdated: '1 week ago',
-        ),
-        WorkMediaItem(
-          id: 'photo_6',
-          title: 'Theatre Rehearsal Stills',
-          url: 'https://drive.google.com/u/1/photo6',
-          mediaUrl:
-              'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=800&q=80',
-          isVideo: false,
-          lastUpdated: '2 weeks ago',
-        ),
-        WorkMediaItem(
-          id: 'photo_7',
-          title: 'Stage Presence & Silhouette',
-          url: 'https://drive.google.com/u/1/photo7',
-          mediaUrl:
-              'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=800&q=80',
-          isVideo: false,
-          lastUpdated: '2 weeks ago',
-        ),
-        WorkMediaItem(
-          id: 'photo_8',
-          title: 'Editorial Headshots Session',
-          url: 'https://drive.google.com/u/1/photo8',
-          mediaUrl:
-              'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=800&q=80',
-          isVideo: false,
-          lastUpdated: '3 weeks ago',
-        ),
-        WorkMediaItem(
-          id: 'photo_9',
-          title: 'Casting Reel Stills - Period Drama',
-          url: 'https://drive.google.com/u/1/photo9',
-          mediaUrl:
-              'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=800&q=80',
-          isVideo: false,
-          lastUpdated: '1 month ago',
-        ),
-        WorkMediaItem(
-          id: 'photo_10',
-          title: 'Urban Action Sequence Frames',
-          url: 'https://drive.google.com/u/1/photo10',
-          mediaUrl:
-              'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&w=800&q=80',
-          isVideo: false,
-          lastUpdated: '1 month ago',
-        ),
-        WorkMediaItem(
-          id: 'photo_11',
-          title: 'Expressive Close-ups - Emotional Arc',
-          url: 'https://drive.google.com/u/1/photo11',
-          mediaUrl:
-              'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80',
-          isVideo: false,
-          lastUpdated: '1 month ago',
-        ),
-        WorkMediaItem(
-          id: 'photo_12',
-          title: 'Director Showcase Wrap Stills',
-          url: 'https://drive.google.com/u/1/photo12',
-          mediaUrl:
-              'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=800&q=80',
-          isVideo: false,
-          lastUpdated: '2 months ago',
-        ),
-      ],
-    );
-  }
-
-  static UserPortfolioState _buildDefaultAlexanderPortfolio() {
-    return const UserPortfolioState(
-      videos: [
-        WorkMediaItem(
-          id: 'vid_zaid_1',
-          title: 'Festival Short Film Trailer — "Lahore Tales"',
-          url: 'https://youtu.be/JXCRWxBA0fE',
-          mediaUrl:
-              'https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&w=800&q=80',
-          isVideo: true,
-          lastUpdated: 'Yesterday',
-        ),
-        WorkMediaItem(
-          id: 'vid_zaid_2',
-          title: 'Directing Showreel & Festival Highlights',
-          url: 'https://youtu.be/JXCRWxBA0fE',
-          mediaUrl:
-              'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=800&q=80',
-          isVideo: true,
-          lastUpdated: '3 days ago',
-        ),
-      ],
-      photos: [
-        WorkMediaItem(
-          id: 'photo_zaid_1',
-          title: 'Director Zaid Khan On-Set Directing',
-          url: 'https://drive.google.com/u/1/z1',
-          mediaUrl:
-              'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=800&q=80',
-          isVideo: false,
-          lastUpdated: '1 day ago',
-        ),
-        WorkMediaItem(
-          id: 'photo_zaid_2',
-          title: 'Historic Walled City Lahore Shoot Location',
-          url: 'https://drive.google.com/u/1/z2',
-          mediaUrl:
-              'https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&w=800&q=80',
-          isVideo: false,
-          lastUpdated: '5 days ago',
-        ),
-        WorkMediaItem(
-          id: 'photo_zaid_3',
-          title: 'Scene Blocking & Rehearsal Session',
-          url: 'https://drive.google.com/u/1/z3',
-          mediaUrl:
-              'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=800&q=80',
-          isVideo: false,
-          lastUpdated: '1 week ago',
-        ),
-      ],
-    );
-  }
-
-  static UserPortfolioState _buildDefaultFilmFarePortfolio() {
-    return const UserPortfolioState(
-      videos: [
-        WorkMediaItem(
-          id: 'vid_skypulse_1',
-          title: 'SkyPulse Studios Official Film Slate 2026',
-          url: 'https://youtu.be/JXCRWxBA0fE',
-          mediaUrl:
-              'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?auto=format&fit=crop&w=800&q=80',
-          isVideo: true,
-          lastUpdated: 'Just Now',
-        ),
-        WorkMediaItem(
-          id: 'vid_skypulse_2',
-          title: 'Open Casting Reel — "Echoes of Rawal"',
-          url: 'https://youtu.be/JXCRWxBA0fE',
-          mediaUrl:
-              'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=800&q=80',
-          isVideo: true,
-          lastUpdated: '4 days ago',
-        ),
-      ],
-      photos: [
-        WorkMediaItem(
-          id: 'photo_skypulse_1',
-          title: 'SkyPulse Studios Main Lot & Production Soundstages',
-          url: 'https://drive.google.com/u/1/sp1',
-          mediaUrl:
-              'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=800&q=80',
-          isVideo: false,
-          lastUpdated: '2 days ago',
-        ),
-        WorkMediaItem(
-          id: 'photo_skypulse_2',
-          title: 'Feature Film Concept Art & Production Design',
-          url: 'https://drive.google.com/u/1/sp2',
-          mediaUrl:
-              'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?auto=format&fit=crop&w=800&q=80',
-          isVideo: false,
-          lastUpdated: '5 days ago',
-        ),
-        WorkMediaItem(
-          id: 'photo_skypulse_3',
-          title: 'Cast Table Read — "Echoes of Rawal"',
-          url: 'https://drive.google.com/u/1/sp3',
-          mediaUrl:
-              'https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&fit=crop&w=800&q=80',
-          isVideo: false,
-          lastUpdated: '1 week ago',
-        ),
-      ],
-    );
-  }
-
-  static UserPortfolioState _buildDefaultJeremiahPortfolio() {
-    return const UserPortfolioState(
-      videos: [
-        WorkMediaItem(
-          id: 'vid_sara_1',
-          title: 'Sara Ahmed Cinematography Showreel (Arri Alexa Mini)',
-          url: 'https://youtu.be/JXCRWxBA0fE',
-          mediaUrl:
-              'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80',
-          isVideo: true,
-          lastUpdated: 'Just Now',
-        ),
-        WorkMediaItem(
-          id: 'vid_sara_2',
-          title: 'Anamorphic Lighting & Moodboard Masterclass Reel',
-          url: 'https://youtu.be/JXCRWxBA0fE',
-          mediaUrl:
-              'https://images.unsplash.com/photo-1426604966848-d7adac402bff?auto=format&fit=crop&w=800&q=80',
-          isVideo: true,
-          lastUpdated: '5 days ago',
-        ),
-      ],
-      photos: [
-        WorkMediaItem(
-          id: 'photo_sara_1',
-          title: 'On-Set Camera Rigging & Anamorphic Primes',
-          url: 'https://drive.google.com/u/1/sr1',
-          mediaUrl:
-              'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80',
-          isVideo: false,
-          lastUpdated: '1 day ago',
-        ),
-        WorkMediaItem(
-          id: 'photo_sara_2',
-          title: 'Cinematic Moodboard — Blue Twilight Studio',
-          url: 'https://drive.google.com/u/1/sr2',
-          mediaUrl:
-              'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=800&q=80',
-          isVideo: false,
-          lastUpdated: '3 days ago',
-        ),
-      ],
-    );
-  }
-
-  static UserPortfolioState _buildDefaultSingerPortfolio() {
-    return const UserPortfolioState(
-      videos: [
-        WorkMediaItem(
-          id: 'vid_bilal_1',
-          title: 'Live Acoustic Performance — "Echoes of Rawal OST"',
-          url: 'https://youtu.be/JXCRWxBA0fE',
-          mediaUrl:
-              'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=800&q=80',
-          isVideo: true,
-          lastUpdated: 'Just Now',
-        ),
-        WorkMediaItem(
-          id: 'vid_bilal_2',
-          title: 'Film Score Recording Studio Session',
-          url: 'https://youtu.be/JXCRWxBA0fE',
-          mediaUrl:
-              'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=800&q=80',
-          isVideo: true,
-          lastUpdated: '4 days ago',
-        ),
-      ],
-      photos: [
-        WorkMediaItem(
-          id: 'photo_bilal_1',
-          title: 'Studio Recording Session with Neumann U87',
-          url: 'https://drive.google.com/u/1/bl1',
-          mediaUrl:
-              'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=800&q=80',
-          isVideo: false,
-          lastUpdated: '2 days ago',
-        ),
-        WorkMediaItem(
-          id: 'photo_bilal_2',
-          title: 'Music Composition & Grand Piano Session',
-          url: 'https://drive.google.com/u/1/bl2',
-          mediaUrl:
-              'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=800&q=80',
-          isVideo: false,
-          lastUpdated: '1 week ago',
-        ),
-      ],
-    );
-  }
-
-  static UserPortfolioState _buildTalentPortfolio(TalentModel talent) {
-    final photos = talent.workPortfolio.map((url) {
-      final idx = talent.workPortfolio.indexOf(url) + 1;
-      return WorkMediaItem(
-        id: 'photo_${talent.id}_$idx',
-        title: '${talent.name} Portfolio Still $idx',
-        url: url,
-        mediaUrl: url,
-        isVideo: false,
-        lastUpdated: '$idx days ago',
-      );
-    }).toList();
-
-    final avatar = talent.avatarUrl ?? '';
-    return UserPortfolioState(
-      videos: [
-        WorkMediaItem(
-          id: 'vid_${talent.id}_1',
-          title: '${talent.name} Official Showreel (${talent.roles.split('|').first.trim()})',
-          url: 'https://youtu.be/JXCRWxBA0fE',
-          mediaUrl: avatar,
-          isVideo: true,
-          lastUpdated: 'Recent',
-        ),
-      ],
-      photos: photos.isNotEmpty
-          ? photos
-          : [
-              WorkMediaItem(
-                id: 'photo_${talent.id}_1',
-                title: '${talent.name} Official Portrait',
-                url: avatar,
-                mediaUrl: avatar,
-                isVideo: false,
-                lastUpdated: 'Recent',
-              ),
-            ],
-    );
-  }
-
-  static List<CastingCallModel> _buildDefaultCastingCalls() {
-    return [
-      CastingCallModel(
-        id: 'call_skypulse_1',
-        projectTitle: 'Echoes of Rawal',
-        authorId: filmfareId,
-        authorName: 'SkyPulse Studios',
-        authorAvatar:
-            'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=400&q=80',
-        publishedDateStr: '2 Days Ago',
-        publishedAt: DateTime.now().subtract(const Duration(days: 2)),
-        description:
-            'An upcoming investigative political drama feature following a determined journalist uncovering systemic truths in the capital.',
-        location: 'Islamabad, Pakistan',
-        locationDisplay: 'Islamabad',
-        type: 'Feature Film',
-        shootDuration: '45 Days',
-        budget: '\$45K',
-        budgetFull: '\$45,000',
-        crewRequired: '4',
-        shootDetails:
-            'Location shoots across Islamabad F-sectors, Margalla hills, and raw Rawalpindi heritage quarters.',
-        position: 'Lead Male Actor',
-        roleTitle: 'Lead Actor — Feature Drama',
-        roleDescription:
-            'Protagonist portraying an ambitious investigative journalist with intense emotional depth.',
-        ageRequired: '24-30 Years',
-        heightRequired: '5.10+ Feet',
-        gender: 'Male Only',
-        contactEmail: 'production@youtooart.com',
-        contactNumber: '+92 51 8899001',
-        applicantsCount: 14,
-        isApplied: true,
-        appliedAt: 'Yesterday',
-      ),
-      CastingCallModel(
-        id: 'call_skypulse_2',
-        projectTitle: 'Midnight Sun',
-        authorId: filmfareId,
-        authorName: 'SkyPulse Studios',
-        authorAvatar:
-            'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=400&q=80',
-        publishedDateStr: '4 Days Ago',
-        publishedAt: DateTime.now().subtract(const Duration(days: 4)),
-        description:
-            'Festival short film exploring memory and reconciliation through evocative visual storytelling.',
-        location: 'Islamabad, Pakistan',
-        locationDisplay: 'Islamabad',
-        type: 'Short Film',
-        shootDuration: '18 Days',
-        budget: '\$15K',
-        budgetFull: '\$15,000',
-        crewRequired: '2',
-        shootDetails:
-            'Indoor soundstage and atmospheric twilight photography.',
-        position: 'Supporting Actress',
-        roleTitle: 'Supporting Actress — Psychological Drama',
-        roleDescription:
-            'Nuanced supporting character with a strong emotional arc.',
-        ageRequired: '22-28 Years',
-        heightRequired: '5.5+ Feet',
-        gender: 'Female Only',
-        contactEmail: 'production@youtooart.com',
-        contactNumber: '+92 51 8899001',
-        applicantsCount: 8,
-        isApplied: false,
-      ),
-      CastingCallModel(
-        id: 'call_zaid_1',
-        projectTitle: 'Lahore Tales',
-        authorId: alexanderId,
-        authorName: 'Zaid Khan',
-        authorAvatar:
-            'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=400&q=80',
-        publishedDateStr: '1 Week Ago',
-        publishedAt: DateTime.now().subtract(const Duration(days: 7)),
-        description:
-            'An authentic independent feature exploring intertwined lives and cultural heritage in Old Lahore.',
-        location: 'Lahore, Pakistan',
-        locationDisplay: 'Lahore',
-        type: 'Indie Feature',
-        shootDuration: '30 Days',
-        budget: '\$25K',
-        budgetFull: '\$25,000',
-        crewRequired: '3',
-        shootDetails:
-            'Historic architectural locations in Walled City Lahore and modern Gulberg districts.',
-        position: 'Director of Photography',
-        roleTitle: 'Cinematographer / DoP',
-        roleDescription:
-            'Seeking a camera visionary proficient with anamorphic glass and naturalistic lighting design.',
-        ageRequired: 'Any',
-        heightRequired: 'N/A',
-        gender: 'Any',
-        contactEmail: 'director@youtooart.com',
-        contactNumber: '+92 42 35789123',
-        applicantsCount: 6,
-        isApplied: false,
-      ),
-    ];
-  }
-
-  static List<CastingApplicationModel> _buildDefaultCastingApplications() {
-    return [
-      CastingApplicationModel(
-        id: 'app_hamza_call_skypulse_1',
-        castingCallId: 'call_skypulse_1',
-        projectTitle: 'Echoes of Rawal',
-        applicantId: actorDefaultId,
-        applicantName: 'Hamza Ali',
-        applicantAvatar:
-            'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',
-        appliedAt: 'Yesterday',
-        appliedDateTime: DateTime.now().subtract(const Duration(days: 1)),
-        contactNumber: '+92 301 5551234',
-        contactEmail: 'actor@youtooart.com',
-        age: '26',
-        height: '5.11 Feet',
-        gender: 'Male',
-        experience: '5+ Years',
-        location: 'Islamabad, Pakistan',
-        note:
-            'Trained dramatic actor with lead experience in indie shorts and theatre. Showreel and monologue attached.',
-        status: ApplicationStatus.received,
-        isWishlisted: false,
-      ),
-      CastingApplicationModel(
-        id: 'app_daniyal_call_skypulse_1',
-        castingCallId: 'call_skypulse_1',
-        projectTitle: 'Echoes of Rawal',
-        applicantId: 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
-        applicantName: 'Daniyal Raza',
-        applicantAvatar:
-            'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=400&q=80',
-        appliedAt: '2 Days Ago',
-        appliedDateTime: DateTime.now().subtract(const Duration(days: 2)),
-        contactNumber: '+92 333 4567890',
-        contactEmail: 'daniyal.raza@gmail.com',
-        age: '27',
-        height: '6.0 Feet',
-        gender: 'Male',
-        experience: '4 Years',
-        location: 'Islamabad, Pakistan',
-        note:
-            'Passionate screen actor with strong monologue delivery and commercial background.',
-        status: ApplicationStatus.wishlisted,
-        isWishlisted: true,
-      ),
-      CastingApplicationModel(
-        id: 'app_zainab_call_skypulse_2',
-        castingCallId: 'call_skypulse_2',
-        projectTitle: 'Midnight Sun',
-        applicantId: '44444444-4444-4444-4444-444444444444',
-        applicantName: 'Zainab Khan',
-        applicantAvatar:
-            'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
-        appliedAt: '3 Days Ago',
-        appliedDateTime: DateTime.now().subtract(const Duration(days: 3)),
-        contactNumber: '+92 312 9876543',
-        contactEmail: 'zainab.k@gmail.com',
-        age: '24',
-        height: '5.6 Feet',
-        gender: 'Female',
-        experience: '3 Years',
-        location: 'Islamabad, Pakistan',
-        note:
-            'Theatre graduate interested in supporting drama role. Portfolio reel submitted.',
-        status: ApplicationStatus.received,
-        isWishlisted: false,
-      ),
-    ];
+  static bool isSeedApp(String id, [String? callId, String? title]) {
+    if (id.startsWith('app_')) {
+      return true;
+    }
+    if (callId != null && (callId.startsWith('call_') || callId == 'my_call_1')) {
+      return true;
+    }
+    if (title == 'Echoes of Rawal' ||
+        title == 'The Next Short Film' ||
+        title == 'Lahore Tales' ||
+        title == 'Melody in the Rain' ||
+        title == 'Midnight Sun') {
+      return true;
+    }
+    return false;
   }
 }

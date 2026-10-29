@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
 import 'package:you_too_art/core/services/app_persistence_service.dart';
-import 'package:you_too_art/core/widgets/persona_switcher_modal.dart';
 import 'package:you_too_art/features/account/presentation/account_sheets.dart';
 import 'package:you_too_art/features/account/presentation/help_support_screen.dart';
 import 'package:you_too_art/features/account/presentation/transaction_history_screen.dart';
@@ -60,8 +59,21 @@ class AccountScreen extends ConsumerWidget {
                               CircleAvatar(
                                 radius: 28,
                                 backgroundColor: const Color(0xFFEEEEEE),
-                                backgroundImage:
-                                    NetworkImage(activePersona.avatarUrl),
+                                backgroundImage: activePersona.avatarUrl.isNotEmpty
+                                    ? NetworkImage(activePersona.avatarUrl)
+                                    : null,
+                                child: activePersona.avatarUrl.isEmpty
+                                    ? Text(
+                                        activePersona.name.isNotEmpty
+                                            ? activePersona.name[0].toUpperCase()
+                                            : 'U',
+                                        style: const TextStyle(
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF3899F3),
+                                        ),
+                                      )
+                                    : null,
                               ),
                               Positioned(
                                 right: -2,
@@ -213,26 +225,6 @@ class AccountScreen extends ConsumerWidget {
                     },
                   ),
 
-                  const SizedBox(height: 32),
-
-                  // ─── Multi-Persona Testing Switcher (Practice Project Helper) ──
-                  Center(
-                    child: TextButton.icon(
-                      onPressed: () => showPersonaSwitcherModal(context, ref),
-                      icon: const Icon(
-                        Icons.swap_horiz,
-                        size: 16,
-                        color: Color(0xFF9E9E9E),
-                      ),
-                      label: Text(
-                        'Switch Persona (${activePersona.name})',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF9E9E9E),
-                        ),
-                      ),
-                    ),
-                  ),
                   const SizedBox(height: 16),
                 ],
               ),

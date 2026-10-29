@@ -23,7 +23,9 @@ class HomeHeader extends ConsumerWidget {
 
     final displayName = user?.firstName.isNotEmpty == true
         ? user!.firstName
-        : (user?.name.isNotEmpty == true ? user!.name : 'Wajahat');
+        : (user?.name.isNotEmpty == true
+            ? user!.name
+            : (user?.email.split('@').first ?? 'there'));
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),

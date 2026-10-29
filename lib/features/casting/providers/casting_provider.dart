@@ -98,36 +98,41 @@ class CastingNotifier extends Notifier<CastingState> {
 
     // 3. Purge legacy dummy seed calls & applications
     calls.removeWhere((c) =>
+        c.id.startsWith('call_') ||
         c.id == 'call_1' ||
         c.id == 'call_2' ||
         c.id == 'call_3' ||
         c.id == 'my_call_1' ||
         c.projectTitle == 'The Next Short Film' ||
+        c.projectTitle == 'Echoes of Rawal' ||
+        c.projectTitle == 'Lahore Tales' ||
+        c.projectTitle == 'Melody in the Rain' ||
+        c.projectTitle == 'Shadows & Dust' ||
+        c.projectTitle == 'Midnight Sun' ||
         c.authorId == 'james_geidt' ||
         c.authorId == 'angel_culhane' ||
         c.authorId == 'angel_culhane_2' ||
-        c.authorId == 'filmfare');
+        c.authorId == 'filmfare' ||
+        c.authorId == 'b2222222-2222-2222-2222-222222222222' ||
+        c.authorId == 'a1111111-1111-1111-1111-111111111111');
 
     apps.removeWhere((a) =>
+        a.id.startsWith('app_') ||
         a.id == 'app_seed_call1' ||
         a.id == 'app_1' ||
         a.id == 'app_2' ||
         a.id == 'app_3' ||
         a.id == 'app_4' ||
         a.projectTitle == 'The Next Short Film' ||
+        a.projectTitle == 'Echoes of Rawal' ||
+        a.projectTitle == 'Lahore Tales' ||
+        a.projectTitle == 'Melody in the Rain' ||
+        a.projectTitle == 'Midnight Sun' ||
+        a.castingCallId.startsWith('call_') ||
         a.castingCallId == 'call_1' ||
         a.castingCallId == 'call_2' ||
         a.castingCallId == 'call_3' ||
         a.castingCallId == 'my_call_1');
-
-    // 4. Fallback: Seed defaults only if genuinely empty
-    if (calls.isEmpty) {
-      calls = _buildDefaultCalls();
-    }
-
-    if (apps.isEmpty) {
-      apps = _buildDefaultApplications();
-    }
 
     // Clean up any globally stamped isApplied flags from stored calls.
     // Application status is user-specific and evaluated dynamically per persona!
@@ -257,10 +262,8 @@ class CastingNotifier extends Notifier<CastingState> {
       applicantId: activePersona.id,
       applicantName: activePersona.name.isNotEmpty
           ? activePersona.name
-          : 'Hamza Ali',
-      applicantAvatar: activePersona.avatarUrl.isNotEmpty
-          ? activePersona.avatarUrl
-          : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',
+          : 'Applicant',
+      applicantAvatar: activePersona.avatarUrl,
       appliedAt: 'Just Now',
       appliedDateTime: now,
       contactNumber: contactNumber,
@@ -519,179 +522,6 @@ class CastingNotifier extends Notifier<CastingState> {
     }).toList();
   }
 
-  // ─── Figma Seed Data ──────────────────────────────────────────
-
-  static List<CastingCallModel> _buildDefaultCalls() {
-    return [
-      CastingCallModel(
-        id: 'call_skypulse_1',
-        projectTitle: 'Echoes of Rawal',
-        authorId: AppPersistenceService.filmfareId,
-        authorName: 'SkyPulse Studios',
-        authorAvatar:
-            'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=400&q=80',
-        publishedDateStr: '2 Days Ago',
-        publishedAt: DateTime.now().subtract(const Duration(days: 2)),
-        description:
-            'An upcoming investigative political drama feature following a determined journalist uncovering systemic truths in the capital.',
-        location: 'Islamabad, Pakistan',
-        locationDisplay: 'Islamabad',
-        type: 'Feature Film',
-        shootDuration: '45 Days',
-        budget: '\$45K',
-        budgetFull: '\$45,000',
-        crewRequired: '4',
-        shootDetails:
-            'Location shoots across Islamabad F-sectors, Margalla hills, and raw Rawalpindi heritage quarters.',
-        position: 'Lead Male Actor',
-        roleTitle: 'Lead Actor — Feature Drama',
-        roleDescription:
-            'Protagonist portraying an ambitious investigative journalist with intense emotional depth.',
-        ageRequired: '24-30 Years',
-        heightRequired: '5.10+ Feet',
-        gender: 'Male Only',
-        contactEmail: 'production@youtooart.com',
-        contactNumber: '+92 51 8899001',
-        applicantsCount: 14,
-        isApplied: false,
-      ),
-      CastingCallModel(
-        id: 'call_skypulse_2',
-        projectTitle: 'Midnight Sun',
-        authorId: AppPersistenceService.filmfareId,
-        authorName: 'SkyPulse Studios',
-        authorAvatar:
-            'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=400&q=80',
-        publishedDateStr: '4 Days Ago',
-        publishedAt: DateTime.now().subtract(const Duration(days: 4)),
-        description:
-            'Festival short film exploring memory and reconciliation through evocative visual storytelling.',
-        location: 'Islamabad, Pakistan',
-        locationDisplay: 'Islamabad',
-        type: 'Short Film',
-        shootDuration: '18 Days',
-        budget: '\$15K',
-        budgetFull: '\$15,000',
-        crewRequired: '2',
-        shootDetails:
-            'Indoor soundstage and atmospheric twilight photography.',
-        position: 'Supporting Actress',
-        roleTitle: 'Supporting Actress — Psychological Drama',
-        roleDescription:
-            'Nuanced supporting character with a strong emotional arc.',
-        ageRequired: '22-28 Years',
-        heightRequired: '5.5+ Feet',
-        gender: 'Female Only',
-        contactEmail: 'production@youtooart.com',
-        contactNumber: '+92 51 8899001',
-        applicantsCount: 8,
-        isApplied: false,
-      ),
-      CastingCallModel(
-        id: 'call_zaid_1',
-        projectTitle: 'Lahore Tales',
-        authorId: AppPersistenceService.alexanderId,
-        authorName: 'Zaid Khan',
-        authorAvatar:
-            'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=400&q=80',
-        publishedDateStr: '1 Week Ago',
-        publishedAt: DateTime.now().subtract(const Duration(days: 7)),
-        description:
-            'An authentic independent feature exploring intertwined lives and cultural heritage in Old Lahore.',
-        location: 'Lahore, Pakistan',
-        locationDisplay: 'Lahore',
-        type: 'Indie Feature',
-        shootDuration: '30 Days',
-        budget: '\$25K',
-        budgetFull: '\$25,000',
-        crewRequired: '3',
-        shootDetails:
-            'Historic architectural locations in Walled City Lahore and modern Gulberg districts.',
-        position: 'Director of Photography',
-        roleTitle: 'Cinematographer / DoP',
-        roleDescription:
-            'Seeking a camera visionary proficient with anamorphic glass and naturalistic lighting design.',
-        ageRequired: 'Any',
-        heightRequired: 'N/A',
-        gender: 'Any',
-        contactEmail: 'director@youtooart.com',
-        contactNumber: '+92 42 35789123',
-        applicantsCount: 6,
-        isApplied: false,
-      ),
-    ];
-  }
-
-  static List<CastingApplicationModel> _buildDefaultApplications() {
-    return [
-      CastingApplicationModel(
-        id: 'app_hamza_call_skypulse_1',
-        castingCallId: 'call_skypulse_1',
-        projectTitle: 'Echoes of Rawal',
-        applicantId: AppPersistenceService.actorDefaultId,
-        applicantName: 'Hamza Ali',
-        applicantAvatar:
-            'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',
-        appliedAt: 'Yesterday',
-        appliedDateTime: DateTime.now().subtract(const Duration(days: 1)),
-        contactNumber: '+92 301 5551234',
-        contactEmail: 'actor@youtooart.com',
-        age: '26',
-        height: '5.11 Feet',
-        gender: 'Male',
-        experience: '5+ Years',
-        location: 'Islamabad, Pakistan',
-        note:
-            'Trained dramatic actor with lead experience in indie shorts and theatre. Showreel and monologue attached.',
-        status: ApplicationStatus.received,
-        isWishlisted: false,
-      ),
-      CastingApplicationModel(
-        id: 'app_daniyal_call_skypulse_1',
-        castingCallId: 'call_skypulse_1',
-        projectTitle: 'Echoes of Rawal',
-        applicantId: 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
-        applicantName: 'Daniyal Raza',
-        applicantAvatar:
-            'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=400&q=80',
-        appliedAt: '2 Days Ago',
-        appliedDateTime: DateTime.now().subtract(const Duration(days: 2)),
-        contactNumber: '+92 333 4567890',
-        contactEmail: 'daniyal.raza@gmail.com',
-        age: '27',
-        height: '6.0 Feet',
-        gender: 'Male',
-        experience: '4 Years',
-        location: 'Islamabad, Pakistan',
-        note:
-            'Passionate screen actor with strong monologue delivery and commercial background.',
-        status: ApplicationStatus.wishlisted,
-        isWishlisted: true,
-      ),
-      CastingApplicationModel(
-        id: 'app_zainab_call_skypulse_2',
-        castingCallId: 'call_skypulse_2',
-        projectTitle: 'Midnight Sun',
-        applicantId: '44444444-4444-4444-4444-444444444444',
-        applicantName: 'Zainab Khan',
-        applicantAvatar:
-            'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
-        appliedAt: '3 Days Ago',
-        appliedDateTime: DateTime.now().subtract(const Duration(days: 3)),
-        contactNumber: '+92 312 9876543',
-        contactEmail: 'zainab.k@gmail.com',
-        age: '24',
-        height: '5.6 Feet',
-        gender: 'Female',
-        experience: '3 Years',
-        location: 'Islamabad, Pakistan',
-        note:
-            'Theatre graduate interested in supporting drama role. Portfolio reel submitted.',
-        status: ApplicationStatus.received,
-        isWishlisted: false,
-      ),
-    ];
-  }
 }
 
 final castingProvider =

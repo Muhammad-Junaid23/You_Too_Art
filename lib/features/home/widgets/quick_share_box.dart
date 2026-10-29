@@ -39,7 +39,9 @@ class QuickShareBox extends ConsumerWidget {
                     children: [
                       AppAvatar(
                         imageUrl: user?.profileImagePath,
-                        name: user?.name.isNotEmpty == true ? user!.name : 'Wajahat',
+                        name: user?.name.isNotEmpty == true
+                            ? user!.name
+                            : (user?.email.split('@').first ?? 'User'),
                         radius: 20,
                       ),
                       const SizedBox(width: 12),

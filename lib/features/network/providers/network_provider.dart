@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:you_too_art/core/constants/supabase_tables.dart';
 import 'package:you_too_art/core/constants/talent_directory.dart';
+import 'package:you_too_art/core/models/user_model.dart';
 import 'package:you_too_art/core/providers/supabase_providers.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
 import 'package:you_too_art/core/repositories/connection_repository.dart';
@@ -159,26 +161,29 @@ class NetworkNotifier extends Notifier<NetworkState> {
       );
     }).toList();
 
-    // 3. Suggestions using canonical test personas (excluding self and already connected/incoming)
+    // 3. Suggestions from real registered users in Supabase
     final connectedIds = connectionItems.map((c) => c.id).toSet();
     final requestedIds = requestItems.map((r) => r.id).toSet();
 
-    final candidateIds = [
-      UserPersonaNotifier.actorDefaultId,
-      UserPersonaNotifier.jeremiahId,
-      UserPersonaNotifier.alexanderId,
-      UserPersonaNotifier.filmfareId,
-    ];
-
     final candidateMap = <String, TalentModel>{};
-    for (final id in candidateIds) {
-      if (!UserPersonaNotifier.isSamePersona(id, _activePersona.id) &&
-          !connectedIds.contains(id) &&
-          !requestedIds.contains(id)) {
-        final t = _resolveTalent(id);
-        candidateMap[t.id] = t;
+    try {
+      final client = ref.read(supabaseClientProvider);
+      final response = await client
+          .from(SupabaseTables.users)
+          .select()
+          .neq('id', _activePersona.id)
+          .limit(20);
+      final list = response as List;
+      for (final data in list) {
+        final u = UserModel.fromJson(data as Map<String, dynamic>);
+        if (!UserPersonaNotifier.isSamePersona(u.id, _activePersona.id) &&
+            !connectedIds.contains(u.id) &&
+            !requestedIds.contains(u.id)) {
+          final t = TalentModel.fromUser(u);
+          candidateMap[t.id] = t;
+        }
       }
-    }
+    } catch (_) {}
     final candidateTalents = candidateMap.values.toList();
 
     final suggestions = <NetworkSuggestionItem>[];
