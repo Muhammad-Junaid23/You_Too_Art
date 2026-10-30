@@ -2,16 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:you_too_art/core/providers/geo_providers.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
+import 'package:you_too_art/core/services/app_persistence_service.dart';
+import 'package:you_too_art/features/auth/providers/auth_provider.dart';
+import 'package:you_too_art/features/home/providers/home_feed_provider.dart';
 import 'package:you_too_art/features/network/providers/network_provider.dart';
 import 'package:you_too_art/features/profile/widgets/profile_avatar_picker.dart';
 import 'package:you_too_art/features/talent/providers/talent_provider.dart';
 
-/// Edit Profile screen — lets the active persona update their
-/// name, bio, location, and avatar.
-///
-/// Since this is an internship project with multi-persona testing,
-/// changes are applied to the local [UserPersona] state only
-/// (no Supabase write for mock personas).
+/// Edit Profile screen — lets the user update their real profile on Supabase.
+/// Supports both Individual Artist and Production House profile attributes.
 class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});
 
@@ -26,22 +25,60 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   late TextEditingController _emailController;
   late TextEditingController _websiteController;
   late TextEditingController _experienceController;
+  late TextEditingController _incorporationController;
+  late TextEditingController _establishedYearController;
+  late TextEditingController _addressController;
+
   String? _avatarUrl;
   String? _selectedCountry;
   String? _selectedCity;
   bool _isSaving = false;
+  bool _isProd = false;
 
   @override
   void initState() {
     super.initState();
     final persona = ref.read(userPersonaProvider);
-    _nameController = TextEditingController(text: persona.name);
-    _roleController = TextEditingController(text: persona.role);
-    _bioController = TextEditingController(text: persona.bio);
-    _emailController = TextEditingController(text: persona.email);
+    final user = ref.read(currentUserProfileProvider).value;
+
+    _isProd = (user?.role.toLowerCase().contains('production') ?? false) ||
+        (user?.incorporationNumber != null &&
+            user!.incorporationNumber!.isNotEmpty) ||
+        persona.isProductionHouse;
+
+    final initialName = user?.name.isNotEmpty == true
+        ? user!.name
+        : (user?.firstName.isNotEmpty == true
+            ? '${user!.firstName} ${user.lastName}'.trim()
+            : persona.name);
+
+    _nameController = TextEditingController(text: initialName);
+    _roleController = TextEditingController(
+      text: user?.role != null && user!.role != 'unset'
+          ? user.role
+          : persona.role,
+    );
+    _bioController = TextEditingController(text: user?.bio ?? persona.bio);
+    _emailController = TextEditingController(text: user?.email ?? persona.email);
     _websiteController = TextEditingController(text: persona.website);
     _experienceController = TextEditingController(text: persona.experience);
-    _avatarUrl = persona.avatarUrl;
+    _incorporationController =
+        TextEditingController(text: user?.incorporationNumber ?? '');
+    _establishedYearController = TextEditingController(
+      text: user?.establishedYear != null ? '${user!.establishedYear}' : '',
+    );
+    _addressController = TextEditingController(text: user?.address ?? '');
+    _avatarUrl = user?.profileImagePath ?? persona.avatarUrl;
+
+    // Parse location if present
+    final loc = user?.location ?? persona.location;
+    if (loc.contains(',')) {
+      final parts = loc.split(',');
+      if (parts.length >= 2) {
+        _selectedCity = parts[0].trim();
+        _selectedCountry = parts[1].trim();
+      }
+    }
   }
 
   @override
@@ -52,81 +89,145 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     _emailController.dispose();
     _websiteController.dispose();
     _experienceController.dispose();
+    _incorporationController.dispose();
+    _establishedYearController.dispose();
+    _addressController.dispose();
     super.dispose();
   }
 
   Future<void> _saveProfile() async {
     setState(() => _isSaving = true);
 
-    // Simulate a brief save delay for realism
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    final persona = ref.read(userPersonaProvider);
-    final countries = ref.read(countriesProvider).value ?? [];
-    String? countryName = _selectedCountry;
-    if (_selectedCountry != null) {
-      final match =
-          countries.where((c) => c['code'] == _selectedCountry).firstOrNull;
-      if (match != null) {
-        countryName = match['name'] as String?;
+    try {
+      final persona = ref.read(userPersonaProvider);
+      final countries = ref.read(countriesProvider).value ?? [];
+      String? countryName = _selectedCountry;
+      if (_selectedCountry != null) {
+        final match =
+            countries.where((c) => c['code'] == _selectedCountry).firstOrNull;
+        if (match != null) {
+          countryName = match['name'] as String?;
+        }
       }
-    }
 
-    final locationStr = (_selectedCity != null && countryName != null)
-        ? '$_selectedCity, $countryName'
-        : (countryName ?? persona.location);
+      final locationStr = (_selectedCity != null && countryName != null)
+          ? '$_selectedCity, $countryName'
+          : (countryName ?? persona.location);
 
-    final updatedPersona = persona.copyWith(
-      name: _nameController.text.trim().isNotEmpty
-          ? _nameController.text.trim()
-          : persona.name,
-      role: _roleController.text.trim().isNotEmpty
-          ? _roleController.text.trim()
-          : persona.role,
-      email: _emailController.text.trim().isNotEmpty
-          ? _emailController.text.trim()
-          : persona.email,
-      bio: _bioController.text.trim().isNotEmpty
-          ? _bioController.text.trim()
-          : persona.bio,
-      website: _websiteController.text.trim().isNotEmpty
-          ? _websiteController.text.trim()
-          : persona.website,
-      experience: _experienceController.text.trim().isNotEmpty
-          ? _experienceController.text.trim()
-          : persona.experience,
-      location: locationStr.isNotEmpty ? locationStr : persona.location,
-      avatarUrl: _avatarUrl ?? persona.avatarUrl,
-    );
+      final uid = ref.read(currentUidProvider);
 
-    await ref.read(userPersonaProvider.notifier).updateProfile(updatedPersona);
-    ref.read(talentListProvider.notifier).fetchTalents();
-    ref.read(networkProvider.notifier).refresh();
+      final updates = <String, dynamic>{
+        'bio': _bioController.text.trim(),
+        'location': locationStr,
+        if (_avatarUrl != null) 'profile_image_path': _avatarUrl,
+      };
 
-    if (!mounted) return;
-    setState(() => _isSaving = false);
+      if (_isProd) {
+        updates['first_name'] = _nameController.text.trim();
+        updates['name'] = _nameController.text.trim();
+        updates['address'] = _addressController.text.trim();
+        updates['incorporation_number'] =
+            _incorporationController.text.trim();
+        final est = int.tryParse(_establishedYearController.text.trim());
+        if (est != null) updates['established_year'] = est;
+      } else {
+        final rawName = _nameController.text.trim();
+        updates['name'] = rawName;
+        updates['first_name'] =
+            rawName.contains(' ') ? rawName.split(' ').first : rawName;
+        updates['last_name'] =
+            rawName.contains(' ') ? rawName.split(' ').sublist(1).join(' ') : '';
+        if (_roleController.text.trim().isNotEmpty) {
+          updates['role'] = _roleController.text.trim();
+        }
+      }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Row(
-          children: [
-            Icon(Icons.check_circle, color: Colors.white, size: 18),
-            SizedBox(width: 8),
-            Text('Profile updated successfully'),
-          ],
+      // 1. Sync to Supabase PostgREST
+      if (uid != null) {
+        try {
+          await ref
+              .read(userRepositoryProvider)
+              .updateProfile(uid: uid, updates: updates);
+        } catch (_) {}
+      }
+
+      // 2. Update local persistent persona
+      final updatedPersona = persona.copyWith(
+        id: uid ?? persona.id,
+        name: _nameController.text.trim().isNotEmpty
+            ? _nameController.text.trim()
+            : persona.name,
+        role: _roleController.text.trim().isNotEmpty
+            ? _roleController.text.trim()
+            : persona.role,
+        email: _emailController.text.trim().isNotEmpty
+            ? _emailController.text.trim()
+            : persona.email,
+        bio: _bioController.text.trim(),
+        website: _websiteController.text.trim(),
+        experience: _experienceController.text.trim(),
+        location: locationStr.isNotEmpty ? locationStr : persona.location,
+        avatarUrl: _avatarUrl ?? persona.avatarUrl,
+        isProductionHouse: _isProd,
+      );
+
+      AppPersistenceService.instance.savePersona(updatedPersona);
+      await ref.read(userPersonaProvider.notifier).updateProfile(updatedPersona);
+
+      // 3. Refresh feeds and directories
+      ref.invalidate(currentUserProfileProvider);
+      ref.read(talentListProvider.notifier).fetchTalents();
+      ref.read(networkProvider.notifier).refresh();
+
+      if (!mounted) return;
+      setState(() => _isSaving = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.white, size: 18),
+              SizedBox(width: 8),
+              Text('Profile updated successfully'),
+            ],
+          ),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: const Color(0xFF00C48C),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
         ),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: const Color(0xFF00C48C),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-      ),
-    );
-    Navigator.of(context).pop(true);
+      );
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isSaving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not save profile: $e')),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final countriesAsync = ref.watch(countriesProvider);
+
+    // If _selectedCountry is a name rather than code, resolve to code
+    if (_selectedCountry != null && countriesAsync.hasValue) {
+      final list = countriesAsync.value!;
+      final match = list.where((c) {
+        final code = c['code'] as String?;
+        final name = c['name'] as String?;
+        return code?.toLowerCase() == _selectedCountry!.toLowerCase() ||
+            name?.toLowerCase() == _selectedCountry!.toLowerCase();
+      }).firstOrNull;
+      if (match != null && _selectedCountry != match['code']) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) setState(() => _selectedCountry = match['code'] as String);
+        });
+      }
+    }
+
     final citiesAsync = _selectedCountry == null
         ? const AsyncValue.data(<Map<String, dynamic>>[])
         : ref.watch(citiesProvider(_selectedCountry!));
@@ -141,9 +242,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           icon: const Icon(Icons.arrow_back, color: Colors.black, size: 22),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text(
-          'Edit Profile',
-          style: TextStyle(
+        title: Text(
+          _isProd ? 'Edit Production Profile' : 'Edit Profile',
+          style: const TextStyle(
             color: Colors.black,
             fontWeight: FontWeight.w700,
             fontSize: 20,
@@ -190,25 +291,60 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             ),
             const SizedBox(height: 28),
 
-            // ─── Full Name ───────────────────────────────────
-            _buildLabel('Full Name'),
+            // ─── Name / Company Name ─────────────────────────
+            _buildLabel(_isProd ? 'Company Name' : 'Full Name'),
             const SizedBox(height: 6),
             _buildTextField(
               controller: _nameController,
-              hint: 'Enter your full name',
-              prefixIcon: Icons.person_outline,
+              hint: _isProd ? 'Enter studio/production name' : 'Enter full name',
+              prefixIcon: _isProd ? Icons.business : Icons.person_outline,
             ),
             const SizedBox(height: 20),
 
-            // ─── Role / Specialization ───────────────────────
-            _buildLabel('Role / Specialization'),
-            const SizedBox(height: 6),
-            _buildTextField(
-              controller: _roleController,
-              hint: 'e.g. Actor | Director | Producer',
-              prefixIcon: Icons.work_outline,
-            ),
-            const SizedBox(height: 20),
+            if (!_isProd) ...[
+              // ─── Role / Specialization (Individual) ────────
+              _buildLabel('Role / Specialization'),
+              const SizedBox(height: 6),
+              _buildTextField(
+                controller: _roleController,
+                hint: 'e.g. Actor | Director | Producer',
+                prefixIcon: Icons.work_outline,
+              ),
+              const SizedBox(height: 20),
+            ],
+
+            if (_isProd) ...[
+              // ─── Incorporation Number ──────────────────────
+              _buildLabel('Incorporation Number'),
+              const SizedBox(height: 6),
+              _buildTextField(
+                controller: _incorporationController,
+                hint: 'e.g. INC-12345678',
+                prefixIcon: Icons.verified_user_outlined,
+              ),
+              const SizedBox(height: 20),
+
+              // ─── Established Year ──────────────────────────
+              _buildLabel('Established Year'),
+              const SizedBox(height: 6),
+              _buildTextField(
+                controller: _establishedYearController,
+                hint: 'e.g. 2018',
+                prefixIcon: Icons.calendar_today_outlined,
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 20),
+
+              // ─── Office Address ────────────────────────────
+              _buildLabel('Office / Studio Address'),
+              const SizedBox(height: 6),
+              _buildTextField(
+                controller: _addressController,
+                hint: 'e.g. Suite 400, Film City Road',
+                prefixIcon: Icons.location_city_outlined,
+              ),
+              const SizedBox(height: 20),
+            ],
 
             // ─── Email ───────────────────────────────────────
             _buildLabel('Email'),
@@ -269,36 +405,42 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             ),
             const SizedBox(height: 20),
 
-            // ─── Bio ─────────────────────────────────────────
-            _buildLabel('Bio'),
+            // ─── Bio / Description ───────────────────────────
+            _buildLabel(_isProd ? 'About Company' : 'Bio'),
             const SizedBox(height: 6),
             _buildTextField(
               controller: _bioController,
-              hint: 'Tell us about yourself...',
+              hint: _isProd
+                  ? 'Describe your production house and film projects...'
+                  : 'Tell us about your background and skills...',
               prefixIcon: Icons.edit_note,
               maxLines: 4,
             ),
             const SizedBox(height: 20),
 
-            // ─── Personal Website ─────────────────────────────
-            _buildLabel('Personal Website'),
+            // ─── Website ─────────────────────────────────────
+            _buildLabel(_isProd ? 'Official Website' : 'Personal Website'),
             const SizedBox(height: 6),
             _buildTextField(
               controller: _websiteController,
-              hint: 'e.g. www.be.net/WajahatUIUX',
+              hint: 'e.g. www.studiofilms.com',
               prefixIcon: Icons.language,
             ),
             const SizedBox(height: 20),
 
-            // ─── Experience ───────────────────────────────────
-            _buildLabel('Experience'),
-            const SizedBox(height: 6),
-            _buildTextField(
-              controller: _experienceController,
-              hint: 'e.g. 5+ Years',
-              prefixIcon: Icons.star_outline_rounded,
-            ),
-            const SizedBox(height: 40),
+            if (!_isProd) ...[
+              // ─── Experience ──────────────────────────────────
+              _buildLabel('Experience'),
+              const SizedBox(height: 6),
+              _buildTextField(
+                controller: _experienceController,
+                hint: 'e.g. 5+ Years',
+                prefixIcon: Icons.star_outline_rounded,
+              ),
+              const SizedBox(height: 40),
+            ] else ...[
+              const SizedBox(height: 40),
+            ],
           ],
         ),
       ),
@@ -369,6 +511,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     required List<DropdownMenuItem<String>> items,
     required ValueChanged<String?> onChanged,
   }) {
+    // Safety guard against Flutter DropdownButton assertion errors when value
+    // is not present in the current items list.
+    final effectiveValue =
+        (value != null && items.any((i) => i.value == value)) ? value : null;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
@@ -378,7 +525,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
-          value: value,
+          value: effectiveValue,
           isExpanded: true,
           hint: Text(
             hint,

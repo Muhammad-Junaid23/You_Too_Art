@@ -34,6 +34,11 @@ final userRepositoryProvider = Provider<UserRepository>((ref) {
   return UserRepository(client);
 });
 
+/// Provider for fetching all registered users from Supabase.
+final allRegisteredUsersProvider = FutureProvider<List<UserModel>>((ref) async {
+  return ref.watch(userRepositoryProvider).getAllUsers();
+});
+
 // ─── Auth Streams ───────────────────────────────────
 
 /// Stream of Supabase auth state changes.

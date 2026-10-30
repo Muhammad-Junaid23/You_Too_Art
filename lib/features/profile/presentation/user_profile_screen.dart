@@ -4,12 +4,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:you_too_art/app/config/routes.dart';
 import 'package:you_too_art/core/constants/talent_directory.dart';
+import 'package:you_too_art/core/models/user_model.dart';
 import 'package:you_too_art/core/providers/supabase_providers.dart'
     hide userPortfolioProvider;
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
 import 'package:you_too_art/core/repositories/connection_repository.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:you_too_art/features/account/presentation/edit_profile_screen.dart';
+import 'package:you_too_art/features/auth/providers/auth_provider.dart';
 import 'package:you_too_art/features/chats/providers/chat_provider.dart';
 import 'package:you_too_art/features/home/models/post_item.dart';
 import 'package:you_too_art/features/home/providers/home_feed_provider.dart';
@@ -234,10 +236,16 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final activePersona = ref.watch(userPersonaProvider);
-    final isOwnProfile = UserPersonaNotifier.isSamePersona(
-      widget.initialTalent.id,
-      activePersona.id,
-    );
+    final currentUid = ref.watch(currentUidProvider);
+    final currentUserAsync = ref.watch(currentUserProfileProvider);
+    final currentUser = currentUserAsync.value;
+
+    final isOwnProfile = (currentUid != null && widget.initialTalent.id == currentUid) ||
+        (currentUser != null && widget.initialTalent.id == currentUser.id) ||
+        UserPersonaNotifier.isSamePersona(
+          widget.initialTalent.id,
+          activePersona.id,
+        );
 
     final isActor = UserPersonaNotifier.isActorId(widget.initialTalent.id);
     final targetPersona = isOwnProfile
@@ -255,35 +263,60 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
         ? ref.watch(userWorkPortfolioProvider)
         : UserPortfolioNotifier.getPortfolioFor(targetPersona?.id ?? widget.initialTalent.id);
 
-    final dynamicPostsCount = '${portfolio.videos.length + portfolio.photos.length}';
+    final allPosts = ref.watch(homeFeedProvider).value ?? [];
+    final userFeedPosts = allPosts
+        .where((p) =>
+            p.authorId == widget.initialTalent.id ||
+            (isOwnProfile && currentUid != null && p.authorId == currentUid))
+        .toList();
+    final dynamicPostsCount = userFeedPosts.length.toString();
 
-    final baseTalent = isOwnProfile
-        ? TalentModel.fromPersona(
-            activePersona,
-            connectsCount: '${ref.watch(networkProvider).connections.length}',
+    final baseTalent = (isOwnProfile && currentUser != null)
+        ? TalentModel.fromUser(
+            currentUser,
+            connectionStatus: _currentStatus ?? widget.initialTalent.connectionStatus,
+          ).copyWith(
+            connectsCount: '',
             postsCount: dynamicPostsCount,
             workPortfolio: portfolio.photos.map((p) => p.mediaUrl).toList(),
           )
-        : (targetPersona != null
+        : (isOwnProfile
             ? TalentModel.fromPersona(
-                targetPersona,
+                activePersona,
+                connectsCount: '',
                 postsCount: dynamicPostsCount,
                 workPortfolio: portfolio.photos.map((p) => p.mediaUrl).toList(),
               )
-            : (fromState ??
-                TalentDirectory.findById(widget.initialTalent.id) ??
-                widget.initialTalent));
+            : (targetPersona != null
+                ? TalentModel.fromPersona(
+                    targetPersona,
+                    postsCount: dynamicPostsCount,
+                    workPortfolio: portfolio.photos.map((p) => p.mediaUrl).toList(),
+                  )
+                : (fromState ??
+                    TalentDirectory.findById(widget.initialTalent.id) ??
+                    widget.initialTalent)));
 
     final effectiveStatus = _currentStatus ?? baseTalent.connectionStatus;
     final talent = baseTalent.copyWith(
       connectionStatus: effectiveStatus,
       postsCount: dynamicPostsCount,
     );
-    final isProd = targetPersona?.isProductionHouse ?? talent.isProductionHouse;
+    final isProd = (isOwnProfile && currentUser != null)
+        ? (currentUser.role.toLowerCase().contains('production') ||
+            (currentUser.incorporationNumber != null &&
+                currentUser.incorporationNumber!.isNotEmpty))
+        : (targetPersona?.isProductionHouse ?? talent.isProductionHouse);
 
-    final displayName = targetPersona?.name ?? talent.name;
-    final displayRoles = targetPersona?.role ?? talent.roles;
-    final displayAvatar = targetPersona?.avatarUrl ?? talent.avatarUrl;
+    final displayName = (isOwnProfile && currentUser != null && currentUser.name.isNotEmpty)
+        ? currentUser.name
+        : (targetPersona?.name ?? talent.name);
+    final displayRoles = (isOwnProfile && currentUser != null && currentUser.role.isNotEmpty && currentUser.role != 'unset')
+        ? (isProd ? 'Production House' : currentUser.role)
+        : (targetPersona?.role ?? talent.roles);
+    final displayAvatar = (isOwnProfile && currentUser != null && currentUser.profileImagePath != null && currentUser.profileImagePath!.isNotEmpty)
+        ? currentUser.profileImagePath!
+        : (targetPersona?.avatarUrl ?? talent.avatarUrl);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -604,6 +637,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                 targetPersona,
                 activePersona,
                 isOwnProfile,
+                currentUser: currentUser,
               ),
             ),
           ] else if (_selectedTabIndex == 2 && !isProd) ...[
@@ -951,116 +985,169 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
     bool isProd,
     UserPersona? targetPersona,
     UserPersona activePersona,
-    bool isOwnProfile,
-  ) {
+    bool isOwnProfile, {
+    UserModel? currentUser,
+  }) {
     final effective = isOwnProfile ? activePersona : targetPersona;
-    final bioText = (effective?.bio.isNotEmpty ?? false)
-        ? effective!.bio
-        : (talent.bio?.isNotEmpty ?? false
-            ? talent.bio!
-            : 'Award-winning performing artist and creative talent.');
-    final websiteText = (effective?.website.isNotEmpty ?? false)
+    final bioText = (isOwnProfile && currentUser != null && currentUser.bio != null && currentUser.bio!.isNotEmpty)
+        ? currentUser.bio!
+        : ((effective?.bio.isNotEmpty ?? false)
+            ? effective!.bio
+            : (talent.bio?.isNotEmpty ?? false
+                ? talent.bio!
+                : (isProd
+                    ? 'Official production house and studio on You Too Art.'
+                    : 'Passionate performing artist and creator on You Too Art.')));
+
+    final locationText = (isOwnProfile && currentUser != null && currentUser.location != null && currentUser.location!.isNotEmpty)
+        ? currentUser.location!
+        : ((effective?.location.isNotEmpty ?? false)
+            ? effective!.location
+            : (talent.location ?? talent.aboutInfo['Location'] ?? ''));
+
+    final website = (effective?.website.isNotEmpty ?? false)
         ? effective!.website
-        : (talent.aboutInfo['Personal Website'] ??
-            talent.aboutInfo['Website'] ??
-            'www.youtooart.com');
-    final experienceText = (effective?.experience.isNotEmpty ?? false)
-        ? effective!.experience
-        : (talent.aboutInfo['Experience'] ?? '5+ Years');
-    final locationText = (effective?.location.isNotEmpty ?? false)
-        ? effective!.location
-        : (talent.location ?? talent.aboutInfo['Location'] ?? '');
+        : (talent.aboutInfo['Website'] ?? talent.aboutInfo['Personal Website'] ?? '');
+
+    final establishedYear = (isOwnProfile && currentUser != null && currentUser.establishedYear != null)
+        ? '${currentUser.establishedYear}'
+        : (talent.aboutInfo['Established'] ?? '');
+
+    final incNumber = (isOwnProfile && currentUser != null && currentUser.incorporationNumber != null && currentUser.incorporationNumber!.isNotEmpty)
+        ? currentUser.incorporationNumber!
+        : (talent.aboutInfo['Incorporation'] ?? '');
+
+    final officeAddress = (isOwnProfile && currentUser != null && currentUser.address != null && currentUser.address!.isNotEmpty)
+        ? currentUser.address!
+        : (talent.aboutInfo['Address'] ?? '');
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Bio
-          const Text(
-            'Bio',
-            style: TextStyle(
-              fontSize: 13,
-              color: Color(0xFF9E9E9E),
-              fontWeight: FontWeight.w400,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            bioText,
-            style: const TextStyle(
-              fontSize: 14.5,
-              color: Color(0xFF1A1A2E),
-              height: 1.45,
-            ),
+          // Bio / About
+          _buildAboutSection(
+            label: isProd ? 'About Company' : 'Bio',
+            value: bioText,
           ),
           const SizedBox(height: 24),
 
-          // Personal Website
-          const Text(
-            'Personal Website',
-            style: TextStyle(
-              fontSize: 13,
-              color: Color(0xFF9E9E9E),
-              fontWeight: FontWeight.w400,
+          if (isProd) ...[
+            // Production House specific fields
+            if (establishedYear.isNotEmpty) ...[
+              _buildAboutSection(
+                label: 'Established Year',
+                value: establishedYear,
+                isBold: true,
+              ),
+              const SizedBox(height: 24),
+            ],
+            if (incNumber.isNotEmpty) ...[
+              _buildAboutSection(
+                label: 'Incorporation Number',
+                value: incNumber,
+                isBold: true,
+              ),
+              const SizedBox(height: 24),
+            ],
+            if (officeAddress.isNotEmpty) ...[
+              _buildAboutSection(
+                label: 'Studio / Office Address',
+                value: officeAddress,
+                isBold: true,
+              ),
+              const SizedBox(height: 24),
+            ],
+            _buildAboutSection(
+              label: 'Category',
+              value: 'Production House',
+              isBold: true,
             ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            websiteText,
-            style: const TextStyle(
-              fontSize: 14.5,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF1A1A2E),
+            const SizedBox(height: 24),
+          ] else ...[
+            // Individual artist specific fields
+            _buildAboutSection(
+              label: 'Category',
+              value: talent.roles.isNotEmpty ? talent.roles : 'Creative Artist',
+              isBold: true,
             ),
-          ),
-          const SizedBox(height: 24),
-
-          // Experience
-          const Text(
-            'Experience',
-            style: TextStyle(
-              fontSize: 13,
-              color: Color(0xFF9E9E9E),
-              fontWeight: FontWeight.w400,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            experienceText,
-            style: const TextStyle(
-              fontSize: 14.5,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF1A1A2E),
-            ),
-          ),
-          const SizedBox(height: 24),
+            const SizedBox(height: 24),
+            if (talent.aboutInfo['Experience'] != null &&
+                talent.aboutInfo['Experience']!.isNotEmpty &&
+                talent.aboutInfo['Experience'] != '5+ Years') ...[
+              _buildAboutSection(
+                label: 'Experience',
+                value: talent.aboutInfo['Experience']!,
+                isBold: true,
+              ),
+              const SizedBox(height: 24),
+            ],
+          ],
 
           // Location
-          const Text(
-            'Location',
-            style: TextStyle(
-              fontSize: 13,
-              color: Color(0xFF9E9E9E),
-              fontWeight: FontWeight.w400,
+          if (locationText.isNotEmpty) ...[
+            _buildAboutSection(
+              label: 'Location',
+              value: locationText,
+              isBold: true,
             ),
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Text(
-                locationText,
-                style: const TextStyle(
-                  fontSize: 14.5,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF1A1A2E),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 80),
+            const SizedBox(height: 24),
+          ],
+
+          // Website (only if real website present, no fake default)
+          if (website.isNotEmpty && website != 'www.youtooart.com') ...[
+            _buildAboutSection(
+              label: isProd ? 'Official Website' : 'Personal Website',
+              value: website,
+              isBold: true,
+            ),
+            const SizedBox(height: 24),
+          ],
+
+          // Email
+          if (talent.email?.isNotEmpty == true) ...[
+            _buildAboutSection(
+              label: 'Contact Email',
+              value: talent.email!,
+              isBold: true,
+            ),
+            const SizedBox(height: 24),
+          ],
+
+          const SizedBox(height: 60),
         ],
       ),
+    );
+  }
+
+  Widget _buildAboutSection({
+    required String label,
+    required String value,
+    bool isBold = false,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13,
+            color: Color(0xFF9E9E9E),
+            fontWeight: FontWeight.w400,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 14.5,
+            fontWeight: isBold ? FontWeight.w700 : FontWeight.w400,
+            color: const Color(0xFF1A1A2E),
+            height: 1.45,
+          ),
+        ),
+      ],
     );
   }
 

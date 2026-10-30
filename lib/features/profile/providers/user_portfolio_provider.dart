@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
 import 'package:you_too_art/core/services/app_persistence_service.dart';
+import 'package:you_too_art/features/auth/providers/auth_provider.dart';
 
 /// Extracts the 11-character YouTube video ID from various YouTube URL formats.
 /// Supports standard watch, short-links, embeds, and YouTube Shorts.
@@ -204,17 +205,25 @@ class UserPortfolioNotifier extends Notifier<UserPortfolioState> {
   @override
   UserPortfolioState build() {
     final activePersona = ref.watch(userPersonaProvider);
+    final currentUid = ref.watch(currentUidProvider);
+    final effectiveUid = (currentUid != null && currentUid.isNotEmpty)
+        ? currentUid
+        : activePersona.id;
     void listener() {
       final active = ref.read(userPersonaProvider);
-      state = AppPersistenceService.instance.getPortfolio(active.id);
+      final uid = ref.read(currentUidProvider) ?? active.id;
+      state = AppPersistenceService.instance.getPortfolio(uid);
     }
     AppPersistenceService.instance.addListener(listener);
     ref.onDispose(() => AppPersistenceService.instance.removeListener(listener));
-    return AppPersistenceService.instance.getPortfolio(activePersona.id);
+    return AppPersistenceService.instance.getPortfolio(effectiveUid);
   }
 
   String _resolveUid(String? targetUserId) {
-    return targetUserId ?? ref.read(userPersonaProvider).id;
+    if (targetUserId != null && targetUserId.isNotEmpty) return targetUserId;
+    final currentUid = ref.read(currentUidProvider);
+    if (currentUid != null && currentUid.isNotEmpty) return currentUid;
+    return ref.read(userPersonaProvider).id;
   }
 
   void addVideo(WorkMediaItem item, [String? targetUserId]) {
@@ -222,10 +231,7 @@ class UserPortfolioNotifier extends Notifier<UserPortfolioState> {
     final current = AppPersistenceService.instance.getPortfolio(uid);
     final updated = current.copyWith(videos: [...current.videos, item]);
     AppPersistenceService.instance.savePortfolio(uid, updated);
-    final activeId = ref.read(userPersonaProvider).id;
-    if (UserPersonaNotifier.isSamePersona(uid, activeId)) {
-      state = updated;
-    }
+    state = updated;
   }
 
   void updateVideo(int index, WorkMediaItem item, [String? targetUserId]) {
@@ -236,10 +242,7 @@ class UserPortfolioNotifier extends Notifier<UserPortfolioState> {
       updatedList[index] = item;
       final updated = current.copyWith(videos: updatedList);
       AppPersistenceService.instance.savePortfolio(uid, updated);
-      final activeId = ref.read(userPersonaProvider).id;
-      if (UserPersonaNotifier.isSamePersona(uid, activeId)) {
-        state = updated;
-      }
+      state = updated;
     }
   }
 
@@ -251,10 +254,7 @@ class UserPortfolioNotifier extends Notifier<UserPortfolioState> {
       updatedList.removeAt(index);
       final updated = current.copyWith(videos: updatedList);
       AppPersistenceService.instance.savePortfolio(uid, updated);
-      final activeId = ref.read(userPersonaProvider).id;
-      if (UserPersonaNotifier.isSamePersona(uid, activeId)) {
-        state = updated;
-      }
+      state = updated;
     }
   }
 
@@ -263,10 +263,7 @@ class UserPortfolioNotifier extends Notifier<UserPortfolioState> {
     final current = AppPersistenceService.instance.getPortfolio(uid);
     final updated = current.copyWith(photos: [...current.photos, item]);
     AppPersistenceService.instance.savePortfolio(uid, updated);
-    final activeId = ref.read(userPersonaProvider).id;
-    if (UserPersonaNotifier.isSamePersona(uid, activeId)) {
-      state = updated;
-    }
+    state = updated;
   }
 
   void updatePhoto(int index, WorkMediaItem item, [String? targetUserId]) {
@@ -277,10 +274,7 @@ class UserPortfolioNotifier extends Notifier<UserPortfolioState> {
       updatedList[index] = item;
       final updated = current.copyWith(photos: updatedList);
       AppPersistenceService.instance.savePortfolio(uid, updated);
-      final activeId = ref.read(userPersonaProvider).id;
-      if (UserPersonaNotifier.isSamePersona(uid, activeId)) {
-        state = updated;
-      }
+      state = updated;
     }
   }
 
@@ -292,10 +286,7 @@ class UserPortfolioNotifier extends Notifier<UserPortfolioState> {
       updatedList.removeAt(index);
       final updated = current.copyWith(photos: updatedList);
       AppPersistenceService.instance.savePortfolio(uid, updated);
-      final activeId = ref.read(userPersonaProvider).id;
-      if (UserPersonaNotifier.isSamePersona(uid, activeId)) {
-        state = updated;
-      }
+      state = updated;
     }
   }
 }

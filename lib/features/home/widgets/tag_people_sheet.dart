@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:you_too_art/core/widgets/app_avatar.dart';
+import 'package:you_too_art/features/auth/providers/auth_provider.dart';
 
-/// Modal bottom sheet for tagging connections matching Figma Image 4.
-class TagPeopleSheet extends StatefulWidget {
+/// Modal bottom sheet for tagging real registered connections matching Figma design.
+class TagPeopleSheet extends ConsumerStatefulWidget {
   final List<String> initialSelectedNames;
 
   const TagPeopleSheet({
@@ -23,51 +25,13 @@ class TagPeopleSheet extends StatefulWidget {
   }
 
   @override
-  State<TagPeopleSheet> createState() => _TagPeopleSheetState();
+  ConsumerState<TagPeopleSheet> createState() => _TagPeopleSheetState();
 }
 
-class _TagPeopleSheetState extends State<TagPeopleSheet> {
+class _TagPeopleSheetState extends ConsumerState<TagPeopleSheet> {
   final _searchController = TextEditingController();
   late Set<String> _selectedNames;
   String _searchQuery = '';
-
-  final List<Map<String, String>> _connections = [
-    {
-      'name': 'Alexander Cole',
-      'subtitle': 'Connected, 2 Days Ago',
-      'avatar': 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
-    },
-    {
-      'name': 'Giana Workman',
-      'subtitle': 'Connected, 2 Days Ago',
-      'avatar': 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
-    },
-    {
-      'name': 'Marley Dokidis',
-      'subtitle': 'Connected, 2 Days Ago',
-      'avatar': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
-    },
-    {
-      'name': 'Allison Press',
-      'subtitle': 'Connected, 2 Days Ago',
-      'avatar': 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-    },
-    {
-      'name': 'Allison Rosser',
-      'subtitle': 'Connected, 2 Days Ago',
-      'avatar': 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150',
-    },
-    {
-      'name': 'Yasir Hafeez',
-      'subtitle': 'Connected, 3 Days Ago',
-      'avatar': 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150',
-    },
-    {
-      'name': 'Qasim Muneer',
-      'subtitle': 'Connected, 4 Days Ago',
-      'avatar': 'https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=150',
-    },
-  ];
 
   @override
   void initState() {
@@ -83,7 +47,31 @@ class _TagPeopleSheetState extends State<TagPeopleSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final filtered = _connections.where((c) {
+    final currentUid = ref.watch(currentUidProvider);
+    final usersAsync = ref.watch(allRegisteredUsersProvider);
+
+    // Convert real registered users into connections, excluding current user
+    final allUsers = (usersAsync.value ?? [])
+        .where((u) => u.id != currentUid)
+        .map((u) {
+          final displayName = u.name.isNotEmpty
+              ? u.name
+              : (u.firstName.isNotEmpty
+                  ? '${u.firstName} ${u.lastName}'.trim()
+                  : u.email.split('@').first);
+          final roleStr = u.role.isNotEmpty && u.role != 'unset'
+              ? u.role.replaceAll('_', ' ').toUpperCase()
+              : 'CREATIVE ARTIST';
+          return {
+            'id': u.id,
+            'name': displayName,
+            'subtitle': roleStr,
+            'avatar': u.profileImagePath ?? '',
+          };
+        })
+        .toList();
+
+    final filtered = allUsers.where((c) {
       if (_searchQuery.isEmpty) return true;
       return c['name']!.toLowerCase().contains(_searchQuery);
     }).toList();
@@ -169,7 +157,22 @@ class _TagPeopleSheetState extends State<TagPeopleSheet> {
                     color: Color(0xFF9B9B9B),
                     size: 20,
                   ),
-                  hintText: 'Search people...',
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(
+                            Icons.clear,
+                            size: 18,
+                            color: Color(0xFF9B9B9B),
+                          ),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() {
+                              _searchQuery = '';
+                            });
+                          },
+                        )
+                      : null,
+                  hintText: 'Search people to tag',
                   hintStyle: const TextStyle(
                     fontSize: 14,
                     color: Color(0xFF9B9B9B),
@@ -195,8 +198,8 @@ class _TagPeopleSheetState extends State<TagPeopleSheet> {
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                     borderSide: const BorderSide(
-                      color: Color(0xFFE6E7E8),
-                      width: 1,
+                      color: Color(0xFF3899F3),
+                      width: 1.5,
                     ),
                   ),
                 ),
@@ -204,111 +207,164 @@ class _TagPeopleSheetState extends State<TagPeopleSheet> {
             ),
           ),
 
-          // Section label: "Selected"
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-            child: Text(
-              'Selected',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: Color(0xFF9B9B9B),
+          // Selected count indicator
+          if (_selectedNames.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+              child: Text(
+                '${_selectedNames.length} selected',
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF3899F3),
+                ),
               ),
             ),
-          ),
 
-          // Connections list
+          const Divider(height: 1, color: Color(0xFFE6E7E8)),
+
+          // Connections list or empty state
           Expanded(
-            child: ListView.separated(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              itemCount: filtered.length,
-              separatorBuilder: (context, index) => const Divider(
-                height: 1,
-                thickness: 0.5,
-                indent: 72,
-                color: Color(0xFFE6E7E8),
-              ),
-              itemBuilder: (context, index) {
-                final user = filtered[index];
-                final name = user['name']!;
-                final isSelected = _selectedNames.contains(name);
-
-                return InkWell(
-                  onTap: () {
-                    setState(() {
-                      if (isSelected) {
-                        _selectedNames.remove(name);
-                      } else {
-                        _selectedNames.add(name);
-                      }
-                    });
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 10,
-                    ),
-                    child: Row(
-                      children: [
-                        AppAvatar(
-                          imageUrl: user['avatar'],
-                          name: name,
-                          radius: 22,
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
+            child: usersAsync.isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : filtered.isEmpty
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24.0),
                           child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Text(
-                                name,
-                                style: const TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF000000),
+                              Container(
+                                width: 56,
+                                height: 56,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFFF2F4F7),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.people_outline_rounded,
+                                  size: 28,
+                                  color: Color(0xFF8E95A0),
                                 ),
                               ),
-                              const SizedBox(height: 2),
+                              const SizedBox(height: 14),
                               Text(
-                                user['subtitle']!,
+                                _searchQuery.isNotEmpty
+                                    ? 'No results for "$_searchQuery"'
+                                    : 'No other registered profiles yet',
                                 style: const TextStyle(
-                                  fontSize: 12,
-                                  color: Color(0xFF9B9B9B),
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF1A1A2E),
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                _searchQuery.isNotEmpty
+                                    ? 'Try searching with a different name.'
+                                    : 'When your team or other profiles register with their emails, they will appear here to tag.',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: Color(0xFF8E95A0),
+                                  height: 1.4,
                                 ),
                               ),
                             ],
                           ),
                         ),
-                        // Trailing check indicator
-                        Container(
-                          width: 24,
-                          height: 24,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: isSelected
-                                ? const Color(0xFF3899F3)
-                                : Colors.transparent,
-                            border: Border.all(
-                              color: isSelected
-                                  ? const Color(0xFF3899F3)
-                                  : const Color(0xFFB8BFC8),
-                              width: 1.5,
-                            ),
-                          ),
-                          child: isSelected
-                              ? const Icon(
-                                  Icons.check,
-                                  size: 14,
-                                  color: Colors.white,
-                                )
-                              : null,
+                      )
+                    : ListView.separated(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        itemCount: filtered.length,
+                        separatorBuilder: (context, index) => const Divider(
+                          height: 1,
+                          thickness: 0.5,
+                          indent: 72,
+                          color: Color(0xFFE6E7E8),
                         ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
+                        itemBuilder: (context, index) {
+                          final user = filtered[index];
+                          final name = user['name']!;
+                          final isSelected = _selectedNames.contains(name);
+
+                          return InkWell(
+                            onTap: () {
+                              setState(() {
+                                if (isSelected) {
+                                  _selectedNames.remove(name);
+                                } else {
+                                  _selectedNames.add(name);
+                                }
+                              });
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 10,
+                              ),
+                              child: Row(
+                                children: [
+                                  AppAvatar(
+                                    imageUrl: user['avatar'],
+                                    name: name,
+                                    radius: 22,
+                                  ),
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          name,
+                                          style: const TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xFF000000),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          user['subtitle']!,
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: Color(0xFF9B9B9B),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  // Trailing check indicator
+                                  Container(
+                                    width: 24,
+                                    height: 24,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: isSelected
+                                          ? const Color(0xFF3899F3)
+                                          : Colors.transparent,
+                                      border: Border.all(
+                                        color: isSelected
+                                          ? const Color(0xFF3899F3)
+                                          : const Color(0xFFB8BFC8),
+                                        width: 1.5,
+                                      ),
+                                    ),
+                                    child: isSelected
+                                        ? const Icon(
+                                            Icons.check,
+                                            size: 14,
+                                            color: Colors.white,
+                                          )
+                                        : null,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
           ),
 
           // Bottom Action Buttons: Cancel and Tag

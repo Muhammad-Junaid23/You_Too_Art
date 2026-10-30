@@ -462,6 +462,7 @@ class _CastingScreenState extends ConsumerState<CastingScreen> {
                 onTap: () => _openDetail(call),
                 onApply: () => _openApply(call),
                 onViewApplications: () => _openApplications(call),
+                onEdit: () => _openEditCall(call),
                 onDelete: () {
                   ref
                       .read(castingProvider.notifier)
@@ -516,6 +517,15 @@ class _CastingScreenState extends ConsumerState<CastingScreen> {
       context,
       MaterialPageRoute(
         builder: (_) => CastingApplicationsScreen(call: call),
+      ),
+    );
+  }
+
+  Future<void> _openEditCall(CastingCallModel call) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CreateCastingCallScreen(callToEdit: call),
       ),
     );
   }

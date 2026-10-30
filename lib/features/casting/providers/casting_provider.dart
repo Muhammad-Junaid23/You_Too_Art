@@ -307,6 +307,21 @@ class CastingNotifier extends Notifier<CastingState> {
     } catch (_) {}
   }
 
+  /// Update an existing casting call
+  Future<void> updateCastingCall(CastingCallModel updatedCall) async {
+    final updatedCalls = state.calls.map((c) {
+      return c.id == updatedCall.id ? updatedCall : c;
+    }).toList();
+
+    state = state.copyWith(calls: updatedCalls);
+    _saveCalls(updatedCalls);
+
+    try {
+      final repo = ref.read(castingRepositoryProvider);
+      await repo.createCastingCall(updatedCall);
+    } catch (_) {}
+  }
+
   /// Delete a casting call
   Future<void> deleteCastingCall(String callId) async {
     final updatedCalls = state.calls.where((c) => c.id != callId).toList();

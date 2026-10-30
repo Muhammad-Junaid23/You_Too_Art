@@ -1,3 +1,4 @@
+import 'package:you_too_art/features/casting/presentation/create_casting_call_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
@@ -50,6 +51,22 @@ class CastingDetailScreen extends ConsumerWidget {
           icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () => Navigator.pop(context),
         ),
+        actions: [
+          if (isMyCall)
+            IconButton(
+              icon: const Icon(Icons.edit_outlined, color: Colors.black),
+              tooltip: 'Edit Casting Call',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        CreateCastingCallScreen(callToEdit: activeCall),
+                  ),
+                );
+              },
+            ),
+        ],
       ),
       body: SafeArea(
         child: Column(
@@ -291,31 +308,71 @@ class CastingDetailScreen extends ConsumerWidget {
                   width: double.infinity,
                   height: 52,
                   child: isMyCall
-                      ? ElevatedButton(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    CastingApplicationsScreen(call: activeCall),
+                      ? Row(
+                          children: [
+                            Expanded(
+                              flex: 3,
+                              child: SizedBox(
+                                height: 52,
+                                child: ElevatedButton(
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            CastingApplicationsScreen(
+                                                call: activeCall),
+                                      ),
+                                    );
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.black,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(26),
+                                    ),
+                                    elevation: 0,
+                                  ),
+                                  child: Text(
+                                    'Applications (${activeCall.applicantsCount})',
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
                               ),
-                            );
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.black,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(26),
                             ),
-                            elevation: 0,
-                          ),
-                          child: Text(
-                            'View Applications (${activeCall.applicantsCount})',
-                            style: const TextStyle(
-                              fontSize: 15.5,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
+                            const SizedBox(width: 10),
+                            Expanded(
+                              flex: 2,
+                              child: SizedBox(
+                                height: 52,
+                                child: OutlinedButton.icon(
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            CreateCastingCallScreen(
+                                                callToEdit: activeCall),
+                                      ),
+                                    );
+                                  },
+                                  icon: const Icon(Icons.edit_outlined, size: 16),
+                                  label: const Text('Edit'),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: Colors.black,
+                                    side: const BorderSide(
+                                        color: Colors.black, width: 1.5),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(26),
+                                    ),
+                                  ),
+                                ),
+                              ),
                             ),
-                          ),
+                          ],
                         )
                       : activeCall.isApplied
                           ? Container(

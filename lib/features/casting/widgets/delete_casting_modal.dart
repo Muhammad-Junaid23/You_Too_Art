@@ -126,11 +126,13 @@ class DeleteCastingModal extends StatelessWidget {
 
                   // 4-column metadata row
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       _buildMetaCol('Location', call.locationDisplay),
+                      const SizedBox(width: 8),
                       _buildMetaCol('Type', call.type),
+                      const SizedBox(width: 8),
                       _buildMetaCol('Shoot', call.shootDuration),
+                      const SizedBox(width: 8),
                       _buildMetaCol('Budget', call.budget),
                     ],
                   ),
@@ -212,26 +214,32 @@ class DeleteCastingModal extends StatelessWidget {
   }
 
   Widget _buildMetaCol(String label, String value) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 11,
-            color: Color(0xFF8E95A0),
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              color: Color(0xFF8E95A0),
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF1A1A2E),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF1A1A2E),
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

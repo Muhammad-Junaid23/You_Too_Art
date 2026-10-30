@@ -6,7 +6,9 @@ import 'package:you_too_art/features/casting/providers/casting_provider.dart';
 
 /// Create Casting Call screen strictly matching Figma Image 3.
 class CreateCastingCallScreen extends ConsumerStatefulWidget {
-  const CreateCastingCallScreen({super.key});
+  final CastingCallModel? callToEdit;
+
+  const CreateCastingCallScreen({super.key, this.callToEdit});
 
   @override
   ConsumerState<CreateCastingCallScreen> createState() =>
@@ -56,7 +58,22 @@ class _CreateCastingCallScreenState
   @override
   void initState() {
     super.initState();
-    // Do NOT auto-fill mock defaults; keep inputs clean for the user
+    if (widget.callToEdit != null) {
+      final c = widget.callToEdit!;
+      _titleController.text = c.projectTitle;
+      _descController.text = c.description;
+      _cityController.text = c.locationDisplay;
+      _emailController.text = c.contactEmail ?? '';
+      _phoneController.text = c.contactNumber ?? '';
+      _roleTitleController.text = c.roleTitle ?? '';
+      _roleDescController.text = c.roleDescription ?? '';
+      _ageController.text = c.ageRequired.replaceAll(' Years', '');
+      _heightController.text = c.heightRequired.replaceAll(' Feet', '');
+      _shootDetailsController.text = c.shootDetails;
+      _budgetController.text = c.budget;
+      _selectedCrewType = c.crewRequired.isNotEmpty ? c.crewRequired : null;
+      _selectedGender = c.gender.isNotEmpty ? c.gender : 'Male Only';
+    }
   }
 
   @override
@@ -125,7 +142,30 @@ class _CreateCastingCallScreenState
         applicantsCount: 0,
       );
 
-      await ref.read(castingProvider.notifier).createCastingCall(newCall);
+      if (widget.callToEdit != null) {
+        final updatedCall = widget.callToEdit!.copyWith(
+          projectTitle: _titleController.text.trim(),
+          description: _descController.text.trim(),
+          location: cityText.isNotEmpty ? '$cityText, Pakistan' : 'Unspecified',
+          locationDisplay: cityText.isNotEmpty ? cityText : 'Unspecified',
+          type: _selectedCrewType ?? widget.callToEdit!.type,
+          crewRequired: _selectedCrewType ?? '1 Crew Member',
+          shootDuration: shootDetailsText.isNotEmpty ? shootDetailsText : widget.callToEdit!.shootDuration,
+          shootDetails: shootDetailsText,
+          budget: budgetText.isNotEmpty ? budgetText : 'Paid',
+          budgetFull: budgetText.isNotEmpty ? budgetText : widget.callToEdit!.budgetFull,
+          roleTitle: roleTitleText,
+          ageRequired: ageText.isNotEmpty ? '$ageText Years' : 'Any',
+          heightRequired: heightText.isNotEmpty ? '$heightText Feet' : 'Any',
+          gender: _selectedGender,
+          contactEmail: emailText.isNotEmpty ? emailText : null,
+          contactNumber: phoneText.isNotEmpty ? phoneText : null,
+          roleDescription: roleDescText.isNotEmpty ? roleDescText : null,
+        );
+        await ref.read(castingProvider.notifier).updateCastingCall(updatedCall);
+      } else {
+        await ref.read(castingProvider.notifier).createCastingCall(newCall);
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -135,12 +175,12 @@ class _CreateCastingCallScreenState
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(10),
             ),
-            content: const Row(
+            content: Row(
               children: [
-                Icon(Icons.check_circle, color: Colors.white, size: 20),
-                SizedBox(width: 10),
+                const Icon(Icons.check_circle, color: Colors.white, size: 20),
+                const SizedBox(width: 10),
                 Text(
-                  'Casting Call created successfully!',
+                  widget.callToEdit != null ? 'Casting Call updated successfully!' : 'Casting Call created successfully!',
                   style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w600,
@@ -190,8 +230,8 @@ class _CreateCastingCallScreenState
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Screen Title
-                      const Text(
-                        'Create Casting Call',
+                      Text(
+                        widget.callToEdit != null ? 'Edit Casting Call' : 'Create Casting Call',
                         style: TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.w800,
@@ -474,8 +514,8 @@ class _CreateCastingCallScreenState
                                     color: Colors.white,
                                   ),
                                 )
-                              : const Text(
-                                  'Submit',
+                              : Text(
+                                  widget.callToEdit != null ? 'Save Changes' : 'Submit',
                                   style: TextStyle(
                                     fontSize: 15,
                                     fontWeight: FontWeight.w700,

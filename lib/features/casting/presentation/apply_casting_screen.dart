@@ -386,11 +386,13 @@ class _ApplyCastingScreenState extends ConsumerState<ApplyCastingScreen> {
           ),
           const SizedBox(height: 16),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               _buildMetaCol('Location', widget.call.locationDisplay),
+              const SizedBox(width: 8),
               _buildMetaCol('Type', widget.call.type),
+              const SizedBox(width: 8),
               _buildMetaCol('Shoot', widget.call.shootDuration),
+              const SizedBox(width: 8),
               _buildMetaCol('Budget', widget.call.budget),
             ],
           ),
@@ -400,27 +402,33 @@ class _ApplyCastingScreenState extends ConsumerState<ApplyCastingScreen> {
   }
 
   Widget _buildMetaCol(String label, String value) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 11,
-            color: Color(0xFF8E95A0),
-            fontWeight: FontWeight.w500,
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              color: Color(0xFF8E95A0),
+              fontWeight: FontWeight.w500,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-        ),
-        const SizedBox(height: 3),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF1A1A2E),
+          const SizedBox(height: 3),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF1A1A2E),
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
