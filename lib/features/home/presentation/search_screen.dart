@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:you_too_art/core/widgets/app_avatar.dart';
+import 'package:you_too_art/features/auth/providers/auth_provider.dart';
 import 'package:you_too_art/features/home/models/post_item.dart';
 import 'package:you_too_art/features/home/providers/home_feed_provider.dart';
 import 'package:you_too_art/features/home/widgets/post_card.dart';
+import 'package:you_too_art/features/profile/presentation/user_profile_screen.dart';
+import 'package:you_too_art/features/talent/models/talent_model.dart';
 
-/// Screen supporting Recent Searches and Search Results matching Figma Image 5.
+/// Screen supporting persistent Recent Searches and live search results matching Figma design.
 class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key});
 
@@ -15,26 +18,59 @@ class SearchScreen extends ConsumerStatefulWidget {
 }
 
 class _SearchScreenState extends ConsumerState<SearchScreen> {
+  static const String _recentKey = 'recent_searches_list_v1';
   final _searchController = TextEditingController();
   String _searchQuery = '';
+  List<String> _recentKeywords = [];
 
-  final List<String> _recentKeywords = [
-    'Don 3 Auditions',
-    'Ranveer Singh',
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadRecentSearches();
+  }
 
-  final List<Map<String, String>> _recentPeople = [
-    {
-      'name': 'Alexander Cole',
-      'subtitle': 'Connection',
-      'avatar': 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
-    },
-    {
-      'name': 'Yasir Hafeez',
-      'subtitle': 'Connection',
-      'avatar': 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150',
-    },
-  ];
+  Future<void> _loadRecentSearches() async {
+    final prefs = ref.read(sharedPreferencesProvider);
+    final saved = prefs.getStringList(_recentKey);
+    if (saved != null) {
+      setState(() {
+        _recentKeywords = List<String>.from(saved);
+      });
+    }
+  }
+
+  Future<void> _saveKeyword(String query) async {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) return;
+    final prefs = ref.read(sharedPreferencesProvider);
+    final list = List<String>.from(_recentKeywords);
+    list.removeWhere((item) => item.toLowerCase() == trimmed.toLowerCase());
+    list.insert(0, trimmed);
+    if (list.length > 15) list.removeLast();
+
+    setState(() {
+      _recentKeywords = list;
+    });
+    await prefs.setStringList(_recentKey, list);
+  }
+
+  Future<void> _removeKeyword(String keyword) async {
+    final prefs = ref.read(sharedPreferencesProvider);
+    final list = List<String>.from(_recentKeywords);
+    list.removeWhere((item) => item.toLowerCase() == keyword.toLowerCase());
+    setState(() {
+      _recentKeywords = list;
+    });
+    await prefs.setStringList(_recentKey, list);
+  }
+
+  Future<void> _clearAllKeywords() async {
+    final prefs = ref.read(sharedPreferencesProvider);
+    setState(() {
+      _recentKeywords.clear();
+    });
+    await prefs.remove(_recentKey);
+  }
 
   @override
   void dispose() {
@@ -44,6 +80,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   void _onKeywordSelected(String keyword) {
     _searchController.text = keyword;
+    _saveKeyword(keyword);
     setState(() {
       _searchQuery = keyword.trim().toLowerCase();
     });
@@ -52,6 +89,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   @override
   Widget build(BuildContext context) {
     final feedAsync = ref.watch(homeFeedProvider);
+    final usersAsync = ref.watch(allRegisteredUsersProvider);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -75,6 +113,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                   _searchQuery = val.trim().toLowerCase();
                 });
               },
+              onSubmitted: (val) {
+                _saveKeyword(val);
+              },
               style: const TextStyle(
                 fontSize: 14,
                 color: Color(0xFF000000),
@@ -91,7 +132,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 ),
                 suffixIcon: _searchQuery.isNotEmpty
                     ? IconButton(
-                        icon: const Icon(Icons.clear, size: 18, color: Color(0xFF9B9B9B)),
+                        icon: const Icon(Icons.clear,
+                            size: 18, color: Color(0xFF9B9B9B)),
                         onPressed: () {
                           _searchController.clear();
                           setState(() {
@@ -100,7 +142,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                         },
                       )
                     : null,
-                hintText: 'Search',
+                hintText: 'Search posts, talent, categories...',
                 hintStyle: const TextStyle(
                   fontSize: 14,
                   color: Color(0xFF9B9B9B),
@@ -126,8 +168,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                   borderSide: const BorderSide(
-                    color: Color(0xFFE6E7E8),
-                    width: 1,
+                    color: Color(0xFF3899F3),
+                    width: 1.5,
                   ),
                 ),
               ),
@@ -137,11 +179,58 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       ),
       body: _searchQuery.isEmpty
           ? _buildRecentSearches()
-          : _buildSearchResults(feedAsync.value ?? []),
+          : _buildSearchResults(
+              feedAsync.value ?? [],
+              usersAsync.value ?? [],
+            ),
     );
   }
 
   Widget _buildRecentSearches() {
+    if (_recentKeywords.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF2F4F7),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.history_rounded,
+                  size: 28,
+                  color: Color(0xFF8E95A0),
+                ),
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'No recent searches',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1A1A2E),
+                ),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Search for posts, production houses, actors, or keywords.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF8E95A0),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       children: [
@@ -158,14 +247,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               ),
             ),
             InkWell(
-              onTap: () {
-                setState(() {
-                  _recentKeywords.clear();
-                  _recentPeople.clear();
-                });
-              },
+              onTap: _clearAllKeywords,
               child: const Text(
-                'See All',
+                'Clear All',
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -212,73 +296,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                   ),
                 ),
                 GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _recentKeywords.remove(keyword);
-                    });
-                  },
-                  child: Container(
-                    width: 24,
-                    height: 24,
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Color(0xFFF2F4F7),
-                    ),
-                    child: const Icon(
-                      Icons.close,
-                      size: 14,
-                      color: Color(0xFF9B9B9B),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        }),
-
-        // Recent People
-        ..._recentPeople.map((person) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Row(
-              children: [
-                AppAvatar(
-                  imageUrl: person['avatar'],
-                  name: person['name'] ?? 'User',
-                  radius: 18,
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: InkWell(
-                    onTap: () => _onKeywordSelected(person['name']!),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          person['name']!,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF000000),
-                          ),
-                        ),
-                        Text(
-                          person['subtitle']!,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF9B9B9B),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _recentPeople.remove(person);
-                    });
-                  },
+                  onTap: () => _removeKeyword(keyword),
                   child: Container(
                     width: 24,
                     height: 24,
@@ -301,13 +319,27 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     );
   }
 
-  Widget _buildSearchResults(List<PostItem> posts) {
-    final matching = posts.where((p) {
+  Widget _buildSearchResults(
+    List<PostItem> posts,
+    List<dynamic> users,
+  ) {
+    final matchingPosts = posts.where((p) {
       return p.caption.toLowerCase().contains(_searchQuery) ||
           p.authorName.toLowerCase().contains(_searchQuery);
     }).toList();
 
-    if (matching.isEmpty) {
+    final matchingUsers = users.where((u) {
+      final name = (u.name as String? ?? '').toLowerCase();
+      final first = (u.firstName as String? ?? '').toLowerCase();
+      final last = (u.lastName as String? ?? '').toLowerCase();
+      final role = (u.role as String? ?? '').toLowerCase();
+      return name.contains(_searchQuery) ||
+          first.contains(_searchQuery) ||
+          last.contains(_searchQuery) ||
+          role.contains(_searchQuery);
+    }).toList();
+
+    if (matchingPosts.isEmpty && matchingUsers.isEmpty) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
@@ -330,7 +362,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               ),
               const SizedBox(height: 8),
               const Text(
-                'Try searching for actors, directors, or hashtags like #Audition',
+                'Try searching with a different name, role, or keyword.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 13,
@@ -343,11 +375,87 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       );
     }
 
-    return ListView.builder(
-      itemCount: matching.length,
-      itemBuilder: (context, index) {
-        return PostCard(post: matching[index]);
-      },
+    return ListView(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      children: [
+        // Matching Users / Profiles
+        if (matchingUsers.isNotEmpty) ...[
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            child: Text(
+              'Profiles',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1A1A2E),
+              ),
+            ),
+          ),
+          ...matchingUsers.map((u) {
+            final displayName = u.name.isNotEmpty
+                ? u.name
+                : (u.firstName.isNotEmpty
+                    ? '${u.firstName} ${u.lastName}'.trim()
+                    : u.email.split('@').first);
+            final role = u.role != 'unset' ? u.role : 'Artist';
+
+            return ListTile(
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+              leading: AppAvatar(
+                imageUrl: u.profileImagePath,
+                name: displayName,
+                radius: 20,
+              ),
+              title: Text(
+                displayName,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                ),
+              ),
+              subtitle: Text(
+                role,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF8E95A0),
+                ),
+              ),
+              trailing: const Icon(
+                Icons.arrow_forward_ios,
+                size: 14,
+                color: Color(0xFF8E95A0),
+              ),
+              onTap: () {
+                _saveKeyword(displayName);
+                final talent = TalentModel.fromUser(u);
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => UserProfileScreen(initialTalent: talent),
+                  ),
+                );
+              },
+            );
+          }),
+          const Divider(height: 24, color: Color(0xFFF0F0F0)),
+        ],
+
+        // Matching Feed Posts
+        if (matchingPosts.isNotEmpty) ...[
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            child: Text(
+              'Posts',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1A1A2E),
+              ),
+            ),
+          ),
+          ...matchingPosts.map((post) => PostCard(post: post)),
+        ],
+      ],
     );
   }
 }

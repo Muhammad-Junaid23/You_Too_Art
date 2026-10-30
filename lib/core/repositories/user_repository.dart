@@ -77,4 +77,17 @@ class UserRepository {
   }) async {
     if (kDebugMode) debugPrint('UserRepository.updateFcmToken: no-op');
   }
+
+  /// Fetch all registered users from Supabase.
+  Future<List<UserModel>> getAllUsers() async {
+    try {
+      final data = await _db.select().order('created_at', ascending: false);
+      return (data as List<dynamic>)
+          .map((row) => UserModel.fromJson(row as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      if (kDebugMode) debugPrint('UserRepository.getAllUsers: $e');
+      return [];
+    }
+  }
 }

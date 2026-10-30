@@ -133,6 +133,11 @@ class AppPersistenceService {
 
   bool isSamePersona(String id1, String id2) {
     if (id1 == id2) return true;
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user != null) {
+      if (id1 == user.id && (isActorId(id2) || id2 == _activePersonaId)) return true;
+      if (id2 == user.id && (isActorId(id1) || id1 == _activePersonaId)) return true;
+    }
     return isActorId(id1) && isActorId(id2);
   }
 
@@ -231,39 +236,49 @@ class AppPersistenceService {
 
   UserPortfolioState getPortfolio(String id) {
     final user = Supabase.instance.client.auth.currentUser;
-    if (user != null && _portfolios.containsKey(user.id)) {
-      return _portfolios[user.id]!;
+    if (_portfolios.containsKey(id)) {
+      return _portfolios[id]!;
     }
-    if (_portfolios.containsKey(id)) return _portfolios[id]!;
+    if (user != null && (id == user.id || isActorId(id) || id == _activePersonaId)) {
+      if (_portfolios.containsKey(user.id)) return _portfolios[user.id]!;
+      if (_portfolios.containsKey('actor')) return _portfolios['actor']!;
+    }
+    final fromPrefs = _prefs.getString('user_work_portfolio_') ??
+        (user != null ? _prefs.getString('user_work_portfolio_') : null);
+    if (fromPrefs != null && fromPrefs.isNotEmpty) {
+      try {
+        final decoded = UserPortfolioState.fromJson(
+          jsonDecode(fromPrefs) as Map<String, dynamic>,
+        );
+        _portfolios[id] = decoded;
+        return decoded;
+      } catch (_) {}
+    }
     return const UserPortfolioState(videos: [], photos: []);
   }
 
   void savePortfolio(String id, UserPortfolioState updated) {
     final user = Supabase.instance.client.auth.currentUser;
-    final isActor = isActorId(id);
     final jsonStr = jsonEncode(updated.toJson());
 
-    if (isActor) {
+    _portfolios[id] = updated;
+    _prefs.setString('user_work_portfolio_', jsonStr);
+
+    if (user != null) {
+      _portfolios[user.id] = updated;
+      _prefs.setString('user_work_portfolio_', jsonStr);
+    }
+
+    if (isActorId(id)) {
       _portfolios['actor'] = updated;
       _portfolios[actorDefaultId] = updated;
-      if (user != null) {
-        _portfolios[user.id] = updated;
-      }
       _prefs.setString('user_work_portfolio_actor', jsonStr);
-      _prefs.setString('user_work_portfolio_$actorDefaultId', jsonStr);
-      if (user != null) {
-        _prefs.setString('user_work_portfolio_${user.id}', jsonStr);
-      }
-    } else {
-      _portfolios[id] = updated;
-      _prefs.setString('user_work_portfolio_$id', jsonStr);
+      _prefs.setString('user_work_portfolio_', jsonStr);
     }
 
     _flush();
-    if (isActor) {
+    if (user != null) {
       _syncActorPortfolioToCloud(updated);
-    } else {
-      _syncMockPortfoliosToCloud();
     }
     notifyListeners();
   }
@@ -883,21 +898,6 @@ class AppPersistenceService {
     } catch (_) {}
   }
 
-  Future<void> _syncMockPortfoliosToCloud() async {
-    final client = Supabase.instance.client;
-    final user = client.auth.currentUser;
-    if (user == null) return;
-
-    try {
-      final mockSnapshot = jsonEncode({
-        for (final id in [alexanderId, filmfareId, jeremiahId])
-          if (_portfolios.containsKey(id)) id: _portfolios[id]!.toJson(),
-      });
-      await client.auth.updateUser(
-        UserAttributes(data: {'mock_portfolios_snapshot': mockSnapshot}),
-      );
-    } catch (_) {}
-  }
 
   Future<void> _syncActorPortfolioToCloud(UserPortfolioState portfolio) async {
     final client = Supabase.instance.client;

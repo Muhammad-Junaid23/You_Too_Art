@@ -11,6 +11,7 @@ class CastingCallCard extends StatelessWidget {
   final VoidCallback onApply;
   final VoidCallback? onViewApplications;
   final VoidCallback? onDelete;
+  final VoidCallback? onEdit;
 
   const CastingCallCard({
     super.key,
@@ -20,6 +21,7 @@ class CastingCallCard extends StatelessWidget {
     required this.onApply,
     this.onViewApplications,
     this.onDelete,
+    this.onEdit,
   });
 
   void _showOptionsModal(BuildContext context) {
@@ -67,6 +69,15 @@ class CastingCallCard extends StatelessWidget {
                   );
                 },
               ),
+              if (isMyCall && onEdit != null)
+                ListTile(
+                  leading: const Icon(Icons.edit_outlined, color: Color(0xFF3899F3)),
+                  title: const Text('Edit Casting Call'),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    onEdit!();
+                  },
+                ),
               if (isMyCall && onDelete != null)
                 ListTile(
                   leading: const Icon(Icons.delete_outline_rounded,
@@ -122,7 +133,7 @@ class CastingCallCard extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: isMyCall ? (onViewApplications ?? onTap) : onTap,
+          onTap: onTap,
           borderRadius: BorderRadius.circular(16),
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -178,6 +189,27 @@ class CastingCallCard extends StatelessWidget {
                     ),
 
                     // Top Action Icons
+                    if (isMyCall && onEdit != null) ...[
+                      // Edit Icon
+                      InkWell(
+                        onTap: onEdit,
+                        borderRadius: BorderRadius.circular(16),
+                        child: Container(
+                          width: 32,
+                          height: 32,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFE8F2FD),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.edit_outlined,
+                            size: 17,
+                            color: Color(0xFF3899F3),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                    ],
                     if (isMyCall && onDelete != null) ...[
                       // Trash Icon
                       InkWell(
@@ -260,11 +292,13 @@ class CastingCallCard extends StatelessWidget {
 
                 // 4-Column Metadata Grid
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     _buildMetaColumn('Location', call.locationDisplay),
+                    const SizedBox(width: 8),
                     _buildMetaColumn('Type', call.type),
-                    _buildMetaColumn('Shoot', call.shootDuration),
+                    const SizedBox(width: 8),
+                    _buildMetaColumn('Shoot', (call.shootDuration.isNotEmpty && call.shootDuration != 'TBD') ? call.shootDuration : (call.shootDetails.isNotEmpty ? call.shootDetails : 'TBD')),
+                    const SizedBox(width: 8),
                     _buildMetaColumn('Budget', call.budget),
                   ],
                 ),
@@ -393,26 +427,32 @@ class CastingCallCard extends StatelessWidget {
   }
 
   Widget _buildMetaColumn(String label, String value) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 11,
-            color: Color(0xFF8E95A0),
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              color: Color(0xFF8E95A0),
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF1A1A2E),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF1A1A2E),
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
