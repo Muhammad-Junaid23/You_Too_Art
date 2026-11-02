@@ -32,15 +32,20 @@ class HomeHeader extends ConsumerWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            'Hi $displayName!',
-            style: const TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF000000),
-              letterSpacing: -0.3,
+          Expanded(
+            child: Text(
+              'Hi $displayName!',
+              style: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF000000),
+                letterSpacing: -0.3,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
+          const SizedBox(width: 8),
           Stack(
             clipBehavior: Clip.none,
             children: [

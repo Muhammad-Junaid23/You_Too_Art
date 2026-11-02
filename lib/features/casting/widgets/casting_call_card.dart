@@ -290,17 +290,47 @@ class CastingCallCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 14),
 
-                // 4-Column Metadata Grid
-                Row(
-                  children: [
-                    _buildMetaColumn('Location', call.locationDisplay),
-                    const SizedBox(width: 8),
-                    _buildMetaColumn('Type', call.type),
-                    const SizedBox(width: 8),
-                    _buildMetaColumn('Shoot', (call.shootDuration.isNotEmpty && call.shootDuration != 'TBD') ? call.shootDuration : (call.shootDetails.isNotEmpty ? call.shootDetails : 'TBD')),
-                    const SizedBox(width: 8),
-                    _buildMetaColumn('Budget', call.budget),
-                  ],
+                // Responsive Metadata Grid (2x2 on narrow viewports < 380px, 4-column on wider)
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final shootText = (call.shootDuration.isNotEmpty && call.shootDuration != 'TBD')
+                        ? call.shootDuration
+                        : (call.shootDetails.isNotEmpty ? call.shootDetails : 'TBD');
+
+                    if (constraints.maxWidth < 300) {
+                      return Column(
+                        children: [
+                          Row(
+                            children: [
+                              _buildMetaColumn('Location', call.locationDisplay),
+                              const SizedBox(width: 12),
+                              _buildMetaColumn('Type', call.type),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              _buildMetaColumn('Shoot', shootText),
+                              const SizedBox(width: 12),
+                              _buildMetaColumn('Budget', call.budget),
+                            ],
+                          ),
+                        ],
+                      );
+                    }
+
+                    return Row(
+                      children: [
+                        _buildMetaColumn('Location', call.locationDisplay),
+                        const SizedBox(width: 8),
+                        _buildMetaColumn('Type', call.type),
+                        const SizedBox(width: 8),
+                        _buildMetaColumn('Shoot', shootText),
+                        const SizedBox(width: 8),
+                        _buildMetaColumn('Budget', call.budget),
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(height: 14),
 
@@ -340,25 +370,32 @@ class CastingCallCard extends StatelessWidget {
                             ),
                           ],
                         ),
-                        InkWell(
-                          onTap: onViewApplications,
-                          child: const Row(
-                            children: [
-                              Text(
-                                'View Applications',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
+                        Flexible(
+                          child: InkWell(
+                            onTap: onViewApplications,
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    'View Applications',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF3899F3),
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(width: 4),
+                                Icon(
+                                  Icons.arrow_forward_rounded,
+                                  size: 14,
                                   color: Color(0xFF3899F3),
                                 ),
-                              ),
-                              SizedBox(width: 4),
-                              Icon(
-                                Icons.arrow_forward_rounded,
-                                size: 14,
-                                color: Color(0xFF3899F3),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                       ],

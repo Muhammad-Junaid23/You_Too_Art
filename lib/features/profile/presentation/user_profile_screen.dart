@@ -39,12 +39,15 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
   int _currentVideoIndex = 0;
   int _currentPhotoIndex = 0;
   ConnectionStatus? _currentStatus;
+  bool? _isFollowing;
+  int? _followersCount;
   StreamSubscription<void>? _connSub;
 
   @override
   void initState() {
     super.initState();
     _currentStatus = widget.initialTalent.connectionStatus;
+    _isFollowing = widget.initialTalent.isFollowing;
     _connSub = ConnectionRepository.connectionChanges.listen((_) {
       if (mounted) _resolveStatus();
     });
@@ -64,8 +67,14 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
       currentUserId: activePersona.id,
       targetUserId: widget.initialTalent.id,
     );
+    final followingSet = await repo.getFollowingIds(activePersona.id);
+    final isFol = followingSet.contains(widget.initialTalent.id);
+    final folCount = await repo.getFollowersCount(widget.initialTalent.id);
+
     if (!mounted) return;
     setState(() {
+      _isFollowing = isFol;
+      _followersCount = folCount;
       if (rel == 'pending_outgoing') {
         _currentStatus = ConnectionStatus.pendingOutgoing;
       } else if (rel == 'pending_incoming') {
@@ -297,16 +306,31 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                     TalentDirectory.findById(widget.initialTalent.id) ??
                     widget.initialTalent)));
 
-    final effectiveStatus = _currentStatus ?? baseTalent.connectionStatus;
-    final talent = baseTalent.copyWith(
-      connectionStatus: effectiveStatus,
-      postsCount: dynamicPostsCount,
-    );
     final isProd = (isOwnProfile && currentUser != null)
         ? (currentUser.role.toLowerCase().contains('production') ||
+            currentUser.role.toLowerCase().contains('studio') ||
             (currentUser.incorporationNumber != null &&
                 currentUser.incorporationNumber!.isNotEmpty))
-        : (targetPersona?.isProductionHouse ?? talent.isProductionHouse);
+        : (baseTalent.isProductionHouse ||
+            baseTalent.roles.toLowerCase().contains('production') ||
+            baseTalent.roles.toLowerCase().contains('studio') ||
+            (targetPersona?.isProductionHouse ?? false));
+
+    final effectiveStatus = _currentStatus ?? baseTalent.connectionStatus;
+    final effectiveFollowing = _isFollowing ?? baseTalent.isFollowing;
+    final displayFollowersCount = isProd
+        ? (_followersCount != null
+            ? _followersCount.toString()
+            : (effectiveFollowing ? '1' : '0'))
+        : '0';
+
+    final talent = baseTalent.copyWith(
+      connectionStatus: effectiveStatus,
+      isFollowing: effectiveFollowing,
+      postsCount: dynamicPostsCount,
+      followersCount: displayFollowersCount,
+      isProductionHouse: isProd,
+    );
 
     final displayName = (isOwnProfile && currentUser != null && currentUser.name.isNotEmpty)
         ? currentUser.name
@@ -469,124 +493,136 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                   ),
                   const SizedBox(height: 20),
 
-                  // Stat Capsules: Centered compact capsules (Fixed width, matching Figma)
+                  // Stat Capsules: Centered compact capsules (Responsive, matching Figma)
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       // Left Capsule: Connects / Followers
-                      Container(
-                        width: 146,
-                        height: 62,
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(31),
-                          border: Border.all(
-                            color: const Color(0xFFE6E7E8),
-                            width: 1,
+                      Flexible(
+                        child: Container(
+                          constraints: const BoxConstraints(maxWidth: 150),
+                          height: 62,
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(31),
+                            border: Border.all(
+                              color: const Color(0xFFE6E7E8),
+                              width: 1,
+                            ),
                           ),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 40,
-                              height: 40,
-                              decoration: const BoxDecoration(
-                                color: Color(0xFFE0F7EF),
-                                shape: BoxShape.circle,
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 38,
+                                height: 38,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFFE0F7EF),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.hub_outlined,
+                                  color: Color(0xFF00C48C),
+                                  size: 19,
+                                ),
                               ),
-                              child: const Icon(
-                                Icons.hub_outlined,
-                                color: Color(0xFF00C48C),
-                                size: 20,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    isProd ? 'Followers' : 'Connects',
-                                    style: const TextStyle(
-                                      fontSize: 11.5,
-                                      color: Color(0xFF8E95A0),
-                                      fontWeight: FontWeight.w400,
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      isProd ? 'Followers' : 'Connects',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 11.0,
+                                        color: Color(0xFF8E95A0),
+                                        fontWeight: FontWeight.w400,
+                                      ),
                                     ),
-                                  ),
-                                  Text(
-                                    isProd
-                                        ? talent.followersCount
-                                        : talent.connectsCount,
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.black,
+                                    Text(
+                                      isProd
+                                          ? talent.followersCount
+                                          : talent.connectsCount,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 15.5,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.black,
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 8),
 
                       // Right Capsule: Posts
-                      Container(
-                        width: 146,
-                        height: 62,
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(31),
-                          border: Border.all(
-                            color: const Color(0xFFE6E7E8),
-                            width: 1,
+                      Flexible(
+                        child: Container(
+                          constraints: const BoxConstraints(maxWidth: 150),
+                          height: 62,
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(31),
+                            border: Border.all(
+                              color: const Color(0xFFE6E7E8),
+                              width: 1,
+                            ),
                           ),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 40,
-                              height: 40,
-                              decoration: const BoxDecoration(
-                                color: Color(0xFFE8F2FD),
-                                shape: BoxShape.circle,
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 38,
+                                height: 38,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFFE8F2FD),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.collections_outlined,
+                                  color: Color(0xFF3899F3),
+                                  size: 19,
+                                ),
                               ),
-                              child: const Icon(
-                                Icons.collections_outlined,
-                                color: Color(0xFF3899F3),
-                                size: 20,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'posts',
-                                    style: TextStyle(
-                                      fontSize: 11.5,
-                                      color: Color(0xFF8E95A0),
-                                      fontWeight: FontWeight.w400,
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'posts',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 11.0,
+                                        color: Color(0xFF8E95A0),
+                                        fontWeight: FontWeight.w400,
+                                      ),
                                     ),
-                                  ),
-                                  Text(
-                                    talent.postsCount,
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.black,
+                                    Text(
+                                      talent.postsCount,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 15.5,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.black,
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ],
@@ -662,55 +698,72 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
     bool isProd,
   ) {
     if (isProd) {
-      if (talent.isFollowing) {
+      final isCurrentlyFollowing = _isFollowing ?? talent.isFollowing;
+      if (isCurrentlyFollowing) {
         return Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            SizedBox(
-              width: 140,
-              height: 42,
-              child: ElevatedButton(
-                onPressed: () {
-                  ref.read(talentListProvider.notifier).toggleFollow(talent.id);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Unfollowed ${talent.name}'),
-                      behavior: SnackBarBehavior.floating,
-                      duration: const Duration(seconds: 1),
+            Expanded(
+              child: SizedBox(
+                height: 42,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    final repo = ref.read(connectionRepositoryProvider);
+                    final activePersona = ref.read(userPersonaProvider);
+                    await repo.toggleFollowing(activePersona.id, talent.id);
+                    final newCount = await repo.getFollowersCount(talent.id);
+                    if (mounted) {
+                      setState(() {
+                        _isFollowing = false;
+                        _followersCount = newCount;
+                      });
+                    }
+                    ref.read(talentListProvider.notifier).fetchTalents();
+                    ref.read(networkProvider.notifier).refresh();
+                    ConnectionRepository.notifyChanges();
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Unfollowed ${talent.name}'),
+                        behavior: SnackBarBehavior.floating,
+                        duration: const Duration(seconds: 1),
+                      ),
+                    );
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.black,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24),
                     ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.black,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(24),
                   ),
-                ),
-                child: const Text(
-                  'Unfollow',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                  child: const Text(
+                    'Unfollow',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                  ),
                 ),
               ),
             ),
             const SizedBox(width: 12),
-            SizedBox(
-              width: 140,
-              height: 42,
-              child: ElevatedButton(
-                onPressed: () => _onMessageTapped(context, talent),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF3899F3),
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(24),
+            Expanded(
+              child: SizedBox(
+                height: 42,
+                child: ElevatedButton(
+                  onPressed: () => _onMessageTapped(context, talent),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF3899F3),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24),
+                    ),
                   ),
-                ),
-                child: const Text(
-                  'Message',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                  child: const Text(
+                    'Message',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                  ),
                 ),
               ),
             ),
@@ -721,9 +774,22 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
           width: 160,
           height: 42,
           child: ElevatedButton(
-            onPressed: () {
-              ref.read(talentListProvider.notifier).toggleFollow(talent.id);
-              ScaffoldMessenger.of(context).showSnackBar(
+            onPressed: () async {
+              final repo = ref.read(connectionRepositoryProvider);
+              final activePersona = ref.read(userPersonaProvider);
+              await repo.toggleFollowing(activePersona.id, talent.id);
+              final newCount = await repo.getFollowersCount(talent.id);
+              if (mounted) {
+                setState(() {
+                  _isFollowing = true;
+                  _followersCount = newCount;
+                });
+              }
+              ref.read(talentListProvider.notifier).fetchTalents();
+              ref.read(networkProvider.notifier).refresh();
+              ConnectionRepository.notifyChanges();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text('Now following ${talent.name}!'),
                   backgroundColor: const Color(0xFF3899F3),
@@ -731,6 +797,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                   duration: const Duration(seconds: 1),
                 ),
               );
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.black,
@@ -1069,7 +1136,11 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
             // Individual artist specific fields
             _buildAboutSection(
               label: 'Category',
-              value: talent.roles.isNotEmpty ? talent.roles : 'Creative Artist',
+              value: (targetPersona != null && targetPersona.role.isNotEmpty)
+                  ? targetPersona.role
+                  : ((currentUser != null && currentUser.id == talent.id && currentUser.role.isNotEmpty && currentUser.role != 'unset')
+                      ? currentUser.role.split('_').map((w) => w.isEmpty ? '' : '${w[0].toUpperCase()}${w.substring(1).toLowerCase()}').join(' ')
+                      : (talent.roles.isNotEmpty ? talent.roles : 'Creative Artist')),
               isBold: true,
             ),
             const SizedBox(height: 24),

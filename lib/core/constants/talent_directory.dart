@@ -127,7 +127,7 @@ class TalentDirectory {
     roles: 'Cinematographer | DoP',
     avatarUrl:
         'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
-    connectsCount: '84.2K',
+    connectsCount: '0',
     postsCount: '194',
     isProductionHouse: false,
     bio:
@@ -154,7 +154,7 @@ class TalentDirectory {
     roles: 'Production House',
     avatarUrl:
         'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=400&q=80',
-    followersCount: '184.2K',
+    followersCount: '0',
     postsCount: '312',
     isProductionHouse: true,
     bio:
@@ -179,7 +179,7 @@ class TalentDirectory {
     roles: 'Director | Filmmaker',
     avatarUrl:
         'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=400&q=80',
-    connectsCount: '98.4K',
+    connectsCount: '0',
     postsCount: '189',
     isProductionHouse: false,
     bio:
@@ -206,7 +206,7 @@ class TalentDirectory {
     roles: 'Actress | Singer | Dancer',
     avatarUrl:
         'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
-    connectsCount: '89.2K',
+    connectsCount: '0',
     postsCount: '184',
     isProductionHouse: false,
     email: 'sophia.vance@youtooart.test',
@@ -226,7 +226,7 @@ class TalentDirectory {
     roles: 'Director | Cinematographer',
     avatarUrl:
         'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',
-    connectsCount: '45.1K',
+    connectsCount: '0',
     postsCount: '96',
     isProductionHouse: false,
     email: 'marcus.chen@youtooart.test',
@@ -240,7 +240,7 @@ class TalentDirectory {
     roles: 'Fashion Model | Voiceover',
     avatarUrl:
         'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&w=400&q=80',
-    connectsCount: '112.5K',
+    connectsCount: '0',
     postsCount: '310',
     isProductionHouse: false,
     email: 'elena.rostova@youtooart.test',
@@ -254,7 +254,7 @@ class TalentDirectory {
     roles: 'Actor | Screenwriter',
     avatarUrl:
         'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=400&q=80',
-    connectsCount: '63.8K',
+    connectsCount: '0',
     postsCount: '145',
     isProductionHouse: false,
     email: 'david.kalu@youtooart.test',
@@ -274,7 +274,7 @@ class TalentDirectory {
     roles: 'Actor | Director | Producer',
     avatarUrl:
         'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80',
-    connectsCount: '52.3K',
+    connectsCount: '0',
     postsCount: '112',
     isProductionHouse: false,
     email: 'lucas.scott@youtooart.test',
@@ -413,7 +413,7 @@ class TalentDirectory {
       final photos = portfolio.photos.map((p) => p.mediaUrl).toList();
       return TalentModel.fromPersona(
         persona,
-        connectsCount: '124.7K',
+        connectsCount: '0',
         postsCount: '${portfolio.videos.length + portfolio.photos.length}',
         workPortfolio: photos,
       );
@@ -425,7 +425,7 @@ class TalentDirectory {
       final photos = portfolio.photos.map((p) => p.mediaUrl).toList();
       return TalentModel.fromPersona(
         persona,
-        connectsCount: base?.connectsCount ?? '124.7K',
+        connectsCount: base?.connectsCount ?? '0',
         postsCount: '${portfolio.videos.length + portfolio.photos.length}',
         posts: base?.posts ?? [],
         aboutInfo: base?.aboutInfo,

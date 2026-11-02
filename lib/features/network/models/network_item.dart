@@ -40,6 +40,7 @@ class NetworkSuggestionItem {
   final String? avatarUrl;
   final String roles;
   final bool isRequested;
+  final bool isFollowing;
   final TalentModel talentModel;
 
   const NetworkSuggestionItem({
@@ -48,8 +49,15 @@ class NetworkSuggestionItem {
     this.avatarUrl,
     required this.roles,
     this.isRequested = false,
+    this.isFollowing = false,
     required this.talentModel,
   });
+
+  bool get isProductionHouse =>
+      talentModel.isProductionHouse ||
+      roles.toLowerCase().contains('production') ||
+      roles.toLowerCase().contains('studio') ||
+      name.toLowerCase().contains('studio');
 
   NetworkSuggestionItem copyWith({
     String? id,
@@ -57,6 +65,7 @@ class NetworkSuggestionItem {
     String? avatarUrl,
     String? roles,
     bool? isRequested,
+    bool? isFollowing,
     TalentModel? talentModel,
   }) {
     return NetworkSuggestionItem(
@@ -65,6 +74,7 @@ class NetworkSuggestionItem {
       avatarUrl: avatarUrl ?? this.avatarUrl,
       roles: roles ?? this.roles,
       isRequested: isRequested ?? this.isRequested,
+      isFollowing: isFollowing ?? this.isFollowing,
       talentModel: talentModel ?? this.talentModel,
     );
   }

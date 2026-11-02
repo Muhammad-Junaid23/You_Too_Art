@@ -396,7 +396,9 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   // Photo & Tag People Pills
-                  Row(
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
                     children: [
                       // Photo Pill
                       InkWell(

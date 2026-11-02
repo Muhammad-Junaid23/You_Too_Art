@@ -56,9 +56,13 @@ class _CastingScreenState extends ConsumerState<CastingScreen> {
     final filteredCalls = rawFilteredCalls.map((call) {
       final isApplied = castingNotifier.isCallAppliedBy(call.id, userPersona.id);
       final appliedAt = castingNotifier.getAppliedAt(call.id, userPersona.id);
+      final count = castingState.applications
+          .where((a) => a.castingCallId == call.id)
+          .length;
       return call.copyWith(
         isApplied: isApplied,
         appliedAt: appliedAt,
+        applicantsCount: count > call.applicantsCount ? count : call.applicantsCount,
       );
     }).toList();
 

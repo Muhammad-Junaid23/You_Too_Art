@@ -70,6 +70,7 @@ class _ChooseCategoryScreenState extends ConsumerState<ChooseCategoryScreen> {
 
       final userRepo = ref.read(userRepositoryProvider);
       await userRepo.updateProfile(uid: uid, updates: {'role': role});
+      ref.read(authProvider.notifier).setRole(role);
 
       if (!mounted) return;
       // Branch by role
@@ -128,25 +129,32 @@ class _ChooseCategoryScreenState extends ConsumerState<ChooseCategoryScreen> {
                     ),
                     const SizedBox(height: 24),
 
-                    // Two-column grid of pills
-                    GridView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: _roles.length,
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
+                    // Responsive grid of category pills
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final width = constraints.maxWidth;
+                        final crossAxisCount = width < 320 ? 1 : 2;
+                        final childAspectRatio = width < 320 ? 5.2 : 2.7;
+
+                        return GridView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: _roles.length,
+                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: crossAxisCount,
                             mainAxisSpacing: 10,
                             crossAxisSpacing: 10,
-                            childAspectRatio: 3.6,
+                            childAspectRatio: childAspectRatio,
                           ),
-                      itemBuilder: (context, i) {
-                        final role = _roles[i];
-                        final selected = _selected == role.value;
-                        return _RolePill(
-                          label: role.label,
-                          selected: selected,
-                          onTap: () => setState(() => _selected = role.value),
+                          itemBuilder: (context, i) {
+                            final role = _roles[i];
+                            final selected = _selected == role.value;
+                            return _RolePill(
+                              label: role.label,
+                              selected: selected,
+                              onTap: () => setState(() => _selected = role.value),
+                            );
+                          },
                         );
                       },
                     ),

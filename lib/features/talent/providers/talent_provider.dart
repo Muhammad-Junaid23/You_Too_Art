@@ -6,6 +6,7 @@ import 'package:you_too_art/core/providers/supabase_providers.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
 import 'package:you_too_art/core/repositories/connection_repository.dart';
 import 'package:you_too_art/features/network/providers/network_provider.dart';
+import 'package:you_too_art/features/auth/providers/auth_provider.dart';
 import 'package:you_too_art/features/chats/providers/chat_provider.dart';
 import 'package:you_too_art/features/talent/models/talent_model.dart';
 
@@ -64,6 +65,7 @@ class TalentNotifier extends Notifier<TalentState> {
 
   @override
   TalentState build() {
+    ref.watch(currentUidProvider);
     _connectionRepo = ref.watch(connectionRepositoryProvider);
     _activePersona = ref.watch(userPersonaProvider);
 
@@ -143,10 +145,13 @@ class TalentNotifier extends Notifier<TalentState> {
           status = ConnectionStatus.pendingIncoming;
         }
 
+        final isFol = followingIds.contains(talent.id);
+        final folCount = await _connectionRepo.getFollowersCount(talent.id);
         resolvedTalents.add(
           talent.copyWith(
             connectionStatus: status,
-            isFollowing: followingIds.contains(talent.id),
+            isFollowing: isFol,
+            followersCount: folCount > 0 ? folCount.toString() : (isFol ? '1' : '0'),
           ),
         );
       }
@@ -227,13 +232,23 @@ class TalentNotifier extends Notifier<TalentState> {
   Future<void> toggleFollow(String productionId) async {
     final updatedTalents = state.talents.map((talent) {
       if (talent.id == productionId) {
-        return talent.copyWith(isFollowing: !talent.isFollowing);
+        final nextFollowing = !talent.isFollowing;
+        final currentCount = int.tryParse(talent.followersCount) ?? 0;
+        final nextCount = nextFollowing
+            ? currentCount + 1
+            : (currentCount - 1).clamp(0, 999999);
+        return talent.copyWith(
+          isFollowing: nextFollowing,
+          followersCount: nextCount.toString(),
+        );
       }
       return talent;
     }).toList();
 
     state = state.copyWith(talents: updatedTalents);
     await _connectionRepo.toggleFollowing(_activePersona.id, productionId);
+    ref.read(networkProvider.notifier).refresh();
+    ConnectionRepository.notifyChanges();
   }
 
   void _updateStatus(String talentId, ConnectionStatus status) {

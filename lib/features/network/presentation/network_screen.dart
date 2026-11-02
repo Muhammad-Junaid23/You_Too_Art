@@ -165,19 +165,23 @@ class _NetworkScreenState extends ConsumerState<NetworkScreen> {
           children: [
             // Top Bar: Title, Persona Badge & Blue Notification Bell
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 16, 8),
+              padding: const EdgeInsets.fromLTRB(16, 12, 12, 8),
               child: Row(
                 children: [
-                  const Text(
-                    'My Network',
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                      letterSpacing: -0.5,
+                  const Expanded(
+                    child: Text(
+                      'My Network',
+                      style: TextStyle(
+                        fontSize: 26,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                        letterSpacing: -0.5,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  const Spacer(),
+                  const SizedBox(width: 8),
                   Stack(
                     clipBehavior: Clip.none,
                     children: [
@@ -229,48 +233,52 @@ class _NetworkScreenState extends ConsumerState<NetworkScreen> {
 
             // Sub-Tabs Header: Requests (N) vs Connections (N)
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 14),
-              child: Row(
-                children: [
-                  // Requests Tab
-                  GestureDetector(
-                    onTap: () {
-                      ref.read(networkProvider.notifier).setActiveTab(0);
-                    },
-                    behavior: HitTestBehavior.opaque,
-                    child: Text(
-                      'Requests (${netState.requests.length})',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight:
-                            activeTab == 0 ? FontWeight.bold : FontWeight.w500,
-                        color: activeTab == 0
-                            ? Colors.black
-                            : const Color(0xFF8E95A0),
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                child: Row(
+                  children: [
+                    // Requests Tab
+                    GestureDetector(
+                      onTap: () {
+                        ref.read(networkProvider.notifier).setActiveTab(0);
+                      },
+                      behavior: HitTestBehavior.opaque,
+                      child: Text(
+                        'Requests (${netState.requests.length})',
+                        style: TextStyle(
+                          fontSize: 14.5,
+                          fontWeight:
+                              activeTab == 0 ? FontWeight.bold : FontWeight.w500,
+                          color: activeTab == 0
+                              ? Colors.black
+                              : const Color(0xFF8E95A0),
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 24),
+                    const SizedBox(width: 20),
 
-                  // Connections Tab
-                  GestureDetector(
-                    onTap: () {
-                      ref.read(networkProvider.notifier).setActiveTab(1);
-                    },
-                    behavior: HitTestBehavior.opaque,
-                    child: Text(
-                      'Connections (${netState.connections.length})',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight:
-                            activeTab == 1 ? FontWeight.bold : FontWeight.w500,
-                        color: activeTab == 1
-                            ? Colors.black
-                            : const Color(0xFF8E95A0),
+                    // Connections Tab
+                    GestureDetector(
+                      onTap: () {
+                        ref.read(networkProvider.notifier).setActiveTab(1);
+                      },
+                      behavior: HitTestBehavior.opaque,
+                      child: Text(
+                        'Connections (${netState.connections.length})',
+                        style: TextStyle(
+                          fontSize: 14.5,
+                          fontWeight:
+                              activeTab == 1 ? FontWeight.bold : FontWeight.w500,
+                          color: activeTab == 1
+                              ? Colors.black
+                              : const Color(0xFF8E95A0),
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
 
@@ -527,19 +535,28 @@ class _NetworkScreenState extends ConsumerState<NetworkScreen> {
                   );
                 },
                 onToggleRequest: () {
+                  final isProd = suggestion.isProductionHouse;
                   ref
                       .read(networkProvider.notifier)
                       .toggleSendSuggestionRequest(suggestion.id);
 
-                  final msg = suggestion.isRequested
-                      ? 'Cancelled connection request to ${suggestion.name}'
-                      : 'Connection request sent to ${suggestion.name}!';
+                  String msg;
+                  if (isProd) {
+                    msg = suggestion.isFollowing
+                        ? 'Unfollowed ${suggestion.name}'
+                        : 'Now following ${suggestion.name}!';
+                  } else {
+                    msg = suggestion.isRequested
+                        ? 'Cancelled connection request to ${suggestion.name}'
+                        : 'Connection request sent to ${suggestion.name}!';
+                  }
 
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(msg),
                       behavior: SnackBarBehavior.floating,
-                      backgroundColor: suggestion.isRequested
+                      duration: const Duration(milliseconds: 2500),
+                      backgroundColor: (isProd ? suggestion.isFollowing : suggestion.isRequested)
                           ? const Color(0xFF474B51)
                           : const Color(0xFF3899F3),
                     ),

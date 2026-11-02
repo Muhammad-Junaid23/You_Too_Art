@@ -11,6 +11,13 @@ import 'package:you_too_art/core/providers/user_persona_provider.dart';
 import 'package:you_too_art/core/constants/test_accounts.dart';
 import 'package:you_too_art/core/models/user_model.dart';
 import 'package:you_too_art/core/providers/shared_preferences_provider.dart';
+import 'package:you_too_art/features/notifications/providers/notification_provider.dart';
+import 'package:you_too_art/features/home/providers/home_feed_provider.dart';
+import 'package:you_too_art/features/talent/providers/talent_provider.dart';
+import 'package:you_too_art/features/network/providers/network_provider.dart';
+import 'package:you_too_art/features/chats/providers/chat_provider.dart';
+import 'package:you_too_art/features/casting/providers/casting_provider.dart';
+import 'package:you_too_art/features/profile/providers/user_portfolio_provider.dart';
 
 // ─── Foundation Providers ───────────────────────────
 
@@ -51,15 +58,23 @@ final authStateChangesProvider = StreamProvider<supabase.AuthState>((ref) {
 /// while respecting active developer testing personas when selected.
 final currentUidProvider = Provider<String?>((ref) {
   final activePersona = ref.watch(userPersonaProvider);
-  if (activePersona.id != UserPersonaNotifier.actorDefaultId) {
+  final prefs = ref.watch(sharedPreferencesProvider);
+  final isTestRole = prefs.getBool('is_test_role_logged_in') ?? false;
+
+  if (isTestRole || TestAccounts.isTestId(activePersona.id)) {
     return activePersona.id;
   }
 
   final authState = ref.watch(authStateChangesProvider);
-  final streamUid = authState.whenData((state) => state.session?.user.id).value;
-  if (streamUid != null) return streamUid;
-  return ref.watch(supabaseClientProvider).auth.currentUser?.id ??
-      activePersona.id;
+  final sessionUser = authState.value?.session?.user;
+  final clientUser = ref.watch(supabaseClientProvider).auth.currentUser;
+  final activeUser = sessionUser ?? clientUser;
+
+  if (activeUser != null && activeUser.id.isNotEmpty) {
+    return activeUser.id;
+  }
+
+  return activePersona.id;
 });
 
 /// Stream of whether the current user's email has been verified.
@@ -76,24 +91,26 @@ class AppAuthState {
   final bool isLoggedIn;
   final bool isLoading;
   final String? errorMessage;
-  String? get role => null;
+  final String? role;
 
   const AppAuthState({
     this.isLoggedIn = false,
     this.isLoading = false,
     this.errorMessage,
+    this.role,
   });
 
   AppAuthState copyWith({
-    bool? isFirstTime,
     bool? isLoggedIn,
     bool? isLoading,
     String? errorMessage,
+    String? role,
   }) {
     return AppAuthState(
       isLoggedIn: isLoggedIn ?? this.isLoggedIn,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: errorMessage,
+      role: role ?? this.role,
     );
   }
 }
@@ -304,6 +321,19 @@ class AuthNotifier extends Notifier<AppAuthState> {
     }
   }
 
+  void _invalidateUserScopedProviders() {
+    ref.invalidate(currentUidProvider);
+    ref.invalidate(userPersonaProvider);
+    ref.invalidate(notificationProvider);
+    ref.invalidate(currentUserProfileProvider);
+    ref.invalidate(homeFeedProvider);
+    ref.invalidate(talentListProvider);
+    ref.invalidate(networkProvider);
+    ref.invalidate(chatListProvider);
+    ref.invalidate(castingProvider);
+    ref.invalidate(userWorkPortfolioProvider);
+  }
+
   /// 1-Tap Instant Login for role testing
   Future<void> loginAsTestRole(TestAccount account) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
@@ -316,6 +346,12 @@ class AuthNotifier extends Notifier<AppAuthState> {
     await prefs.setBool('is_test_role_logged_in', true);
 
     state = state.copyWith(isLoading: false, isLoggedIn: true);
+    _invalidateUserScopedProviders();
+  }
+
+  /// Set the active role in auth state.
+  void setRole(String role) {
+    state = state.copyWith(role: role);
   }
 
   // Called AFTER routing is decided.
@@ -326,16 +362,19 @@ class AuthNotifier extends Notifier<AppAuthState> {
       prefs.setBool('is_test_role_logged_in', true);
     }
     state = state.copyWith(isLoggedIn: true);
+    _invalidateUserScopedProviders();
   }
 
   /// Log out the current user.
   Future<void> logout() async {
-    state = state.copyWith(isLoading: true, errorMessage: null);
+    state = state.copyWith(isLoading: true, errorMessage: null, role: null);
     try {
       final prefs = ref.read(sharedPreferencesProvider);
       await prefs.setBool('is_test_role_logged_in', false);
+      AppPersistenceService.instance.setActivePersonaId('');
       await _authRepo.logout();
-      state = state.copyWith(isLoggedIn: false, isLoading: false);
+      state = state.copyWith(isLoggedIn: false, isLoading: false, role: null);
+      _invalidateUserScopedProviders();
     } catch (e) {
       if (kDebugMode) debugPrint('AuthNotifier.logout: $e');
       state = state.copyWith(isLoading: false, errorMessage: friendlyError(e));

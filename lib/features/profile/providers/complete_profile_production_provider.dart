@@ -118,8 +118,9 @@ class ProductionProfileNotifier extends Notifier<ProductionProfileState> {
           .updateProfile(
             uid: uid,
             updates: {
-              'first_name': state.companyName.trim(), // ← add
+              'first_name': state.companyName.trim(),
               'name': state.companyName.trim(),
+              'role': 'production_house',
               'incorporation_number': state.incorporationNumber.trim(),
               'established_year': state.establishedYear,
               'address': state.address.trim(),

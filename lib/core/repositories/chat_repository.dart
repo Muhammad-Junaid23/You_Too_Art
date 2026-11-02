@@ -448,36 +448,23 @@ class _LocalChatStore {
   Stream<void> get messagesStream => _msgController.stream;
 
   String _normalizeUserId(String uid) {
-    final actorPersona = UserPersonaNotifier.buildActorPersona();
-    if (uid == UserPersonaNotifier.actorDefaultId || uid == actorPersona.id) {
-      return UserPersonaNotifier.actorDefaultId;
-    }
-    return uid;
+    return uid.trim();
   }
 
   bool _isActorMatch(String a, String b) {
     if (a == b) return true;
-    final actorPersona = UserPersonaNotifier.buildActorPersona();
-    final isA = a == UserPersonaNotifier.actorDefaultId || a == actorPersona.id;
-    final isB = b == UserPersonaNotifier.actorDefaultId || b == actorPersona.id;
+    final isA = a == UserPersonaNotifier.actorDefaultId || a == 'actor';
+    final isB = b == UserPersonaNotifier.actorDefaultId || b == 'actor';
     return isA && isB;
   }
 
   List<String> _allUserKeys(String uid) {
-    final keys = <String>{uid};
-    final norm = _normalizeUserId(uid);
-    keys.add(norm);
-    try {
-      final actor = UserPersonaNotifier.buildActorPersona();
-      if (uid == UserPersonaNotifier.actorDefaultId ||
-          uid == actor.id ||
-          norm == UserPersonaNotifier.actorDefaultId) {
-        keys.add(UserPersonaNotifier.actorDefaultId);
-        keys.add(actor.id);
-        final curId = Supabase.instance.client.auth.currentUser?.id;
-        if (curId != null) keys.add(curId);
-      }
-    } catch (_) {}
+    final cleanUid = uid.trim();
+    final keys = <String>{cleanUid};
+    if (cleanUid == 'actor' || cleanUid == UserPersonaNotifier.actorDefaultId) {
+      keys.add('actor');
+      keys.add(UserPersonaNotifier.actorDefaultId);
+    }
     return keys.toList();
   }
 

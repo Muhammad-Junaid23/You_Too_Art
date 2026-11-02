@@ -312,6 +312,7 @@ class _ChatsScreenState extends ConsumerState<ChatsScreen> {
 
       // ─── Floating Action Button: Black circle with white edit icon ───
       floatingActionButton: FloatingActionButton(
+        heroTag: null,
         onPressed: _openNewChatModal,
         backgroundColor: Colors.black,
         elevation: 4,

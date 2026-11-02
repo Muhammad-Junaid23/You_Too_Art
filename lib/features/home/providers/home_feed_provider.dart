@@ -8,16 +8,23 @@ import 'package:you_too_art/features/auth/providers/auth_provider.dart';
 import 'package:you_too_art/features/home/models/post_item.dart';
 
 /// Provider for the current logged-in user's profile.
-final currentUserProfileProvider = StreamProvider<UserModel?>((ref) {
+final currentUserProfileProvider = StreamProvider<UserModel?>((ref) async* {
   final uid = ref.watch(currentUidProvider);
-  if (uid == null) return Stream.value(null);
-  return ref.watch(userRepositoryProvider).watch(uid);
+  if (uid == null || TestAccounts.isTestId(uid)) {
+    yield null;
+    return;
+  }
+  final repo = ref.watch(userRepositoryProvider);
+  final immediate = await repo.getById(uid);
+  if (immediate != null) yield immediate;
+  yield* repo.watch(uid);
 });
 
 /// Riverpod 3.x AsyncNotifier for the Home Social Feed.
 class HomeFeedNotifier extends AsyncNotifier<List<PostItem>> {
   @override
   Future<List<PostItem>> build() async {
+    ref.watch(currentUidProvider);
     return _fetchFeed();
   }
 
@@ -35,11 +42,16 @@ class HomeFeedNotifier extends AsyncNotifier<List<PostItem>> {
       if (rawPosts.isNotEmpty) {
         return rawPosts.map((json) {
           final id = json['id']?.toString() ?? '';
-          return PostItem.fromJson(
+          final localTags = prefs.getStringList('post_tags_$id') ?? [];
+          final post = PostItem.fromJson(
             json,
             currentUserId: currentUid,
             isSaved: savedIds.contains(id),
           );
+          if (localTags.isNotEmpty && post.taggedUsers.isEmpty) {
+            return post.copyWith(taggedUsers: localTags);
+          }
+          return post;
         }).toList();
       }
     } catch (e) {
@@ -177,6 +189,10 @@ class HomeFeedNotifier extends AsyncNotifier<List<PostItem>> {
     }
 
     final postUuid = createdId ?? _generateUuid();
+    final prefs = ref.read(sharedPreferencesProvider);
+    if (taggedUsers.isNotEmpty) {
+      await prefs.setStringList('post_tags_$postUuid', taggedUsers);
+    }
 
     final newPost = PostItem(
       id: postUuid,
@@ -215,6 +231,11 @@ class HomeFeedNotifier extends AsyncNotifier<List<PostItem>> {
     final current = state.value ?? [];
     final index = current.indexWhere((p) => p.id == postId);
     if (index == -1) return false;
+
+    if (taggedUsers != null) {
+      final prefs = ref.read(sharedPreferencesProvider);
+      await prefs.setStringList('post_tags_$postId', taggedUsers);
+    }
 
     final updated = current[index].copyWith(
       caption: caption,

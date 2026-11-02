@@ -36,9 +36,9 @@ class TalentModel {
     this.connectionStatus = ConnectionStatus.none,
     this.isFollowing = false,
     this.isProductionHouse = false,
-    this.connectsCount = '124.7K',
+    this.connectsCount = '0',
     this.postsCount = '0',
-    this.followersCount = '124.7K',
+    this.followersCount = '0',
     this.email,
     this.bio,
     this.location,
@@ -60,9 +60,9 @@ class TalentModel {
     UserPersona persona, {
     ConnectionStatus connectionStatus = ConnectionStatus.none,
     bool isFollowing = false,
-    String connectsCount = '124.7K',
+    String connectsCount = '0',
     String? postsCount,
-    String followersCount = '124.7K',
+    String followersCount = '0',
     List<PostItem> posts = const [],
     Map<String, String>? aboutInfo,
     List<String>? workPortfolio,
@@ -114,13 +114,17 @@ class TalentModel {
     ConnectionStatus connectionStatus = ConnectionStatus.none,
     bool isFollowing = false,
   }) {
-    final isProd = user.role.toLowerCase().contains('production') ||
+    final roleLower = user.role.toLowerCase();
+    final isProd = roleLower.contains('production') ||
+        roleLower.contains('house') ||
+        roleLower.contains('studio') ||
+        user.name.toLowerCase().contains('studio') ||
         (user.incorporationNumber != null &&
             user.incorporationNumber!.isNotEmpty);
 
     String rolesStr = isProd ? 'Production House' : 'Actor | Model | Director';
     if (user.role.isNotEmpty && user.role.toLowerCase() != 'unset') {
-      rolesStr = user.role;
+      rolesStr = user.role.split('_').map((w) => w.isEmpty ? '' : '${w[0].toUpperCase()}${w.substring(1).toLowerCase()}').join(' ');
     }
     if (user.bio != null &&
         user.bio!.trim().isNotEmpty &&
@@ -136,6 +140,8 @@ class TalentModel {
       connectionStatus: connectionStatus,
       isFollowing: isFollowing,
       isProductionHouse: isProd,
+      connectsCount: isProd ? '0' : '0',
+      followersCount: '0',
       email: user.email,
       bio: user.bio ?? (isProd
           ? 'Official Production House profile on You Too Art.'
