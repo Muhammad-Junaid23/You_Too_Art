@@ -183,12 +183,12 @@ class AppPersistenceService {
   }
 
   UserPersona getActivePersona() {
-    final user = Supabase.instance.client.auth.currentUser;
-    if (user != null) {
-      return getActorPersona();
-    }
-    if (_personas.containsKey(_activePersonaId)) {
+    if (_activePersonaId.isNotEmpty && _personas.containsKey(_activePersonaId)) {
       return _personas[_activePersonaId]!;
+    }
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user != null && _personas.containsKey(user.id)) {
+      return _personas[user.id]!;
     }
     return getActorPersona();
   }
@@ -235,16 +235,11 @@ class AppPersistenceService {
   // ─── Portfolio Queries ──────────────────────────────────────
 
   UserPortfolioState getPortfolio(String id) {
-    final user = Supabase.instance.client.auth.currentUser;
     if (_portfolios.containsKey(id)) {
       return _portfolios[id]!;
     }
-    if (user != null && (id == user.id || isActorId(id) || id == _activePersonaId)) {
-      if (_portfolios.containsKey(user.id)) return _portfolios[user.id]!;
-      if (_portfolios.containsKey('actor')) return _portfolios['actor']!;
-    }
-    final fromPrefs = _prefs.getString('user_work_portfolio_') ??
-        (user != null ? _prefs.getString('user_work_portfolio_') : null);
+    final fromPrefs = _prefs.getString('user_work_portfolio_$id') ??
+        _prefs.getString('user_work_portfolio_');
     if (fromPrefs != null && fromPrefs.isNotEmpty) {
       try {
         final decoded = UserPortfolioState.fromJson(
@@ -262,22 +257,16 @@ class AppPersistenceService {
     final jsonStr = jsonEncode(updated.toJson());
 
     _portfolios[id] = updated;
-    _prefs.setString('user_work_portfolio_', jsonStr);
-
-    if (user != null) {
-      _portfolios[user.id] = updated;
-      _prefs.setString('user_work_portfolio_', jsonStr);
-    }
+    _prefs.setString('user_work_portfolio_$id', jsonStr);
 
     if (isActorId(id)) {
       _portfolios['actor'] = updated;
       _portfolios[actorDefaultId] = updated;
       _prefs.setString('user_work_portfolio_actor', jsonStr);
-      _prefs.setString('user_work_portfolio_', jsonStr);
     }
 
     _flush();
-    if (user != null) {
+    if (user != null && (id == user.id || id == _activePersonaId || isActorId(id))) {
       _syncActorPortfolioToCloud(updated);
     }
     notifyListeners();
@@ -727,15 +716,7 @@ class AppPersistenceService {
           final videos = <WorkMediaItem>[];
           final photos = <WorkMediaItem>[];
           for (final row in pRows) {
-            final mediaType = row['media_type'] as String? ?? 'photo';
-            final item = WorkMediaItem(
-              id: row['id']?.toString() ?? '',
-              title: row['title'] as String? ?? '',
-              url: row['media_url'] as String? ?? '',
-              mediaUrl: row['media_url'] as String? ?? '',
-              isVideo: mediaType.toLowerCase() == 'video',
-              lastUpdated: 'Just Now',
-            );
+            final item = WorkMediaItem.fromJson(row);
             if (item.isVideo) {
               videos.add(item);
             } else {
@@ -927,24 +908,28 @@ class AppPersistenceService {
 
     try {
       for (final video in portfolio.videos) {
-        await client.from('portfolio_items').upsert({
-          if (video.id.isNotEmpty && video.id.length >= 30) 'id': video.id,
-          'user_id': user.id,
-          'title': video.title,
-          'media_url': video.mediaUrl,
-          'media_type': 'video',
-          'created_at': DateTime.now().toUtc().toIso8601String(),
-        });
+        if (video.id.isNotEmpty && video.id.length >= 30 && !video.id.startsWith('port_')) {
+          await client.from('portfolio_items').upsert({
+            'id': video.id,
+            'user_id': user.id,
+            'title': video.title,
+            'media_url': video.mediaUrl,
+            'media_type': 'video',
+            'created_at': DateTime.now().toUtc().toIso8601String(),
+          });
+        }
       }
       for (final photo in portfolio.photos) {
-        await client.from('portfolio_items').upsert({
-          if (photo.id.isNotEmpty && photo.id.length >= 30) 'id': photo.id,
-          'user_id': user.id,
-          'title': photo.title,
-          'media_url': photo.mediaUrl,
-          'media_type': 'photo',
-          'created_at': DateTime.now().toUtc().toIso8601String(),
-        });
+        if (photo.id.isNotEmpty && photo.id.length >= 30 && !photo.id.startsWith('port_')) {
+          await client.from('portfolio_items').upsert({
+            'id': photo.id,
+            'user_id': user.id,
+            'title': photo.title,
+            'media_url': photo.mediaUrl,
+            'media_type': 'photo',
+            'created_at': DateTime.now().toUtc().toIso8601String(),
+          });
+        }
       }
     } catch (_) {}
   }

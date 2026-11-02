@@ -179,11 +179,17 @@ class _CreateCastingCallScreenState
               children: [
                 const Icon(Icons.check_circle, color: Colors.white, size: 20),
                 const SizedBox(width: 10),
-                Text(
-                  widget.callToEdit != null ? 'Casting Call updated successfully!' : 'Casting Call created successfully!',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
+                Expanded(
+                  child: Text(
+                    widget.callToEdit != null
+                        ? 'Casting Call updated successfully!'
+                        : 'Casting Call created successfully!',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ],

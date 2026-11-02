@@ -253,11 +253,19 @@ class _TalentScreenState extends ConsumerState<TalentScreen> {
                             ),
                             padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                             gridDelegate:
-                                const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2,
+                                SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount:
+                                  MediaQuery.sizeOf(context).width < 340
+                                      ? 1
+                                      : (MediaQuery.sizeOf(context).width > 900
+                                          ? 4
+                                          : (MediaQuery.sizeOf(context).width >
+                                                  600
+                                              ? 3
+                                              : 2)),
                               crossAxisSpacing: 14,
                               mainAxisSpacing: 14,
-                              childAspectRatio: 0.74,
+                              mainAxisExtent: 220.0,
                             ),
                             itemCount: talents.length,
                             itemBuilder: (context, index) {
@@ -271,7 +279,9 @@ class _TalentScreenState extends ConsumerState<TalentScreen> {
                                   );
                                 },
                                 onConnect: () {
-                                  final isProd = talent.isProductionHouse;
+                                  final isProd = talent.isProductionHouse ||
+                                      talent.roles.toLowerCase().contains('production') ||
+                                      talent.roles.toLowerCase().contains('studio');
                                   if (isProd) {
                                     ref
                                         .read(talentListProvider.notifier)
@@ -344,20 +354,13 @@ class _TalentScreenState extends ConsumerState<TalentScreen> {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
                                         content: Text(
-                                          'Connect with ${talent.name} first to start chatting!',
+                                          talent.isProductionHouse
+                                              ? 'Follow ${talent.name} first to start chatting!'
+                                              : 'Connect with ${talent.name} first to start chatting!',
                                         ),
                                         behavior: SnackBarBehavior.floating,
                                         backgroundColor: const Color(0xFF1E293B),
-                                        duration: const Duration(seconds: 2),
-                                        action: SnackBarAction(
-                                          label: 'Connect',
-                                          textColor: const Color(0xFF3899F3),
-                                          onPressed: () {
-                                            ref
-                                                .read(talentListProvider.notifier)
-                                                .toggleConnection(talent.id);
-                                          },
-                                        ),
+                                        duration: const Duration(milliseconds: 2500),
                                       ),
                                     );
                                   }

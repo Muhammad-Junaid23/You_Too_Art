@@ -176,7 +176,7 @@ class PostRepository {
   }) async {
     try {
       final post = await _db
-          .select('author_id, title, content')
+          .select('author_id, caption')
           .eq('id', postId)
           .maybeSingle();
       if (post == null) return;

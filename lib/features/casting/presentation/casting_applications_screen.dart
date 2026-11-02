@@ -281,57 +281,59 @@ class _CastingApplicationsScreenState
     required int rejectedCount,
     required int wishlistCount,
   }) {
-    return Row(
-      children: [
-        _buildTabPill(0, Icons.description_outlined, 'Received ($receivedCount)'),
-        const SizedBox(width: 8),
-        _buildTabPill(1, Icons.block_flipped, 'Rejected ($rejectedCount)'),
-        const SizedBox(width: 8),
-        _buildTabPill(2, Icons.auto_awesome_outlined, 'Wishlist ($wishlistCount)'),
-      ],
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          _buildTabPill(0, Icons.description_outlined, 'Received ($receivedCount)'),
+          const SizedBox(width: 8),
+          _buildTabPill(1, Icons.block_flipped, 'Rejected ($rejectedCount)'),
+          const SizedBox(width: 8),
+          _buildTabPill(2, Icons.auto_awesome_outlined, 'Wishlist ($wishlistCount)'),
+        ],
+      ),
     );
   }
 
   Widget _buildTabPill(int index, IconData icon, String label) {
     final isSelected = _selectedTabIndex == index;
 
-    return Expanded(
-      child: InkWell(
-        onTap: () => setState(() => _selectedTabIndex = index),
-        borderRadius: BorderRadius.circular(24),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 9),
-          decoration: BoxDecoration(
-            color: isSelected ? const Color(0xFFF0F6FF) : Colors.transparent,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: isSelected ? const Color(0xFF3899F3) : const Color(0xFFE0E0E0),
-              width: 1.2,
-            ),
+    return InkWell(
+      onTap: () => setState(() => _selectedTabIndex = index),
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFFF0F6FF) : Colors.transparent,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF3899F3) : const Color(0xFFE0E0E0),
+            width: 1.2,
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 15,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 14,
+              color: isSelected
+                  ? const Color(0xFF3899F3)
+                  : const Color(0xFF8E95A0),
+            ),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
                 color: isSelected
                     ? const Color(0xFF3899F3)
                     : const Color(0xFF8E95A0),
               ),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
-                  color: isSelected
-                      ? const Color(0xFF3899F3)
-                      : const Color(0xFF8E95A0),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -482,11 +484,13 @@ class _CastingApplicationsScreenState
 
                 // 4-Column Metadata
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     _buildMetaCol('Age', app.age),
+                    const SizedBox(width: 6),
                     _buildMetaCol('Height', app.height),
+                    const SizedBox(width: 6),
                     _buildMetaCol('Gender', app.gender),
+                    const SizedBox(width: 6),
                     _buildMetaCol('Experience', app.experience),
                   ],
                 ),

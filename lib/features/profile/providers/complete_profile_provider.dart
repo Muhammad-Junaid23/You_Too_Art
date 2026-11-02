@@ -103,8 +103,16 @@ class CompleteProfileNotifier extends Notifier<CompleteProfileState> {
           '${state.firstName.trim()} ${state.lastName.trim()}'.trim();
       final locationStr = '${state.city}, ${state.country}';
 
-      final authRole = ref.read(authProvider).role;
-      final roleStr = (authRole != null && authRole.isNotEmpty) ? authRole : 'Actor';
+      String? existingRole = ref.read(authProvider).role;
+      if (existingRole == null || existingRole.isEmpty || existingRole == 'unset') {
+        final existingUser = await ref.read(userRepositoryProvider).getById(uid);
+        if (existingUser != null && existingUser.role.isNotEmpty && existingUser.role != 'unset') {
+          existingRole = existingUser.role;
+        }
+      }
+      final roleStr = (existingRole != null && existingRole.isNotEmpty && existingRole != 'unset')
+          ? existingRole
+          : 'Director';
 
       await ref
           .read(userRepositoryProvider)

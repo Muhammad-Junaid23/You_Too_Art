@@ -6,6 +6,7 @@ import 'package:you_too_art/core/models/user_model.dart';
 import 'package:you_too_art/core/providers/supabase_providers.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
 import 'package:you_too_art/core/repositories/connection_repository.dart';
+import 'package:you_too_art/features/auth/providers/auth_provider.dart';
 import 'package:you_too_art/features/home/models/post_item.dart';
 import 'package:you_too_art/features/network/models/network_item.dart';
 import 'package:you_too_art/features/chats/providers/chat_provider.dart';
@@ -70,6 +71,7 @@ class NetworkNotifier extends Notifier<NetworkState> {
 
   @override
   NetworkState build() {
+    ref.watch(currentUidProvider);
     _connectionRepo = ref.watch(connectionRepositoryProvider);
     _activePersona = ref.watch(userPersonaProvider);
 
@@ -186,6 +188,9 @@ class NetworkNotifier extends Notifier<NetworkState> {
     } catch (_) {}
     final candidateTalents = candidateMap.values.toList();
 
+    final followingIds =
+        await _connectionRepo.getFollowingIds(_activePersona.id);
+
     final suggestions = <NetworkSuggestionItem>[];
     for (final talent in candidateTalents) {
       final rel = await _connectionRepo.getRelationshipStatus(
@@ -193,6 +198,7 @@ class NetworkNotifier extends Notifier<NetworkState> {
         targetUserId: talent.id,
       );
       final isReq = rel == 'pending_outgoing';
+      final isFol = followingIds.contains(talent.id);
       suggestions.add(
         NetworkSuggestionItem(
           id: talent.id,
@@ -200,7 +206,9 @@ class NetworkNotifier extends Notifier<NetworkState> {
           roles: talent.roles,
           avatarUrl: talent.avatarUrl,
           isRequested: isReq,
+          isFollowing: isFol,
           talentModel: talent.copyWith(
+            isFollowing: isFol,
             connectionStatus: isReq
                 ? ConnectionStatus.pendingOutgoing
                 : (rel == 'accepted'
@@ -291,10 +299,35 @@ class NetworkNotifier extends Notifier<NetworkState> {
     ref.read(chatListProvider.notifier).refreshConnections();
   }
 
-  /// Toggle sending a connection request to a suggested user
+  /// Toggle sending a connection request or following a suggested user
   Future<void> toggleSendSuggestionRequest(String targetUserId) async {
     final existing = [...state.suggestions, ...state.recommendations]
         .firstWhere((s) => s.id == targetUserId);
+
+    if (existing.isProductionHouse) {
+      final newFollowing = !existing.isFollowing;
+      final updatedSuggestions = state.suggestions.map((s) {
+        if (s.id == targetUserId) {
+          final currentCount = int.tryParse(s.talentModel.followersCount) ?? 0;
+          final nextCount = newFollowing
+              ? currentCount + 1
+              : (currentCount - 1).clamp(0, 999999);
+          return s.copyWith(
+            isFollowing: newFollowing,
+            talentModel: s.talentModel.copyWith(
+              isFollowing: newFollowing,
+              followersCount: nextCount.toString(),
+            ),
+          );
+        }
+        return s;
+      }).toList();
+
+      state = state.copyWith(suggestions: updatedSuggestions);
+      await _connectionRepo.toggleFollowing(_activePersona.id, targetUserId);
+      ref.read(talentListProvider.notifier).fetchTalents();
+      return;
+    }
 
     final newStatus = !existing.isRequested;
 

@@ -133,6 +133,8 @@ class _VerifyOtpScreenState extends ConsumerState<VerifyOtpScreen> {
     final text = Theme.of(context).textTheme;
     final isLoading = ref.watch(authProvider).isLoading;
 
+    final isNarrow = MediaQuery.sizeOf(context).width < 340;
+
     return Scaffold(
       backgroundColor: colors.surface,
       body: SafeArea(
@@ -140,8 +142,8 @@ class _VerifyOtpScreenState extends ConsumerState<VerifyOtpScreen> {
           children: [
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
+                padding: EdgeInsets.symmetric(
+                  horizontal: isNarrow ? 14 : 20,
                   vertical: 16,
                 ),
                 child: Column(
@@ -217,10 +219,13 @@ class _VerifyOtpScreenState extends ConsumerState<VerifyOtpScreen> {
                     const SizedBox(height: 28),
 
                     // ─── Resend Code Section ────────────────
-                    Row(
+                    Wrap(
+                      spacing: 4,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         Text(
-                          "Didn't receive code? ",
+                          "Didn't receive code?",
                           style: text.bodyMedium?.copyWith(
                             color: colors.textSecondary,
                             fontSize: 13,
@@ -256,7 +261,7 @@ class _VerifyOtpScreenState extends ConsumerState<VerifyOtpScreen> {
 
             // Bottom pinned: button + terms
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+              padding: EdgeInsets.fromLTRB(isNarrow ? 14 : 20, 0, isNarrow ? 14 : 20, 16),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -329,27 +334,33 @@ class _OtpBoxes extends StatelessWidget {
             valueListenable: controller,
             builder: (context, value, _) {
               final code = value.text;
+              final isNarrow = MediaQuery.sizeOf(context).width < 340;
               return Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: List.generate(length, (i) {
                   final filled = i < code.length;
-                  return Container(
-                    width: 48,
-                    height: 52,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: colors.surface,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: filled ? colors.primary : colors.border,
-                        width: 1,
+                  return Expanded(
+                    child: Container(
+                      height: isNarrow ? 46 : 52,
+                      margin: EdgeInsets.symmetric(horizontal: isNarrow ? 1.5 : 3),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: colors.surface,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: filled ? colors.primary : colors.border,
+                          width: 1,
+                        ),
                       ),
-                    ),
-                    child: Text(
-                      filled ? code[i] : '',
-                      style: text.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: colors.textPrimary,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          filled ? code[i] : '',
+                          style: text.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: colors.textPrimary,
+                          ),
+                        ),
                       ),
                     ),
                   );
@@ -369,6 +380,7 @@ class _TermsLine extends StatelessWidget {
     final colors = AppColors.of(context);
     final text = Theme.of(context).textTheme;
     return Text.rich(
+      textAlign: TextAlign.center,
       TextSpan(
         style: text.bodySmall?.copyWith(color: colors.textSecondary),
         children: [

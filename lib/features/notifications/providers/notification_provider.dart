@@ -4,6 +4,7 @@ import 'package:you_too_art/core/providers/supabase_providers.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
 import 'package:you_too_art/core/repositories/connection_repository.dart';
 import 'package:you_too_art/core/repositories/notification_repository.dart';
+import 'package:you_too_art/features/auth/providers/auth_provider.dart';
 import 'package:you_too_art/features/chats/providers/chat_provider.dart';
 import 'package:you_too_art/features/network/providers/network_provider.dart';
 import 'package:you_too_art/features/notifications/models/notification_item.dart';
@@ -40,31 +41,45 @@ class NotificationNotifier extends Notifier<NotificationState> {
   NotificationState build() {
     _notifRepo = ref.watch(notificationRepositoryProvider);
     _connectionRepo = ref.watch(connectionRepositoryProvider);
+    final currentUid = ref.watch(currentUidProvider);
     final activePersona = ref.watch(userPersonaProvider);
+    final effectiveUserId = (currentUid != null && currentUid.isNotEmpty)
+        ? currentUid
+        : activePersona.id;
 
     ref.onDispose(() {
       _sub?.cancel();
     });
 
-    _subscribe(activePersona.id);
+    if (effectiveUserId.isNotEmpty) {
+      Future.microtask(() => _subscribe(effectiveUserId));
+    }
     return const NotificationState(isLoading: true);
   }
 
   void _subscribe(String userId) {
     _sub?.cancel();
     _sub = _notifRepo.watchNotifications(userId).listen((items) {
-      state = state.copyWith(items: items, isLoading: false);
+      Future.microtask(() {
+        state = state.copyWith(items: items, isLoading: false);
+      });
     });
+  }
+
+  String _currentEffectiveId() {
+    final curUid = ref.read(currentUidProvider);
+    if (curUid != null && curUid.isNotEmpty) return curUid;
+    return ref.read(userPersonaProvider).id;
   }
 
   /// Accept connection request from notification tile
   Future<void> acceptConnection(NotificationItem item) async {
-    final activePersona = ref.read(userPersonaProvider);
+    final myId = _currentEffectiveId();
     final senderId = item.senderId ?? item.actorId;
 
     if (senderId != null && senderId.isNotEmpty) {
       await _connectionRepo.acceptConnection(
-        userId: activePersona.id,
+        userId: myId,
         senderUserId: senderId,
       );
       // Immediately refresh all screens: chats, talent, and network
@@ -81,12 +96,12 @@ class NotificationNotifier extends Notifier<NotificationState> {
 
   /// Decline connection request from notification tile
   Future<void> declineConnection(NotificationItem item) async {
-    final activePersona = ref.read(userPersonaProvider);
+    final myId = _currentEffectiveId();
     final senderId = item.senderId ?? item.actorId;
 
     if (senderId != null && senderId.isNotEmpty) {
       await _connectionRepo.declineConnection(
-        userId: activePersona.id,
+        userId: myId,
         senderUserId: senderId,
       );
       // Immediately refresh all screens: chats, talent, and network
@@ -113,14 +128,14 @@ class NotificationNotifier extends Notifier<NotificationState> {
 
   /// Mark all notifications as read for current persona
   Future<void> markAllAsRead() async {
-    final activePersona = ref.read(userPersonaProvider);
-    await _notifRepo.markAllAsRead(activePersona.id);
+    final myId = _currentEffectiveId();
+    await _notifRepo.markAllAsRead(myId);
   }
 
   /// Clear all notifications for current persona
   Future<void> clearAll() async {
-    final activePersona = ref.read(userPersonaProvider);
-    await _notifRepo.clearAll(activePersona.id);
+    final myId = _currentEffectiveId();
+    await _notifRepo.clearAll(myId);
   }
 }
 

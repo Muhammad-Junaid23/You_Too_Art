@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:you_too_art/app/config/routes.dart';
 import 'package:you_too_art/core/models/user_model.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
 import 'package:you_too_art/core/services/app_persistence_service.dart';
@@ -9,7 +11,6 @@ import 'package:you_too_art/features/account/presentation/transaction_history_sc
 import 'package:you_too_art/features/auth/providers/auth_provider.dart';
 import 'package:you_too_art/features/home/providers/home_feed_provider.dart';
 import 'package:you_too_art/features/network/providers/network_provider.dart';
-import 'package:you_too_art/features/profile/presentation/user_profile_screen.dart';
 import 'package:you_too_art/features/talent/models/talent_model.dart';
 
 /// "My Account" screen matching the exact Figma design
@@ -56,7 +57,7 @@ class AccountScreen extends ConsumerWidget {
 
             // ─── User Profile Row ──────────────────────────────
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Row(
                 children: [
                   // Avatar and Name clickable
@@ -166,7 +167,7 @@ class AccountScreen extends ConsumerWidget {
                           Text(
                             'View Profile',
                             style: TextStyle(
-                              fontSize: 14,
+                              fontSize: 13,
                               fontWeight: FontWeight.w600,
                               color: Color(0xFF3899F3),
                             ),
@@ -358,10 +359,6 @@ class AccountScreen extends ConsumerWidget {
       );
     }
 
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => UserProfileScreen(initialTalent: talent),
-      ),
-    );
+    context.push(AppRoutes.profileDetail, extra: talent);
   }
 }

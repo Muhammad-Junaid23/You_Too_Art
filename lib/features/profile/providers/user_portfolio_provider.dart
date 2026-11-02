@@ -8,16 +8,41 @@ import 'package:you_too_art/core/services/app_persistence_service.dart';
 import 'package:you_too_art/features/auth/providers/auth_provider.dart';
 
 /// Extracts the 11-character YouTube video ID from various YouTube URL formats.
-/// Supports standard watch, short-links, embeds, and YouTube Shorts.
+/// Supports standard watch, short-links, embeds, YouTube Shorts, and thumbnail URLs.
 String? extractYouTubeVideoId(String url) {
   final trimmed = url.trim();
   if (trimmed.isEmpty) return null;
   final regExp = RegExp(
-    r'(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?|shorts)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})',
+    r'(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:vi?|e(?:mbed)?|shorts)\/|\S*?[?&]v=)|youtu\.be\/|ytimg\.com\/vi\/)([a-zA-Z0-9_-]{11})',
     caseSensitive: false,
   );
   final match = regExp.firstMatch(trimmed);
   return match?.group(1);
+}
+
+/// Resolves a video link to a playable destination (e.g. YouTube watch URL if thumbnail or video ID).
+String resolvePlayableVideoUrl(String rawUrl) {
+  final trimmed = rawUrl.trim();
+  if (trimmed.isEmpty) return '';
+  final ytId = extractYouTubeVideoId(trimmed);
+  if (ytId != null && ytId.isNotEmpty) {
+    return 'https://www.youtube.com/watch?v=$ytId';
+  }
+  return trimmed;
+}
+
+/// Unpacks any proxy wrapper (such as images.weserv.nl) to return the original media URL.
+String unpackOriginalMediaUrl(String url) {
+  final trimmed = url.trim();
+  if (trimmed.startsWith('https://images.weserv.nl/?url=') ||
+      trimmed.startsWith('http://images.weserv.nl/?url=')) {
+    final uri = Uri.tryParse(trimmed);
+    final inner = uri?.queryParameters['url'];
+    if (inner != null && inner.isNotEmpty) {
+      return inner;
+    }
+  }
+  return trimmed;
 }
 
 /// Returns the YouTube thumbnail URL (hqdefault) for a given video URL or ID.
@@ -127,9 +152,11 @@ class WorkMediaItem {
       };
 
   factory WorkMediaItem.fromJson(Map<String, dynamic> json) {
-    final rawMediaUrl = json['mediaUrl'] as String? ?? '';
-    final rawUrl = json['url'] as String? ?? '';
-    final isVideo = json['isVideo'] as bool? ?? false;
+    final rawMediaUrl =
+        (json['media_url'] ?? json['mediaUrl']) as String? ?? '';
+    final rawUrl = (json['url'] ?? rawMediaUrl) as String? ?? '';
+    final isVideo = json['isVideo'] as bool? ??
+        (json['media_type']?.toString().toLowerCase() == 'video');
 
     // Auto-fix any YouTube watch URLs or empty video thumbnails
     var effectiveMedia = rawMediaUrl;
@@ -146,7 +173,9 @@ class WorkMediaItem {
     return WorkMediaItem(
       id: json['id'] as String? ?? '',
       title: json['title'] as String? ?? '',
-      url: rawUrl,
+      url: isVideo
+          ? resolvePlayableVideoUrl(rawUrl.isNotEmpty ? rawUrl : rawMediaUrl)
+          : unpackOriginalMediaUrl(rawUrl.isNotEmpty ? rawUrl : rawMediaUrl),
       mediaUrl: effectiveMedia,
       isVideo: isVideo,
       lastUpdated: json['lastUpdated'] as String? ?? 'Just Now',
@@ -246,16 +275,22 @@ class UserPortfolioNotifier extends Notifier<UserPortfolioState> {
     }
   }
 
-  void deleteVideo(int index, [String? targetUserId]) {
+  void deleteVideo(int index, [String? targetUserId, WorkMediaItem? itemToDelete]) {
     final uid = _resolveUid(targetUserId);
     final current = AppPersistenceService.instance.getPortfolio(uid);
-    if (index >= 0 && index < current.videos.length) {
-      final updatedList = List<WorkMediaItem>.from(current.videos);
+    final updatedList = List<WorkMediaItem>.from(current.videos);
+    if (index >= 0 && index < updatedList.length) {
       updatedList.removeAt(index);
-      final updated = current.copyWith(videos: updatedList);
-      AppPersistenceService.instance.savePortfolio(uid, updated);
-      state = updated;
     }
+    if (itemToDelete != null) {
+      updatedList.removeWhere((v) =>
+          v.id == itemToDelete.id ||
+          (v.title.trim() == itemToDelete.title.trim() &&
+              (v.url == itemToDelete.url || v.mediaUrl == itemToDelete.mediaUrl)));
+    }
+    final updated = current.copyWith(videos: updatedList);
+    AppPersistenceService.instance.savePortfolio(uid, updated);
+    state = updated;
   }
 
   void addPhoto(WorkMediaItem item, [String? targetUserId]) {
@@ -278,16 +313,22 @@ class UserPortfolioNotifier extends Notifier<UserPortfolioState> {
     }
   }
 
-  void deletePhoto(int index, [String? targetUserId]) {
+  void deletePhoto(int index, [String? targetUserId, WorkMediaItem? itemToDelete]) {
     final uid = _resolveUid(targetUserId);
     final current = AppPersistenceService.instance.getPortfolio(uid);
-    if (index >= 0 && index < current.photos.length) {
-      final updatedList = List<WorkMediaItem>.from(current.photos);
+    final updatedList = List<WorkMediaItem>.from(current.photos);
+    if (index >= 0 && index < updatedList.length) {
       updatedList.removeAt(index);
-      final updated = current.copyWith(photos: updatedList);
-      AppPersistenceService.instance.savePortfolio(uid, updated);
-      state = updated;
     }
+    if (itemToDelete != null) {
+      updatedList.removeWhere((p) =>
+          p.id == itemToDelete.id ||
+          (p.title.trim() == itemToDelete.title.trim() &&
+              (p.url == itemToDelete.url || p.mediaUrl == itemToDelete.mediaUrl)));
+    }
+    final updated = current.copyWith(photos: updatedList);
+    AppPersistenceService.instance.savePortfolio(uid, updated);
+    state = updated;
   }
 }
 

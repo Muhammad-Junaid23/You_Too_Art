@@ -170,7 +170,7 @@ class NotificationsScreen extends ConsumerWidget {
 
     if (item.type == NotificationType.castingCall ||
         item.type == NotificationType.castingApplication) {
-      context.push(AppRoutes.casting);
+      context.go(AppRoutes.casting);
       return;
     }
 
@@ -345,7 +345,9 @@ class _NotificationTile extends StatelessWidget {
                     const SizedBox(height: 10),
                     if (item.requestStatus ==
                         ConnectionRequestNotificationStatus.pending)
-                      Row(
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 6,
                         children: [
                           // Accept Pill
                           InkWell(
@@ -353,8 +355,8 @@ class _NotificationTile extends StatelessWidget {
                             borderRadius: BorderRadius.circular(20),
                             child: Container(
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 7,
+                                horizontal: 12,
+                                vertical: 6,
                               ),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFE0F7EF),
@@ -365,23 +367,22 @@ class _NotificationTile extends StatelessWidget {
                                 children: [
                                   Icon(
                                     Icons.check,
-                                    size: 16,
+                                    size: 15,
                                     color: Color(0xFF00C48C),
                                   ),
-                                  SizedBox(width: 5),
+                                  SizedBox(width: 4),
                                   Text(
                                     'Accept',
                                     style: TextStyle(
                                       color: Color(0xFF00C48C),
                                       fontWeight: FontWeight.w600,
-                                      fontSize: 13,
+                                      fontSize: 12,
                                     ),
                                   ),
                                 ],
                               ),
                             ),
                           ),
-                          const SizedBox(width: 10),
 
                           // Reject Pill
                           InkWell(
@@ -389,8 +390,8 @@ class _NotificationTile extends StatelessWidget {
                             borderRadius: BorderRadius.circular(20),
                             child: Container(
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 7,
+                                horizontal: 12,
+                                vertical: 6,
                               ),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFFDE8E8),
@@ -401,16 +402,16 @@ class _NotificationTile extends StatelessWidget {
                                 children: [
                                   Icon(
                                     Icons.block,
-                                    size: 15,
+                                    size: 14,
                                     color: Color(0xFFE02424),
                                   ),
-                                  SizedBox(width: 5),
+                                  SizedBox(width: 4),
                                   Text(
                                     'Reject',
                                     style: TextStyle(
                                       color: Color(0xFFE02424),
                                       fontWeight: FontWeight.w600,
-                                      fontSize: 13,
+                                      fontSize: 12,
                                     ),
                                   ),
                                 ],

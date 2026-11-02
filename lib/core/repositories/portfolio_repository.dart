@@ -63,13 +63,50 @@ class PortfolioRepository {
     }
   }
 
+  /// Update an existing portfolio item
+  Future<void> updatePortfolioItem({
+    required String itemId,
+    required String title,
+    required String mediaUrl,
+  }) async {
+    if (_client.auth.currentUser == null || itemId.startsWith('local-')) return;
+    try {
+      if (!itemId.startsWith('port_') && itemId.length >= 30) {
+        await _db.update({
+          'title': title,
+          'media_url': mediaUrl,
+        }).eq('id', itemId);
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('PortfolioRepository.updatePortfolioItem: $e');
+    }
+  }
+
   /// Delete a portfolio item by [itemId].
-  Future<void> deletePortfolioItem(String itemId) async {
-    if (_client.auth.currentUser == null || itemId.startsWith('local-')) {
+  Future<void> deletePortfolioItem(
+    String itemId, {
+    String? userId,
+    String? title,
+    String? mediaUrl,
+  }) async {
+    if (_client.auth.currentUser == null) {
       return;
     }
     try {
-      await _db.delete().eq('id', itemId);
+      if (!itemId.startsWith('local-') &&
+          !itemId.startsWith('port_') &&
+          itemId.length >= 30) {
+        await _db.delete().eq('id', itemId);
+      } else if (userId != null && (title != null || mediaUrl != null)) {
+        var query = _db.delete().eq('user_id', userId);
+        if (title != null && title.isNotEmpty) {
+          query = query.eq('title', title);
+        }
+        if (mediaUrl != null && mediaUrl.isNotEmpty) {
+          query = query.eq('media_url', mediaUrl);
+        }
+        await query;
+      }
     } catch (e) {
       if (kDebugMode) debugPrint('PortfolioRepository.deletePortfolioItem: $e');
     }

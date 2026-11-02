@@ -45,12 +45,16 @@ class QuickShareBox extends ConsumerWidget {
                         radius: 20,
                       ),
                       const SizedBox(width: 12),
-                      const Text(
-                        'Have something to share?',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Color(0xFF9B9B9B),
-                          fontWeight: FontWeight.w400,
+                      const Expanded(
+                        child: Text(
+                          'Have something to share?',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFF9B9B9B),
+                            fontWeight: FontWeight.w400,
+                          ),
                         ),
                       ),
                     ],

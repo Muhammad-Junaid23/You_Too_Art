@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
-import 'package:you_too_art/app/config/routes.dart';
 import 'package:you_too_art/features/chats/providers/chat_provider.dart';
 
 class _NavItem {
@@ -69,17 +68,16 @@ class MainWrapper extends ConsumerWidget {
           top: false,
           child: Container(
             height: 58,
-            padding: const EdgeInsets.symmetric(horizontal: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 2),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: List.generate(_items.length, (index) {
                 final item = _items[index];
                 final isSelected = index == currentIndex;
 
                 Widget iconWidget = SvgPicture.asset(
                   item.svgPath,
-                  width: isSelected ? 20 : 22,
-                  height: isSelected ? 20 : 22,
+                  width: 20,
+                  height: 20,
                   colorFilter: ColorFilter.mode(
                     isSelected
                         ? const Color(0xFF3899F3)
@@ -126,51 +124,56 @@ class MainWrapper extends ConsumerWidget {
                   );
                 }
 
-                return GestureDetector(
-                  onTap: () {
-                    if (index < AppRoutes.branchNavKeys.length) {
-                      final targetNavKey = AppRoutes.branchNavKeys[index];
-                      if (targetNavKey.currentState?.canPop() == true) {
-                        targetNavKey.currentState?.popUntil((route) => route.isFirst);
-                      }
-                    }
-                    navigationShell.goBranch(
-                      index,
-                      initialLocation: true,
-                    );
-                  },
-                  behavior: HitTestBehavior.opaque,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    curve: Curves.easeInOut,
-                    padding: isSelected
-                        ? const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 7,
-                          )
-                        : const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? const Color(0xFFE7F3FE)
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        iconWidget,
-                        if (isSelected) ...[
-                          const SizedBox(width: 6),
-                          Text(
-                            item.label,
-                            style: const TextStyle(
-                              color: Color(0xFF3899F3),
-                              fontWeight: FontWeight.w600,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ],
-                      ],
+                return Expanded(
+                  flex: isSelected ? 2 : 1,
+                  child: Center(
+                    child: GestureDetector(
+                      onTap: () {
+                        navigationShell.goBranch(
+                          index,
+                          initialLocation: index == navigationShell.currentIndex,
+                        );
+                      },
+                      behavior: HitTestBehavior.opaque,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        curve: Curves.easeInOut,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? const Color(0xFFE7F3FE)
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            iconWidget,
+                            if (isSelected) ...[
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    item.label,
+                                    maxLines: 1,
+                                    style: const TextStyle(
+                                      color: Color(0xFF3899F3),
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 11.0,
+                                      letterSpacing: -0.2,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 );

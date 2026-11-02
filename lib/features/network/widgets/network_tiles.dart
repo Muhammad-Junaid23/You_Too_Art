@@ -307,11 +307,11 @@ class NetworkSuggestionCard extends StatelessWidget {
                       height: 36,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color: suggestion.isRequested
-                            ? const Color(0xFFE7F3FE)
-                            : Colors.black,
+                        color: suggestion.isProductionHouse
+                            ? (suggestion.isFollowing ? const Color(0xFFE7F3FE) : Colors.black)
+                            : (suggestion.isRequested ? const Color(0xFFE7F3FE) : Colors.black),
                         borderRadius: BorderRadius.circular(20),
-                        border: suggestion.isRequested
+                        border: (suggestion.isProductionHouse ? suggestion.isFollowing : suggestion.isRequested)
                             ? Border.all(
                                 color: const Color(0xFF3899F3),
                                 width: 1.2,
@@ -319,11 +319,13 @@ class NetworkSuggestionCard extends StatelessWidget {
                             : null,
                       ),
                       child: Text(
-                        suggestion.isRequested ? 'Request Sent' : 'Send Request',
+                        suggestion.isProductionHouse
+                            ? (suggestion.isFollowing ? 'Following' : 'Follow')
+                            : (suggestion.isRequested ? 'Request Sent' : 'Send Request'),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: suggestion.isRequested
+                          color: (suggestion.isProductionHouse ? suggestion.isFollowing : suggestion.isRequested)
                               ? const Color(0xFF3899F3)
                               : Colors.white,
                           fontSize: 11.5,

@@ -671,16 +671,33 @@ class ConnectionRepository {
     return list.toSet();
   }
 
+  static const String _followersCountPrefKey = 'yt_prod_followers_count_';
+
+  /// Get total followers count for a production house
+  Future<int> getFollowersCount(String targetId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final count = prefs.getInt('$_followersCountPrefKey$targetId');
+    if (count != null) return count;
+    return 0;
+  }
+
   Future<void> toggleFollowing(String userId, String targetId) async {
     final prefs = await SharedPreferences.getInstance();
     final key = '$_followingPrefKeyPrefix$userId';
+    final countKey = '$_followersCountPrefKey$targetId';
     final set = (prefs.getStringList(key) ?? []).toSet();
+    int followers = prefs.getInt(countKey) ?? 0;
+
     if (set.contains(targetId)) {
       set.remove(targetId);
+      followers = (followers - 1).clamp(0, 999999);
     } else {
       set.add(targetId);
+      followers = followers + 1;
     }
     await prefs.setStringList(key, set.toList());
+    await prefs.setInt(countKey, followers);
+    notifyChanges();
   }
 
   /// Real-time stream of connections for a given [uid].

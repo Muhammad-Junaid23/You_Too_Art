@@ -137,7 +137,14 @@ class CastingNotifier extends Notifier<CastingState> {
     // Clean up any globally stamped isApplied flags from stored calls.
     // Application status is user-specific and evaluated dynamically per persona!
     calls = calls
-        .map((c) => c.copyWith(isApplied: false, appliedAt: null))
+        .map((c) {
+          final appsCount = apps.where((a) => a.castingCallId == c.id).length;
+          return c.copyWith(
+            isApplied: false,
+            appliedAt: null,
+            applicantsCount: appsCount > c.applicantsCount ? appsCount : c.applicantsCount,
+          );
+        })
         .toList()
       ..sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
 
@@ -207,13 +214,20 @@ class CastingNotifier extends Notifier<CastingState> {
           }
         }
 
+        final mergedApps = appMap.values.toList();
+
         final mergedCalls = callMap.values
             .where((c) => !c.isDeleted)
-            .map((c) => c.copyWith(isApplied: false, appliedAt: null))
+            .map((c) {
+              final appsCount = mergedApps.where((a) => a.castingCallId == c.id).length;
+              return c.copyWith(
+                isApplied: false,
+                appliedAt: null,
+                applicantsCount: appsCount > c.applicantsCount ? appsCount : c.applicantsCount,
+              );
+            })
             .toList()
           ..sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
-
-        final mergedApps = appMap.values.toList();
 
         state = state.copyWith(
           calls: mergedCalls,
@@ -478,6 +492,12 @@ class CastingNotifier extends Notifier<CastingState> {
                 c.authorName == activePersona.name ||
                 AppPersistenceService.instance.isSamePersona(c.authorId, currentUserId) ||
                 AppPersistenceService.instance.isSamePersona(c.authorId, activePersona.id)))
+        .map((c) {
+          final appsCount = state.applications.where((a) => a.castingCallId == c.id).length;
+          return c.copyWith(
+            applicantsCount: appsCount > c.applicantsCount ? appsCount : c.applicantsCount,
+          );
+        })
         .toList();
   }
 

@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:you_too_art/core/constants/supabase_tables.dart';
-import 'package:you_too_art/core/providers/user_persona_provider.dart';
 import 'package:you_too_art/features/notifications/models/notification_item.dart';
 
 /// Centralized repository for managing in-app notifications.
@@ -31,11 +30,7 @@ class NotificationRepository {
       StreamController<void>.broadcast();
 
   String _normalizeUserId(String uid) {
-    final actorPersona = UserPersonaNotifier.buildActorPersona();
-    if (uid == UserPersonaNotifier.actorDefaultId || uid == actorPersona.id) {
-      return UserPersonaNotifier.actorDefaultId;
-    }
-    return uid;
+    return uid.trim();
   }
 
   static bool isValidUuid(String id) {

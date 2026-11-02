@@ -18,7 +18,9 @@ class TalentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isProd = talent.isProductionHouse;
+    final isProd = talent.isProductionHouse ||
+        talent.roles.toLowerCase().contains('production') ||
+        talent.roles.toLowerCase().contains('studio');
 
     String buttonText;
     Color buttonBg;
@@ -71,11 +73,13 @@ class TalentCard extends StatelessWidget {
         color: const Color(0xFFF0F6FE),
         borderRadius: BorderRadius.circular(16),
       ),
-      padding: const EdgeInsets.fromLTRB(10, 16, 10, 14),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+      child: SingleChildScrollView(
+        physics: const NeverScrollableScrollPhysics(),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
           // Tappable Avatar & Info Section opening Profile
           GestureDetector(
             onTap: onTapProfile,
@@ -93,16 +97,16 @@ class TalentCard extends StatelessWidget {
                   child: AppAvatar(
                     imageUrl: talent.avatarUrl,
                     name: talent.name,
-                    radius: 36,
+                    radius: 34,
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
 
                 // Talent Name
                 Text(
                   talent.name,
                   style: const TextStyle(
-                    fontSize: 15,
+                    fontSize: 14.5,
                     fontWeight: FontWeight.bold,
                     color: Colors.black,
                   ),
@@ -110,13 +114,13 @@ class TalentCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 3),
+                const SizedBox(height: 2),
 
                 // Talent Roles / Profession
                 Text(
                   talent.roles,
                   style: const TextStyle(
-                    fontSize: 12,
+                    fontSize: 11.5,
                     color: Color(0xFF8E95A0),
                     fontWeight: FontWeight.w400,
                   ),
@@ -127,7 +131,7 @@ class TalentCard extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 13),
+          const SizedBox(height: 10),
 
           // Action Buttons: Connect Pill + Mail Box
           Row(
@@ -141,19 +145,24 @@ class TalentCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(20),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
-                      height: 36,
+                      height: 34,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
                         color: buttonBg,
                         borderRadius: BorderRadius.circular(20),
                         border: buttonBorder,
                       ),
-                      child: Text(
-                        buttonText,
-                        style: TextStyle(
-                          color: buttonTextColor,
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w600,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Text(
+                          buttonText,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: buttonTextColor,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ),
@@ -170,8 +179,8 @@ class TalentCard extends StatelessWidget {
                   onTap: onMessage,
                   customBorder: const CircleBorder(),
                   child: Container(
-                    width: 36,
-                    height: 36,
+                    width: 34,
+                    height: 34,
                     decoration: BoxDecoration(
                       color: Colors.white,
                       shape: BoxShape.circle,
@@ -183,7 +192,7 @@ class TalentCard extends StatelessWidget {
                     alignment: Alignment.center,
                     child: const Icon(
                       Icons.mail_outline_rounded,
-                      size: 18,
+                      size: 17,
                       color: Color(0xFF474B51),
                     ),
                   ),
@@ -193,6 +202,7 @@ class TalentCard extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 }

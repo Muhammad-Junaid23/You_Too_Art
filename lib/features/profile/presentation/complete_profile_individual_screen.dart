@@ -101,8 +101,22 @@ class _CompleteProfileIndividualScreenState
         : ref.watch(userPortfolioProvider(uid));
 
     final allItems = portfolioAsync.value ?? const <Map<String, dynamic>>[];
-    final videos = allItems.where((i) => i['media_type'] == 'video').toList();
-    final photos = allItems.where((i) => i['media_type'] == 'photo').toList();
+
+    // Deduplicate any repeated items by title and media type
+    final seen = <String>{};
+    final uniqueItems = <Map<String, dynamic>>[];
+    for (final item in allItems) {
+      final titleKey = (item['title'] ?? '').toString().toLowerCase().trim();
+      final typeKey = (item['media_type'] ?? '').toString().toLowerCase().trim();
+      final key = '$typeKey:$titleKey';
+      if (titleKey.isNotEmpty && !seen.add(key)) {
+        continue;
+      }
+      uniqueItems.add(item);
+    }
+
+    final videos = uniqueItems.where((i) => i['media_type'] == 'video').toList();
+    final photos = uniqueItems.where((i) => i['media_type'] == 'photo').toList();
 
     final auth = ref.watch(authProvider);
     final countriesAsync = ref.watch(countriesProvider);
@@ -395,24 +409,26 @@ class _CompleteProfileIndividualScreenState
     try {
       final uid = ref.read(authProvider.notifier).currentUid;
       if (uid == null) throw StateError('Not signed in');
+      final isVideo = type.toLowerCase() == 'video';
+      final rawMediaUrl = result['url']!;
+      final sanitized = resolvePortfolioMediaUrl(rawMediaUrl, isVideo: isVideo);
+      final finalUrl = sanitized.isNotEmpty ? sanitized : rawMediaUrl;
+
       await ref
           .read(portfolioRepositoryProvider)
           .addPortfolioItem(
             userId: uid,
             title: result['title']!,
-            mediaUrl: result['url']!,
+            mediaUrl: finalUrl,
             mediaType: type,
           );
       ref.invalidate(userPortfolioProvider(uid));
 
-      final isVideo = type.toLowerCase() == 'video';
-      final rawMediaUrl = result['url']!;
-      final sanitized = resolvePortfolioMediaUrl(rawMediaUrl, isVideo: isVideo);
       final newItem = WorkMediaItem(
         id: 'port_${DateTime.now().millisecondsSinceEpoch}',
         title: result['title']!,
-        url: rawMediaUrl,
-        mediaUrl: sanitized.isNotEmpty ? sanitized : rawMediaUrl,
+        url: finalUrl,
+        mediaUrl: finalUrl,
         isVideo: isVideo,
         lastUpdated: 'Just Now',
       );
@@ -641,16 +657,40 @@ class _PortfolioTile extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: Container(
+              width: 56,
+              height: 56,
               color: colors.avatarBg,
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Icon(
-              isVideo ? Icons.play_circle_outline : Icons.image_outlined,
-              color: colors.link,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  buildPortfolioImage(
+                    isVideo
+                        ? (extractYouTubeThumbnail(url) ?? url)
+                        : resolvePortfolioMediaUrl(url),
+                    width: 56,
+                    height: 56,
+                    fit: BoxFit.cover,
+                  ),
+                  if (isVideo)
+                    Center(
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.45),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.play_arrow_rounded,
+                          color: Colors.white,
+                          size: 18,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
           const SizedBox(width: 12),
