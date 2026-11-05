@@ -140,8 +140,19 @@ class NotificationRepository {
       final combined = <NotificationItem>[...incoming, ...currentList];
       final deduped = _deduplicateNotifications(combined);
 
-      _userNotifications[normUserId] = deduped;
-      controller.add(deduped);
+      // Strictly isolate notifications:
+      // 1. Only show notifications addressed to this user (recipientId == normUserId)
+      // 2. Never show notifications where this user was the sender/actor
+      final filtered = deduped.where((item) {
+        final rId = _normalizeUserId(item.recipientId ?? '');
+        final aId = _normalizeUserId(item.actorId ?? item.senderId ?? '');
+        if (rId.isNotEmpty && rId != normUserId) return false;
+        if (aId.isNotEmpty && aId == normUserId) return false;
+        return true;
+      }).toList();
+
+      _userNotifications[normUserId] = filtered;
+      controller.add(filtered);
     }
 
     controller = StreamController<List<NotificationItem>>.broadcast(
@@ -153,8 +164,15 @@ class NotificationRepository {
         // Listen to local store mutations
         localSub = _updateController.stream.listen((_) {
           final currentLocal = _userNotifications[normUserId] ?? [];
+          final filtered = currentLocal.where((item) {
+            final rId = _normalizeUserId(item.recipientId ?? '');
+            final aId = _normalizeUserId(item.actorId ?? item.senderId ?? '');
+            if (rId.isNotEmpty && rId != normUserId) return false;
+            if (aId.isNotEmpty && aId == normUserId) return false;
+            return true;
+          }).toList();
           if (!controller.isClosed) {
-            controller.add(List.from(currentLocal));
+            controller.add(filtered);
           }
         });
 

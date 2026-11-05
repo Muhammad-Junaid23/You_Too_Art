@@ -117,7 +117,6 @@ class CastingNotifier extends Notifier<CastingState> {
         c.authorId == 'a1111111-1111-1111-1111-111111111111');
 
     apps.removeWhere((a) =>
-        a.id.startsWith('app_') ||
         a.id == 'app_seed_call1' ||
         a.id == 'app_1' ||
         a.id == 'app_2' ||
@@ -128,7 +127,6 @@ class CastingNotifier extends Notifier<CastingState> {
         a.projectTitle == 'Lahore Tales' ||
         a.projectTitle == 'Melody in the Rain' ||
         a.projectTitle == 'Midnight Sun' ||
-        a.castingCallId.startsWith('call_') ||
         a.castingCallId == 'call_1' ||
         a.castingCallId == 'call_2' ||
         a.castingCallId == 'call_3' ||
@@ -270,7 +268,7 @@ class CastingNotifier extends Notifier<CastingState> {
     // 2. Create new application
     final call = state.calls.firstWhere((c) => c.id == callId);
     final newApp = CastingApplicationModel(
-      id: 'app_${now.millisecondsSinceEpoch}',
+      id: 'application_${now.microsecondsSinceEpoch}',
       castingCallId: callId,
       projectTitle: call.projectTitle,
       applicantId: activePersona.id,
@@ -318,6 +316,32 @@ class CastingNotifier extends Notifier<CastingState> {
     try {
       final repo = ref.read(castingRepositoryProvider);
       await repo.createCastingCall(newCall);
+    } catch (_) {}
+
+    // Broadcast notification to network connections about newly created casting call
+    try {
+      final notifRepo = ref.read(notificationRepositoryProvider);
+      final netRepo = ref.read(connectionRepositoryProvider);
+      final connections = await netRepo.fetchAcceptedConnections(newCall.authorId);
+      for (final conn in connections) {
+        final peerId = conn['connected_user_id']?.toString() == newCall.authorId
+            ? conn['user_id']?.toString()
+            : conn['connected_user_id']?.toString();
+        if (peerId != null && peerId.isNotEmpty && peerId != newCall.authorId) {
+          await notifRepo.sendNotification(
+            recipientId: peerId,
+            actorId: newCall.authorId,
+            type: NotificationType.castingApplication,
+            primarySubject: newCall.authorName,
+            actionText: 'posted a new casting call:',
+            targetObject: newCall.projectTitle,
+            avatarUrl: newCall.authorAvatar,
+            isCastingIcon: true,
+            entityType: 'casting_call',
+            entityId: newCall.id,
+          );
+        }
+      }
     } catch (_) {}
   }
 
@@ -377,18 +401,27 @@ class CastingNotifier extends Notifier<CastingState> {
       await repo.updateApplicationStatus(applicationId, newStatus.name);
     } catch (_) {}
 
-    // Trigger in-app notification when an application is accepted
-    if (newStatus == ApplicationStatus.accepted && targetApp != null) {
+    // Trigger in-app notification when an application status updates (accepted, rejected, wishlisted)
+    if (targetApp != null &&
+        (newStatus == ApplicationStatus.accepted ||
+            newStatus == ApplicationStatus.rejected ||
+            newStatus == ApplicationStatus.wishlisted)) {
       try {
         final creator = ref.read(userPersonaProvider);
         final notifRepo = ref.read(notificationRepositoryProvider);
+
+        final action = newStatus == ApplicationStatus.accepted
+            ? 'accepted your application for'
+            : (newStatus == ApplicationStatus.wishlisted
+                ? 'shortlisted your application for'
+                : 'declined your application for');
 
         await notifRepo.sendNotification(
           recipientId: targetApp!.applicantId,
           actorId: creator.id,
           type: NotificationType.castingApplication,
           primarySubject: creator.name.isNotEmpty ? creator.name : 'Creator',
-          actionText: 'accepted your application for',
+          actionText: action,
           targetObject: targetApp!.projectTitle,
           avatarUrl: creator.avatarUrl,
           isCastingIcon: true,
@@ -493,7 +526,7 @@ class CastingNotifier extends Notifier<CastingState> {
                 AppPersistenceService.instance.isSamePersona(c.authorId, currentUserId) ||
                 AppPersistenceService.instance.isSamePersona(c.authorId, activePersona.id)))
         .map((c) {
-          final appsCount = state.applications.where((a) => a.castingCallId == c.id).length;
+          final appsCount = getApplicationsForCall(c.id).length;
           return c.copyWith(
             applicantsCount: appsCount > c.applicantsCount ? appsCount : c.applicantsCount,
           );
@@ -506,9 +539,16 @@ class CastingNotifier extends Notifier<CastingState> {
     String callId, [
     ApplicationStatus? statusFilter,
   ]) {
+    final targetCall = state.calls.where((c) => c.id == callId).firstOrNull;
+    final targetTitle = targetCall?.projectTitle.trim().toLowerCase();
+
     return state.applications.where((a) {
-      final matchesCall = a.castingCallId == callId ||
+      final matchesId = a.castingCallId == callId ||
           (callId.startsWith('call_') && a.castingCallId == 'my_call_1');
+      final matchesTitle = targetTitle != null &&
+          targetTitle.isNotEmpty &&
+          a.projectTitle.trim().toLowerCase() == targetTitle;
+      final matchesCall = matchesId || matchesTitle;
       if (!matchesCall) return false;
       if (statusFilter != null) {
         return a.status == statusFilter;

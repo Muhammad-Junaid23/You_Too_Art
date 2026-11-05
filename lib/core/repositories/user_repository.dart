@@ -14,10 +14,18 @@ class UserRepository {
 
   SupabaseQueryBuilder get _db => _client.from(SupabaseTables.users);
 
+  static bool isValidUuid(String id) {
+    return RegExp(
+      r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+    ).hasMatch(id);
+  }
+
   /// Fetch a user profile by [uid].
   Future<UserModel?> getById(String uid) async {
+    final cleanUid = uid.trim();
+    if (cleanUid.isEmpty || !isValidUuid(cleanUid)) return null;
     try {
-      final data = await _db.select().eq('id', uid).maybeSingle();
+      final data = await _db.select().eq('id', cleanUid).maybeSingle();
       if (data == null) return null;
       return UserModel.fromJson(data);
     } catch (e) {
@@ -28,7 +36,11 @@ class UserRepository {
 
   /// Real-time stream of a user profile by [uid].
   Stream<UserModel?> watch(String uid) {
-    return _db.stream(primaryKey: ['id']).eq('id', uid).map((rows) {
+    final cleanUid = uid.trim();
+    if (cleanUid.isEmpty || !isValidUuid(cleanUid)) {
+      return Stream.value(null);
+    }
+    return _db.stream(primaryKey: ['id']).eq('id', cleanUid).map((rows) {
       if (rows.isEmpty) return null;
       return UserModel.fromJson(rows.first);
     });

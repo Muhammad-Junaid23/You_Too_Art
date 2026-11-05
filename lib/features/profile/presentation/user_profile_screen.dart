@@ -9,7 +9,9 @@ import 'package:you_too_art/core/providers/supabase_providers.dart'
     hide userPortfolioProvider;
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
 import 'package:you_too_art/core/repositories/connection_repository.dart';
+import 'package:you_too_art/core/services/app_persistence_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:you_too_art/features/account/presentation/edit_profile_screen.dart';
 import 'package:you_too_art/features/auth/providers/auth_provider.dart';
 import 'package:you_too_art/features/chats/providers/chat_provider.dart';
@@ -41,6 +43,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
   ConnectionStatus? _currentStatus;
   bool? _isFollowing;
   int? _followersCount;
+  int? _connectionsCount;
   StreamSubscription<void>? _connSub;
 
   @override
@@ -63,18 +66,60 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
   Future<void> _resolveStatus() async {
     final repo = ref.read(connectionRepositoryProvider);
     final activePersona = ref.read(userPersonaProvider);
+    final currentUid = ref.read(currentUidProvider);
+    final effectiveUid = (currentUid != null && currentUid.isNotEmpty)
+        ? currentUid
+        : activePersona.id;
+
     final rel = await repo.getRelationshipStatus(
-      currentUserId: activePersona.id,
+      currentUserId: effectiveUid,
       targetUserId: widget.initialTalent.id,
     );
-    final followingSet = await repo.getFollowingIds(activePersona.id);
+    final followingSet = await repo.getFollowingIds(effectiveUid);
     final isFol = followingSet.contains(widget.initialTalent.id);
     final folCount = await repo.getFollowersCount(widget.initialTalent.id);
+    final connCount = await repo.getConnectionsCount(widget.initialTalent.id);
+
+    // Asynchronously fetch remote portfolio items from Supabase if not cached
+    try {
+      final client = Supabase.instance.client;
+      final targetId = widget.initialTalent.id;
+      final pRows = await client
+          .from('portfolio_items')
+          .select()
+          .eq('user_id', targetId)
+          .order('created_at', ascending: true);
+      if (pRows.isNotEmpty) {
+        final videos = <WorkMediaItem>[];
+        final photos = <WorkMediaItem>[];
+        for (final row in pRows) {
+          final item = WorkMediaItem.fromJson(row);
+          if (item.isVideo) {
+            videos.add(item);
+          } else {
+            photos.add(item);
+          }
+        }
+        final defaultPort = UserPersonaNotifier.isDirectorId(targetId)
+            ? AppPersistenceService.defaultDirectorPortfolio
+            : (UserPersonaNotifier.isProductionId(targetId)
+                ? AppPersistenceService.defaultProductionPortfolio
+                : AppPersistenceService.defaultActorPortfolio);
+        final effectiveVideos =
+            videos.isNotEmpty ? videos : defaultPort.videos;
+        final effectivePhotos =
+            photos.isNotEmpty ? photos : defaultPort.photos;
+        final cloudPort =
+            UserPortfolioState(videos: effectiveVideos, photos: effectivePhotos);
+        AppPersistenceService.instance.savePortfolio(targetId, cloudPort);
+      }
+    } catch (_) {}
 
     if (!mounted) return;
     setState(() {
       _isFollowing = isFol;
       _followersCount = folCount;
+      _connectionsCount = connCount;
       if (rel == 'pending_outgoing') {
         _currentStatus = ConnectionStatus.pendingOutgoing;
       } else if (rel == 'pending_incoming') {
@@ -196,10 +241,9 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
 
   void _onMessageTapped(BuildContext context, TalentModel talent) async {
     final isProd = talent.isProductionHouse;
-    final isMessageable = isProd
-        ? talent.isFollowing
-        : (talent.connectionStatus == ConnectionStatus.connected ||
-            ref.read(chatListProvider.notifier).canMessageUser(talent.id));
+    // Messaging requires an accepted connection across all users and production houses
+    final isMessageable = talent.connectionStatus == ConnectionStatus.connected ||
+        ref.read(chatListProvider.notifier).canMessageUser(talent.id);
 
     if (isMessageable) {
       final convId = await ref
@@ -219,9 +263,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            isProd
-                ? 'Follow ${talent.name} first to start chatting!'
-                : 'Connect with ${talent.name} first to start chatting!',
+            'Connect with ${talent.name} first to start chatting!',
           ),
           behavior: SnackBarBehavior.floating,
           backgroundColor: const Color(0xFF1E293B),
@@ -280,31 +322,40 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
         .toList();
     final dynamicPostsCount = userFeedPosts.length.toString();
 
+    final dynamicConnectsCount = isOwnProfile
+        ? ref.watch(networkProvider).connections.length.toString()
+        : (_connectionsCount != null
+            ? _connectionsCount.toString()
+            : (targetPersona != null ? '0' : (widget.initialTalent.connectsCount.isNotEmpty ? widget.initialTalent.connectsCount : '0')));
+
     final baseTalent = (isOwnProfile && currentUser != null)
         ? TalentModel.fromUser(
             currentUser,
             connectionStatus: _currentStatus ?? widget.initialTalent.connectionStatus,
           ).copyWith(
-            connectsCount: '',
+            connectsCount: dynamicConnectsCount,
             postsCount: dynamicPostsCount,
             workPortfolio: portfolio.photos.map((p) => p.mediaUrl).toList(),
           )
         : (isOwnProfile
             ? TalentModel.fromPersona(
                 activePersona,
-                connectsCount: '',
+                connectsCount: dynamicConnectsCount,
                 postsCount: dynamicPostsCount,
                 workPortfolio: portfolio.photos.map((p) => p.mediaUrl).toList(),
               )
             : (targetPersona != null
                 ? TalentModel.fromPersona(
                     targetPersona,
+                    connectsCount: dynamicConnectsCount,
                     postsCount: dynamicPostsCount,
                     workPortfolio: portfolio.photos.map((p) => p.mediaUrl).toList(),
                   )
                 : (fromState ??
                     TalentDirectory.findById(widget.initialTalent.id) ??
-                    widget.initialTalent)));
+                    widget.initialTalent).copyWith(
+                      connectsCount: dynamicConnectsCount,
+                    )));
 
     final isProd = (isOwnProfile && currentUser != null)
         ? (currentUser.role.toLowerCase().contains('production') ||
@@ -321,12 +372,18 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
     final displayFollowersCount = isProd
         ? (_followersCount != null
             ? _followersCount.toString()
-            : (effectiveFollowing ? '1' : '0'))
+            : (effectiveFollowing
+                ? '1'
+                : (baseTalent.followersCount.isNotEmpty &&
+                        baseTalent.followersCount != '0'
+                    ? baseTalent.followersCount
+                    : '0')))
         : '0';
 
     final talent = baseTalent.copyWith(
       connectionStatus: effectiveStatus,
       isFollowing: effectiveFollowing,
+      connectsCount: dynamicConnectsCount,
       postsCount: dynamicPostsCount,
       followersCount: displayFollowersCount,
       isProductionHouse: isProd,
@@ -545,7 +602,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                                     Text(
                                       isProd
                                           ? talent.followersCount
-                                          : talent.connectsCount,
+                                          : (talent.connectsCount.isNotEmpty ? talent.connectsCount : '0'),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
@@ -699,14 +756,15 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
   ) {
     if (isProd) {
       final isCurrentlyFollowing = _isFollowing ?? talent.isFollowing;
+      final isConnected = (_currentStatus ?? talent.connectionStatus) == ConnectionStatus.connected;
       if (isCurrentlyFollowing) {
         return Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Expanded(
               child: SizedBox(
-                height: 42,
-                child: ElevatedButton(
+                height: 44,
+                child: OutlinedButton(
                   onPressed: () async {
                     final repo = ref.read(connectionRepositoryProvider);
                     final activePersona = ref.read(userPersonaProvider);
@@ -723,56 +781,63 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                     ConnectionRepository.notifyChanges();
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Unfollowed ${talent.name}'),
-                        behavior: SnackBarBehavior.floating,
-                        duration: const Duration(seconds: 1),
-                      ),
-                    );
+                        SnackBar(
+                          content: Text('Unfollowed ${talent.name}'),
+                          behavior: SnackBarBehavior.floating,
+                          duration: const Duration(seconds: 1),
+                        ),
+                      );
                     }
                   },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.black,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF474B51),
+                    side: const BorderSide(color: Color(0xFFD0D5DD), width: 1.2),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(24),
                     ),
                   ),
-                  child: const Text(
-                    'Unfollow',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: SizedBox(
-                height: 42,
-                child: ElevatedButton(
-                  onPressed: () => _onMessageTapped(context, talent),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF3899F3),
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24),
+                  child: const FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      'Following',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                     ),
                   ),
-                  child: const Text(
-                    'Message',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                  ),
                 ),
               ),
             ),
+            if (isConnected) ...[
+              const SizedBox(width: 10),
+              Expanded(
+                child: SizedBox(
+                  height: 44,
+                  child: ElevatedButton(
+                    onPressed: () => _onMessageTapped(context, talent),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF3899F3),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                    ),
+                    child: const FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        'Message',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ],
         );
       } else {
-        return SizedBox(
-          width: 160,
-          height: 42,
+        return Container(
+          constraints: const BoxConstraints(maxWidth: 220),
+          height: 44,
           child: ElevatedButton(
             onPressed: () async {
               final repo = ref.read(connectionRepositoryProvider);
@@ -790,13 +855,13 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
               ConnectionRepository.notifyChanges();
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Now following ${talent.name}!'),
-                  backgroundColor: const Color(0xFF3899F3),
-                  behavior: SnackBarBehavior.floating,
-                  duration: const Duration(seconds: 1),
-                ),
-              );
+                  SnackBar(
+                    content: Text('Now following ${talent.name}!'),
+                    backgroundColor: const Color(0xFF3899F3),
+                    behavior: SnackBarBehavior.floating,
+                    duration: const Duration(seconds: 1),
+                  ),
+                );
               }
             },
             style: ElevatedButton.styleFrom(
@@ -807,9 +872,12 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                 borderRadius: BorderRadius.circular(24),
               ),
             ),
-            child: const Text(
-              'Follow',
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            child: const FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                'Follow',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              ),
             ),
           ),
         );
@@ -818,9 +886,9 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
       final effectiveStatus = _currentStatus ?? talent.connectionStatus;
       switch (effectiveStatus) {
         case ConnectionStatus.none:
-          return SizedBox(
-            width: 220,
-            height: 42,
+          return Container(
+            constraints: const BoxConstraints(maxWidth: 240),
+            height: 44,
             child: ElevatedButton(
               onPressed: () {
                 setState(
@@ -846,41 +914,46 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                   borderRadius: BorderRadius.circular(24),
                 ),
               ),
-              child: const Text(
-                'Send Connection Request',
-                style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
+              child: const FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  'Send Connection Request',
+                  style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
+                ),
               ),
             ),
           );
 
         case ConnectionStatus.pendingOutgoing:
-          return Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              OutlinedButton.icon(
-                onPressed: () {
-                  setState(() => _currentStatus = ConnectionStatus.none);
-                  ref
-                      .read(talentListProvider.notifier)
-                      .removeConnection(talent.id);
-                  ref.read(networkProvider.notifier).refresh();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'Cancelled connection request to ${talent.name}',
-                      ),
-                      backgroundColor: const Color(0xFF474B51),
-                      behavior: SnackBarBehavior.floating,
-                      duration: const Duration(seconds: 2),
+          return Container(
+            constraints: const BoxConstraints(maxWidth: 260),
+            height: 44,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                setState(() => _currentStatus = ConnectionStatus.none);
+                ref
+                    .read(talentListProvider.notifier)
+                    .removeConnection(talent.id);
+                ref.read(networkProvider.notifier).refresh();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Cancelled connection request to ${talent.name}',
                     ),
-                  );
-                },
-                icon: const Icon(
-                  Icons.schedule_rounded,
-                  size: 16,
-                  color: Color(0xFF3899F3),
-                ),
-                label: const Text(
+                    backgroundColor: const Color(0xFF474B51),
+                    behavior: SnackBarBehavior.floating,
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              },
+              icon: const Icon(
+                Icons.schedule_rounded,
+                size: 16,
+                color: Color(0xFF3899F3),
+              ),
+              label: const FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
                   'Request Sent (Tap to Cancel)',
                   style: TextStyle(
                     fontSize: 13,
@@ -888,91 +961,98 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                     color: Color(0xFF3899F3),
                   ),
                 ),
-                style: OutlinedButton.styleFrom(
-                  backgroundColor: const Color(0xFFE7F3FE),
-                  side: const BorderSide(color: Color(0xFF3899F3), width: 1.2),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(24),
-                  ),
+              ),
+              style: OutlinedButton.styleFrom(
+                backgroundColor: const Color(0xFFE7F3FE),
+                side: const BorderSide(color: Color(0xFF3899F3), width: 1.2),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
                 ),
               ),
-            ],
+            ),
           );
 
         case ConnectionStatus.pendingIncoming:
           return Row(
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              SizedBox(
-                height: 42,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    setState(() => _currentStatus = ConnectionStatus.connected);
-                    ref
-                        .read(talentListProvider.notifier)
-                        .acceptConnection(talent.id);
-                    ref.read(networkProvider.notifier).refresh();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Connected with ${talent.name}!'),
-                        backgroundColor: const Color(0xFF12B76A),
-                        behavior: SnackBarBehavior.floating,
-                        duration: const Duration(seconds: 2),
+              Expanded(
+                flex: 5,
+                child: SizedBox(
+                  height: 44,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      setState(() => _currentStatus = ConnectionStatus.connected);
+                      ref
+                          .read(talentListProvider.notifier)
+                          .acceptConnection(talent.id);
+                      ref.read(networkProvider.notifier).refresh();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Connected with ${talent.name}!'),
+                          backgroundColor: const Color(0xFF12B76A),
+                          behavior: SnackBarBehavior.floating,
+                          duration: const Duration(seconds: 2),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.check_rounded, size: 17),
+                    label: const FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        'Accept Request',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                       ),
-                    );
-                  },
-                  icon: const Icon(Icons.check_rounded, size: 18),
-                  label: const Text(
-                    'Accept Request',
-                    style:
-                        TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF3899F3),
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF3899F3),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24),
+                      ),
                     ),
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
-              SizedBox(
-                height: 42,
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    setState(() => _currentStatus = ConnectionStatus.none);
-                    ref
-                        .read(talentListProvider.notifier)
-                        .removeConnection(talent.id);
-                    ref.read(networkProvider.notifier).refresh();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Declined request from ${talent.name}'),
-                        backgroundColor: const Color(0xFF474B51),
-                        behavior: SnackBarBehavior.floating,
-                        duration: const Duration(seconds: 2),
+              const SizedBox(width: 10),
+              Expanded(
+                flex: 4,
+                child: SizedBox(
+                  height: 44,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      setState(() => _currentStatus = ConnectionStatus.none);
+                      ref
+                          .read(talentListProvider.notifier)
+                          .removeConnection(talent.id);
+                      ref.read(networkProvider.notifier).refresh();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Declined request from ${talent.name}'),
+                          backgroundColor: const Color(0xFF474B51),
+                          behavior: SnackBarBehavior.floating,
+                          duration: const Duration(seconds: 2),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.close_rounded,
+                        size: 16, color: Color(0xFF474B51)),
+                    label: const FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        'Decline',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                       ),
-                    );
-                  },
-                  icon: const Icon(Icons.close_rounded,
-                      size: 16, color: Color(0xFF474B51)),
-                  label: const Text(
-                    'Decline',
-                    style:
-                        TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF474B51),
-                    side:
-                        const BorderSide(color: Color(0xFFD0D5DD), width: 1.2),
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF474B51),
+                      side:
+                          const BorderSide(color: Color(0xFFD0D5DD), width: 1.2),
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24),
+                      ),
                     ),
                   ),
                 ),
@@ -982,62 +1062,70 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
 
         case ConnectionStatus.connected:
           return Row(
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              SizedBox(
-                width: 175,
-                height: 44,
-                child: ElevatedButton(
-                  onPressed: () {
-                    setState(() => _currentStatus = ConnectionStatus.none);
-                    ref
-                        .read(talentListProvider.notifier)
-                        .removeConnection(talent.id);
-                    ref.read(networkProvider.notifier).refresh();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Removed connection with ${talent.name}'),
-                        behavior: SnackBarBehavior.floating,
-                        duration: const Duration(seconds: 1),
+              Expanded(
+                flex: 5,
+                child: SizedBox(
+                  height: 44,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      setState(() => _currentStatus = ConnectionStatus.none);
+                      ref
+                          .read(talentListProvider.notifier)
+                          .removeConnection(talent.id);
+                      ref.read(networkProvider.notifier).refresh();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Removed connection with ${talent.name}'),
+                          behavior: SnackBarBehavior.floating,
+                          duration: const Duration(seconds: 1),
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.black,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24),
                       ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.black,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24),
                     ),
-                  ),
-                  child: const Text(
-                    'Remove Connection',
-                    maxLines: 1,
-                    softWrap: false,
-                    style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
+                    child: const FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        'Remove Connection',
+                        maxLines: 1,
+                        style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
+                      ),
+                    ),
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
-              SizedBox(
-                width: 135,
-                height: 44,
-                child: ElevatedButton(
-                  onPressed: () => _onMessageTapped(context, talent),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF3899F3),
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24),
+              const SizedBox(width: 10),
+              Expanded(
+                flex: 4,
+                child: SizedBox(
+                  height: 44,
+                  child: ElevatedButton(
+                    onPressed: () => _onMessageTapped(context, talent),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF3899F3),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24),
+                      ),
                     ),
-                  ),
-                  child: const Text(
-                    'Message',
-                    maxLines: 1,
-                    style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
+                    child: const FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        'Message',
+                        maxLines: 1,
+                        style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -1056,37 +1144,66 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
     UserModel? currentUser,
   }) {
     final effective = isOwnProfile ? activePersona : targetPersona;
-    final bioText = (isOwnProfile && currentUser != null && currentUser.bio != null && currentUser.bio!.isNotEmpty)
+    final rawBio = (isOwnProfile && currentUser != null && currentUser.bio != null && currentUser.bio!.isNotEmpty)
         ? currentUser.bio!
         : ((effective?.bio.isNotEmpty ?? false)
             ? effective!.bio
             : (talent.bio?.isNotEmpty ?? false
                 ? talent.bio!
-                : (isProd
-                    ? 'Official production house and studio on You Too Art.'
-                    : 'Passionate performing artist and creator on You Too Art.')));
+                : ''));
 
-    final locationText = (isOwnProfile && currentUser != null && currentUser.location != null && currentUser.location!.isNotEmpty)
+    final isSeedBio = rawBio.contains('Leading digital film studio') ||
+        rawBio.contains('Award-winning independent filmmaker') ||
+        rawBio.contains('Passionate actor and performing artist') ||
+        rawBio.contains('Official production house and studio') ||
+        rawBio.contains('Passionate performing artist and creator');
+
+    final bioText = (!isSeedBio && rawBio.trim().isNotEmpty)
+        ? rawBio.trim()
+        : (isProd
+            ? 'No company bio provided yet.'
+            : 'No bio provided yet.');
+
+    final rawLocation = (isOwnProfile && currentUser != null && currentUser.location != null && currentUser.location!.isNotEmpty)
         ? currentUser.location!
         : ((effective?.location.isNotEmpty ?? false)
             ? effective!.location
-            : (talent.location ?? talent.aboutInfo['Location'] ?? ''));
+            : (talent.location ?? ''));
+
+    final isSeedLocation = rawLocation == 'Islamabad, Pakistan' ||
+        rawLocation == 'Lahore, Pakistan' ||
+        rawLocation == 'Karachi, Pakistan';
+    final locationText = (isOwnProfile && currentUser != null && currentUser.location != null && currentUser.location!.isNotEmpty)
+        ? currentUser.location!
+        : (!isSeedLocation ? rawLocation : '');
 
     final website = (effective?.website.isNotEmpty ?? false)
         ? effective!.website
         : (talent.aboutInfo['Website'] ?? talent.aboutInfo['Personal Website'] ?? '');
 
-    final establishedYear = (isOwnProfile && currentUser != null && currentUser.establishedYear != null)
+    final rawEstablished = (isOwnProfile && currentUser != null && currentUser.establishedYear != null)
         ? '${currentUser.establishedYear}'
-        : (talent.aboutInfo['Established'] ?? '');
+        : '';
+    final establishedYear = (rawEstablished.isNotEmpty && rawEstablished != '2019') ? rawEstablished : '';
 
-    final incNumber = (isOwnProfile && currentUser != null && currentUser.incorporationNumber != null && currentUser.incorporationNumber!.isNotEmpty)
+    final rawInc = (isOwnProfile && currentUser != null && currentUser.incorporationNumber != null && currentUser.incorporationNumber!.isNotEmpty)
         ? currentUser.incorporationNumber!
-        : (talent.aboutInfo['Incorporation'] ?? '');
+        : '';
+    final incNumber = (rawInc.isNotEmpty && rawInc != 'PK-REG-84920') ? rawInc : '';
 
-    final officeAddress = (isOwnProfile && currentUser != null && currentUser.address != null && currentUser.address!.isNotEmpty)
+    final rawAddress = (isOwnProfile && currentUser != null && currentUser.address != null && currentUser.address!.isNotEmpty)
         ? currentUser.address!
-        : (talent.aboutInfo['Address'] ?? '');
+        : '';
+    final officeAddress = (rawAddress.isNotEmpty && !rawAddress.contains('Blue Area')) ? rawAddress : '';
+
+    final rawExp = (effective?.experience.isNotEmpty ?? false)
+        ? effective!.experience
+        : (talent.aboutInfo['Experience'] ?? '');
+    final isSeedExp = rawExp == '5+ Years' ||
+        rawExp == '7+ Years' ||
+        rawExp == '8+ Years' ||
+        rawExp.contains('Experience');
+    final experienceText = (!isSeedExp && rawExp.isNotEmpty) ? rawExp : '';
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
@@ -1144,12 +1261,10 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
               isBold: true,
             ),
             const SizedBox(height: 24),
-            if (talent.aboutInfo['Experience'] != null &&
-                talent.aboutInfo['Experience']!.isNotEmpty &&
-                talent.aboutInfo['Experience'] != '5+ Years') ...[
+            if (experienceText.isNotEmpty) ...[
               _buildAboutSection(
                 label: 'Experience',
-                value: talent.aboutInfo['Experience']!,
+                value: experienceText,
                 isBold: true,
               ),
               const SizedBox(height: 24),
@@ -1219,6 +1334,131 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  void _openMediaPreviewModal(BuildContext context, WorkMediaItem item) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.88),
+      builder: (ctx) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header with Title & Close button
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      item.title.isNotEmpty
+                          ? item.title
+                          : (item.isVideo ? 'Video Preview' : 'Photo Preview'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded,
+                        color: Colors.white, size: 26),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              // Media Display Container
+              Flexible(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      InteractiveViewer(
+                        minScale: 0.8,
+                        maxScale: 3.5,
+                        child: buildPortfolioImage(
+                          item.mediaUrl,
+                          width: double.infinity,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                      if (item.isVideo)
+                        GestureDetector(
+                          onTap: () async {
+                            final targetUrl =
+                                item.url.isNotEmpty ? item.url : item.mediaUrl;
+                            final uri = Uri.tryParse(targetUrl);
+                            if (uri != null) {
+                              try {
+                                await launchUrl(uri,
+                                    mode: LaunchMode.externalApplication);
+                              } catch (_) {}
+                            }
+                          },
+                          child: Container(
+                            width: 64,
+                            height: 64,
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.65),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 2),
+                            ),
+                            child: const Icon(
+                              Icons.play_arrow_rounded,
+                              size: 40,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Action button (e.g. Watch Video / Open Link)
+              if (item.isVideo && item.url.isNotEmpty)
+                SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      final uri = Uri.tryParse(item.url);
+                      if (uri != null) {
+                        try {
+                          await launchUrl(uri,
+                              mode: LaunchMode.externalApplication);
+                        } catch (_) {}
+                      }
+                    },
+                    icon: const Icon(Icons.open_in_new_rounded, size: 18),
+                    label: const Text(
+                      'Watch Video / Open Link',
+                      style:
+                          TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF3899F3),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -1352,84 +1592,93 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(14),
-                        child: buildPortfolioImage(
-                          currentVideo.mediaUrl,
-                          height: 190,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                      Container(
-                        width: 52,
-                        height: 52,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.88),
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.15),
-                              blurRadius: 10,
-                            ),
-                          ],
-                        ),
-                        child: const Icon(
-                          Icons.play_arrow_rounded,
-                          size: 32,
-                          color: Color(0xFF1A1A2E),
-                        ),
-                      ),
-                      if (currentVideo.url.toLowerCase().contains('youtu'))
-                        Positioned(
-                          bottom: 10,
-                          right: 12,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFE50914),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.play_circle_fill,
-                                    size: 12, color: Colors.white),
-                                SizedBox(width: 4),
-                                Text(
-                                  'YouTube',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
+                  GestureDetector(
+                    onTap: () => _openMediaPreviewModal(context, currentVideo),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(14),
+                          child: buildPortfolioImage(
+                            currentVideo.mediaUrl,
+                            height: 190,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
                           ),
                         ),
-                    ],
+                        Container(
+                          width: 52,
+                          height: 52,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.88),
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.15),
+                                blurRadius: 10,
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.play_arrow_rounded,
+                            size: 32,
+                            color: Color(0xFF1A1A2E),
+                          ),
+                        ),
+                        if (currentVideo.url.toLowerCase().contains('youtu'))
+                          Positioned(
+                            bottom: 10,
+                            right: 12,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE50914),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.play_circle_fill,
+                                      size: 12, color: Colors.white),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'YouTube',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 10),
-                  Text(
-                    currentVideo.title,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF1A1A2E),
+                  GestureDetector(
+                    onTap: () => _openMediaPreviewModal(context, currentVideo),
+                    child: Text(
+                      currentVideo.title,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1A1A2E),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    currentVideo.url,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF3899F3),
-                      decoration: TextDecoration.underline,
+                  GestureDetector(
+                    onTap: () => _openMediaPreviewModal(context, currentVideo),
+                    child: Text(
+                      currentVideo.url,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF3899F3),
+                        decoration: TextDecoration.underline,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -1478,12 +1727,12 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                 border: Border.all(color: const Color(0xFFE8E8E8)),
                 color: const Color(0xFFFAFAFA),
               ),
-              child: const Column(
+              child: Column(
                 children: [
-                  Icon(Icons.video_library_outlined,
+                  const Icon(Icons.video_library_outlined,
                       size: 40, color: Color(0xFFBDBDBD)),
-                  SizedBox(height: 8),
-                  Text(
+                  const SizedBox(height: 8),
+                  const Text(
                     'No videos yet',
                     style: TextStyle(
                       fontSize: 14,
@@ -1491,10 +1740,12 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                       color: Color(0xFF757575),
                     ),
                   ),
-                  SizedBox(height: 4),
+                  const SizedBox(height: 4),
                   Text(
-                    'Tap + above to add video links or showreels',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF9E9E9E)),
+                    isOwnProfile
+                        ? 'Tap + above to add video links or showreels'
+                        : 'No showreels or videos uploaded yet',
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF9E9E9E)),
                   ),
                 ],
               ),
@@ -1608,31 +1859,40 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(14),
-                    child: buildPortfolioImage(
-                      currentPhoto.mediaUrl,
-                      height: 190,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
+                  GestureDetector(
+                    onTap: () => _openMediaPreviewModal(context, currentPhoto),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(14),
+                      child: buildPortfolioImage(
+                        currentPhoto.mediaUrl,
+                        height: 190,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 10),
-                  Text(
-                    currentPhoto.title,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF1A1A2E),
+                  GestureDetector(
+                    onTap: () => _openMediaPreviewModal(context, currentPhoto),
+                    child: Text(
+                      currentPhoto.title,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1A1A2E),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    currentPhoto.url,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF3899F3),
-                      decoration: TextDecoration.underline,
+                  GestureDetector(
+                    onTap: () => _openMediaPreviewModal(context, currentPhoto),
+                    child: Text(
+                      currentPhoto.url,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF3899F3),
+                        decoration: TextDecoration.underline,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -1681,12 +1941,12 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                 border: Border.all(color: const Color(0xFFE8E8E8)),
                 color: const Color(0xFFFAFAFA),
               ),
-              child: const Column(
+              child: Column(
                 children: [
-                  Icon(Icons.photo_library_outlined,
+                  const Icon(Icons.photo_library_outlined,
                       size: 40, color: Color(0xFFBDBDBD)),
-                  SizedBox(height: 8),
-                  Text(
+                  const SizedBox(height: 8),
+                  const Text(
                     'No photos yet',
                     style: TextStyle(
                       fontSize: 14,
@@ -1694,10 +1954,12 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                       color: Color(0xFF757575),
                     ),
                   ),
-                  SizedBox(height: 4),
+                  const SizedBox(height: 4),
                   Text(
-                    'Tap + above to add photos or portfolio stills',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF9E9E9E)),
+                    isOwnProfile
+                        ? 'Tap + above to add photos or portfolio stills'
+                        : 'No portfolio photos uploaded yet',
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF9E9E9E)),
                   ),
                 ],
               ),
@@ -1883,7 +2145,6 @@ class _HorizontalTabHeaderDelegate extends SliverPersistentHeaderDelegate {
           const Divider(height: 1, thickness: 1, color: Color(0xFFF0F1F3)),
           Expanded(
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: List.generate(tabs.length, (index) {
                 final tab = tabs[index];
                 final isSelected = index == selectedIndex;
@@ -1891,31 +2152,37 @@ class _HorizontalTabHeaderDelegate extends SliverPersistentHeaderDelegate {
                     ? const Color(0xFF3899F3)
                     : const Color(0xFF8E95A0);
 
-                return GestureDetector(
-                  onTap: () => onTabSelected(index),
-                  behavior: HitTestBehavior.opaque,
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          tab.icon,
-                          size: 20,
-                          color: activeColor,
+                return Expanded(
+                  child: GestureDetector(
+                    onTap: () => onTabSelected(index),
+                    behavior: HitTestBehavior.opaque,
+                    child: Container(
+                      alignment: Alignment.center,
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              tab.icon,
+                              size: 19,
+                              color: activeColor,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              tab.label,
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight:
+                                    isSelected ? FontWeight.w700 : FontWeight.w500,
+                                color: activeColor,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          tab.label,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight:
-                                isSelected ? FontWeight.w700 : FontWeight.w500,
-                            color: activeColor,
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                 );

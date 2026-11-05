@@ -1,13 +1,16 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:you_too_art/core/constants/talent_directory.dart';
+import 'package:you_too_art/core/models/user_model.dart';
 import 'package:you_too_art/core/providers/supabase_providers.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
 import 'package:you_too_art/core/repositories/chat_repository.dart';
 import 'package:you_too_art/core/repositories/connection_repository.dart';
+import 'package:you_too_art/core/services/app_persistence_service.dart';
 import 'package:you_too_art/features/chats/models/chat_message_model.dart';
 import 'package:you_too_art/features/chats/models/conversation_model.dart';
 import 'package:you_too_art/features/talent/models/talent_model.dart';
+import 'package:you_too_art/features/talent/providers/talent_provider.dart';
 
 // ─── Chat List State ──────────────────────────────────────────────────────────
 
@@ -25,9 +28,13 @@ class ChatListState {
   });
 
   List<ConversationModel> get filteredConversations {
-    if (searchQuery.trim().isEmpty) return conversations;
+    // Only display active conversations where at least one message has been sent
+    final activeConvs = conversations
+        .where((c) => c.lastMessage.trim().isNotEmpty)
+        .toList();
+    if (searchQuery.trim().isEmpty) return activeConvs;
     final query = searchQuery.trim().toLowerCase();
-    return conversations.where((c) {
+    return activeConvs.where((c) {
       return c.peerName.toLowerCase().contains(query) ||
           c.lastMessage.toLowerCase().contains(query);
     }).toList();
@@ -38,6 +45,7 @@ class ChatListState {
     final isTargetActor = targetUserId == UserPersonaNotifier.actorDefaultId ||
         targetUserId == actorPersona.id;
     return connectedTalents.any((t) {
+      if (t.connectionStatus != ConnectionStatus.connected) return false;
       if (t.id == targetUserId) return true;
       if (isTargetActor &&
           (t.id == UserPersonaNotifier.actorDefaultId || t.id == actorPersona.id)) {
@@ -104,43 +112,80 @@ class ChatListNotifier extends Notifier<ChatListState> {
           final partB = row['participant_b'] as String? ?? '';
           final peerId = partA == activeUserId ? partB : partA;
 
-          // Resolve peer metadata from directory
-          var peerTalent = TalentDirectory.findById(peerId);
-          if (peerTalent == null) {
-            // Check if peer is one of the active test personas
-            final personaMatch = UserPersonaNotifier.allPersonas
-                .where((p) => p.id == peerId)
-                .firstOrNull;
-            if (personaMatch != null) {
-              peerTalent = TalentModel(
-                id: personaMatch.id,
-                name: personaMatch.name,
-                roles: personaMatch.role,
-                avatarUrl: personaMatch.avatarUrl,
-                isProductionHouse: personaMatch.isProductionHouse,
-              );
-            } else {
-              peerTalent = TalentModel(
-                id: peerId,
-                name: 'Artist',
-                roles: 'Performing Artist',
-              );
-            }
+          // Resolve peer metadata from persistent persona, directory, or talent list
+          TalentModel? peerTalent;
+          if (UserPersonaNotifier.hasPersona(peerId)) {
+            final p = UserPersonaNotifier.getPersonaById(peerId);
+            peerTalent = TalentModel.fromPersona(p);
+          } else if (UserPersonaNotifier.isActorId(peerId)) {
+            final p = UserPersonaNotifier.getActorPersona();
+            peerTalent = TalentModel.fromPersona(p);
+          } else {
+            peerTalent = TalentDirectory.findById(peerId);
+          }
+
+          if (peerTalent == null || peerTalent.name == 'Artist') {
+            try {
+              final fromTalentList =
+                  ref.read(talentListProvider).findById(peerId);
+              if (fromTalentList != null) {
+                peerTalent = fromTalentList;
+              }
+            } catch (_) {}
+          }
+
+          peerTalent ??= TalentModel(
+            id: peerId,
+            name: 'Artist',
+            roles: 'Performing Artist',
+          );
+
+          if (ConnectionRepository.isValidUuid(peerId) &&
+              !UserPersonaNotifier.hasPersona(peerId)) {
+            Future.microtask(() async {
+              try {
+                final client = ref.read(supabaseClientProvider);
+                final uRow = await client
+                    .from('users')
+                    .select()
+                    .eq('id', peerId)
+                    .maybeSingle();
+                if (uRow != null) {
+                  final u = UserModel.fromJson(uRow);
+                  final persona = UserPersona(
+                    id: u.id,
+                    name: u.name.isNotEmpty
+                        ? u.name
+                        : '${u.firstName} ${u.lastName}'.trim(),
+                    email: u.email,
+                    role: u.role,
+                    avatarUrl: u.profileImagePath ?? '',
+                    bio: u.bio ?? '',
+                    location: u.location ?? '',
+                  );
+                  AppPersistenceService.instance.savePersona(persona);
+                }
+              } catch (_) {}
+            });
           }
 
           // Compute dynamic unread count and read status for active persona
           final convId = row['id'] as String? ?? '';
+          final msgs = _chatRepo.getMessages(convId, userId: activeUserId);
+          if (msgs.isEmpty) {
+            // Never display empty or draft conversations without messages in the chat list
+            continue;
+          }
+          final lastMsg = msgs.last;
+
           final unreadCount = _chatRepo.getUnreadCount(
             conversationId: convId,
             userId: activeUserId,
           );
-          final msgs = _chatRepo.getMessages(convId, userId: activeUserId);
-          final lastMsg = msgs.isNotEmpty ? msgs.last : null;
-          final isMine = lastMsg != null &&
+          final isMine =
               _isActorMatch(lastMsg['sender_id']?.toString() ?? '', activeUserId);
-          final isRead = lastMsg != null &&
-              (lastMsg['read_at'] != null &&
-                  lastMsg['read_at'].toString().isNotEmpty);
+          final isRead = (lastMsg['read_at'] != null &&
+              lastMsg['read_at'].toString().isNotEmpty);
 
           models.add(
             ConversationModel.fromRow(
@@ -215,16 +260,7 @@ class ChatListNotifier extends Notifier<ChatListState> {
         }
       }
 
-      // Include followed production houses (artists can message production houses they follow)
-      final followingIds = await _connectionRepo.getFollowingIds(activeUserId);
-      for (final pid in followingIds) {
-        final prod = TalentDirectory.findById(pid);
-        if (prod != null && !connectedList.any((t) => t.id == prod.id)) {
-          connectedList.add(prod.copyWith(isFollowing: true));
-        }
-      }
-
-      // Connected talents list
+      // Connected talents list (only mutually accepted connections)
       state = state.copyWith(connectedTalents: connectedList);
     } catch (_) {}
   }
@@ -292,11 +328,12 @@ class ChatListNotifier extends Notifier<ChatListState> {
   }
 
   /// Check whether [targetUserId] is messageable with active persona.
+  /// Strictly requires an accepted mutual connection.
   bool canMessageUser(String targetUserId) {
-    final activePersona = ref.read(userPersonaProvider);
-    if (activePersona.isProductionHouse) return true;
     return state.connectedTalents.any(
-      (t) => t.id == targetUserId || _isActorMatch(t.id, targetUserId),
+      (t) =>
+          (t.id == targetUserId || _isActorMatch(t.id, targetUserId)) &&
+          t.connectionStatus == ConnectionStatus.connected,
     );
   }
 }

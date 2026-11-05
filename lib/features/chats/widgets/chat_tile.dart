@@ -111,7 +111,7 @@ class ChatTile extends StatelessWidget {
                             child: Text(
                               conversation.lastMessage.isNotEmpty
                                   ? conversation.lastMessage
-                                  : 'Started a conversation',
+                                  : 'No messages yet',
                               style: TextStyle(
                                 fontSize: 13.5,
                                 fontWeight: hasUnread

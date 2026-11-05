@@ -104,7 +104,7 @@ class TalentNotifier extends Notifier<TalentState> {
         }
       } catch (_) {}
 
-      // Pure real talents directory from registered users
+      // Pure real talents directory from registered users and platform personas
       final combined = <TalentModel>[];
       for (final fetched in fetchedList) {
         if (UserPersonaNotifier.hasPersona(fetched.id)) {
@@ -112,6 +112,18 @@ class TalentNotifier extends Notifier<TalentState> {
           combined.add(TalentModel.fromPersona(p));
         } else {
           combined.add(fetched);
+        }
+      }
+
+      // Always include platform candidate personas if not already in combined
+      final platformPersonas = [
+        UserPersonaNotifier.getActorPersona(),
+        UserPersonaNotifier.getPersonaById(AppPersistenceService.realDirectorId),
+        UserPersonaNotifier.getPersonaById(AppPersistenceService.realProductionId),
+      ];
+      for (final p in platformPersonas) {
+        if (!combined.any((t) => UserPersonaNotifier.isSamePersona(t.id, p.id))) {
+          combined.add(TalentModel.fromPersona(p));
         }
       }
 

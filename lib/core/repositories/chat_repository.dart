@@ -62,7 +62,9 @@ class ChatRepository {
   SupabaseQueryBuilder get _messages =>
       _client.from(SupabaseTables.messages);
 
-  /// Find existing conversation or create a new one between [userA] and [userB].
+  /// Find existing conversation or create a draft between [userA] and [userB].
+  /// Does NOT materialize an empty conversation in the database or chat list
+  /// until the user actually sends their first message.
   Future<Map<String, dynamic>> getOrCreateConversation({
     required String userA,
     required String userB,
@@ -81,35 +83,20 @@ class ChatRepository {
 
         if (existing != null) {
           _isSupabaseTableAvailable = true;
-          _LocalChatStore.instance.registerConversation(existing);
-          _LocalChatStore.instance
-              .undeleteForUser(existing['id'].toString(), userA);
           return existing;
         }
-
-        // 2. Insert into Supabase if not found
-        final now = DateTime.now().toUtc().toIso8601String();
-        final inserted = await _conversations
-            .insert({
-              'participant_a': userA,
-              'participant_b': userB,
-              'last_message': '',
-              'last_message_at': now,
-              'created_at': now,
-            })
-            .select()
-            .single();
-
-        _isSupabaseTableAvailable = true;
-        _LocalChatStore.instance.registerConversation(inserted);
-        _LocalChatStore.instance
-            .undeleteForUser(inserted['id'].toString(), userA);
-        return inserted;
       } catch (e) {
         _recordSupabaseError(e);
       }
     }
-    // Resilient local store fallback
+
+    // 2. Try finding existing in local store
+    final localExisting = _LocalChatStore.instance.findExisting(userA: userA, userB: userB);
+    if (localExisting != null) {
+      return localExisting;
+    }
+
+    // 3. Return an in-memory draft conversation without inserting until first message is sent
     return _LocalChatStore.instance.getOrCreate(userA: userA, userB: userB);
   }
 
@@ -140,13 +127,19 @@ class ChatRepository {
             _LocalChatStore.instance.getMessages(convId, userId: uid);
         final copy = Map<String, dynamic>.from(conv);
         if (visibleMsgs.isEmpty) {
-          copy['last_message'] = '';
+          copy['last_message'] = (conv['last_message'] as String? ?? '');
         } else {
           copy['last_message'] = visibleMsgs.last['text'] ?? '';
           copy['last_message_at'] =
               visibleMsgs.last['created_at'] ?? conv['last_message_at'];
         }
         return copy;
+      }).where((conv) {
+        // Strictly exclude empty conversations that have no messages
+        final convId = conv['id'].toString();
+        final visibleMsgs =
+            _LocalChatStore.instance.getMessages(convId, userId: uid);
+        return visibleMsgs.isNotEmpty;
       }).toList()
         ..sort((a, b) {
           final timeA = a['last_message_at'] as String? ?? '';
@@ -308,6 +301,34 @@ class ChatRepository {
         isValidUuid(conversationId) &&
         isValidUuid(senderId)) {
       try {
+        final convCheck = await _conversations
+            .select('id')
+            .eq('id', conversationId)
+            .maybeSingle();
+
+        if (convCheck == null) {
+          final localConv = _LocalChatStore.instance.getConversation(conversationId);
+          final userA = localConv?['participant_a']?.toString() ?? senderId;
+          final userB = localConv?['participant_b']?.toString() ?? '';
+          if (isValidUuid(userA) && isValidUuid(userB)) {
+            await _conversations.insert({
+              'id': conversationId,
+              'participant_a': userA,
+              'participant_b': userB,
+              'last_message': text,
+              'last_message_at': now,
+              'created_at': now,
+            });
+          }
+        } else {
+          await _conversations
+              .update({
+                'last_message': text,
+                'last_message_at': now,
+              })
+              .eq('id', conversationId);
+        }
+
         final remote = await _messages
             .insert({
               'id': messageId,
@@ -319,13 +340,6 @@ class ChatRepository {
             })
             .select()
             .single();
-
-        await _conversations
-            .update({
-              'last_message': text,
-              'last_message_at': now,
-            })
-            .eq('id', conversationId);
 
         _isSupabaseTableAvailable = true;
         _LocalChatStore.instance.addMessage(remote);
@@ -377,7 +391,6 @@ class ChatRepository {
   }
 
   /// Clear messages in a conversation for [userId] (Clear for me).
-  /// The other participant's message history remains completely intact.
   Future<void> clearConversationMessages({
     required String conversationId,
     required String userId,
@@ -386,10 +399,20 @@ class ChatRepository {
       conversationId: conversationId,
       userId: userId,
     );
+
+    if (_isSupabaseTableAvailable != false && isValidUuid(conversationId)) {
+      try {
+        await _messages.delete().eq('conversation_id', conversationId);
+        await _conversations
+            .update({'last_message': ''})
+            .eq('id', conversationId);
+      } catch (e) {
+        if (kDebugMode) debugPrint('ChatRepository.clearConversationMessages error: $e');
+      }
+    }
   }
 
-  /// Delete a conversation for [userId] (Delete for me).
-  /// The other participant's conversation and messages remain completely intact.
+  /// Delete a conversation for [userId] and wipe it from local and cloud storage.
   Future<void> deleteConversation({
     required String conversationId,
     required String userId,
@@ -398,6 +421,15 @@ class ChatRepository {
       conversationId: conversationId,
       userId: userId,
     );
+
+    if (_isSupabaseTableAvailable != false && isValidUuid(conversationId)) {
+      try {
+        await _messages.delete().eq('conversation_id', conversationId);
+        await _conversations.delete().eq('id', conversationId);
+      } catch (e) {
+        if (kDebugMode) debugPrint('ChatRepository.deleteConversation Supabase error: $e');
+      }
+    }
   }
 
   /// Get the unread message count in a conversation for [userId].
@@ -437,6 +469,7 @@ class _LocalChatStore {
   final Map<String, Set<String>> _deletedConvsByUser = {};
   final Map<String, Map<String, DateTime>> _clearedTimestampsByUser = {};
   final Map<String, Map<String, dynamic>> _conversations = {};
+  final Map<String, Map<String, dynamic>> _draftConversations = {};
   final Map<String, List<Map<String, dynamic>>> _messages = {};
 
   final StreamController<void> _convController =
@@ -453,17 +486,26 @@ class _LocalChatStore {
 
   bool _isActorMatch(String a, String b) {
     if (a == b) return true;
-    final isA = a == UserPersonaNotifier.actorDefaultId || a == 'actor';
-    final isB = b == UserPersonaNotifier.actorDefaultId || b == 'actor';
-    return isA && isB;
+    return UserPersonaNotifier.isSamePersona(a, b);
   }
 
   List<String> _allUserKeys(String uid) {
     final cleanUid = uid.trim();
     final keys = <String>{cleanUid};
-    if (cleanUid == 'actor' || cleanUid == UserPersonaNotifier.actorDefaultId) {
+    if (UserPersonaNotifier.isActorId(cleanUid)) {
       keys.add('actor');
-      keys.add(UserPersonaNotifier.actorDefaultId);
+      keys.add(AppPersistenceService.actorDefaultId);
+      keys.add(AppPersistenceService.realActorId);
+      keys.add('00000000-0000-0000-0000-000000000001');
+    } else if (UserPersonaNotifier.isDirectorId(cleanUid)) {
+      keys.add(AppPersistenceService.alexanderId);
+      keys.add(AppPersistenceService.realDirectorId);
+      keys.add('a1111111-1111-1111-1111-111111111111');
+    } else if (UserPersonaNotifier.isProductionId(cleanUid)) {
+      keys.add(AppPersistenceService.filmfareId);
+      keys.add('filmfare');
+      keys.add(AppPersistenceService.realProductionId);
+      keys.add('b2222222-2222-2222-2222-222222222222');
     }
     return keys.toList();
   }
@@ -529,6 +571,13 @@ class _LocalChatStore {
         }
       }
 
+      // Strictly purge any conversations that have zero messages
+      _conversations.removeWhere((id, conv) {
+        final msgs = _messages[id];
+        return msgs == null || msgs.isEmpty;
+      });
+      await prefs.setString(_localConvsKey, jsonEncode(_conversations));
+
       _convController.add(null);
       _msgController.add(null);
     } catch (_) {
@@ -577,6 +626,11 @@ class _LocalChatStore {
       if (_deletedConvsByUser[k]?.contains(conversationId) == true) {
         return true;
       }
+      try {
+        if (AppPersistenceService.instance.isConvDeletedForUser(conversationId, k)) {
+          return true;
+        }
+      } catch (_) {}
     }
     return false;
   }
@@ -587,6 +641,9 @@ class _LocalChatStore {
       if (_deletedConvsByUser[k]?.remove(conversationId) == true) {
         changed = true;
       }
+      try {
+        AppPersistenceService.instance.unmarkConvDeletedForUser(conversationId, k);
+      } catch (_) {}
     }
     if (changed) {
       _saveUserDeletedToPrefs();
@@ -632,26 +689,18 @@ class _LocalChatStore {
     _convController.add(null);
   }
 
-  void deleteConversation({
-    required String conversationId,
-    required String userId,
-  }) {
-    final now = DateTime.now().toUtc();
-    for (final k in _allUserKeys(userId)) {
-      _deletedConvsByUser
-          .putIfAbsent(k, () => <String>{})
-          .add(conversationId);
-      _clearedTimestampsByUser
-          .putIfAbsent(k, () => <String, DateTime>{})[conversationId] = now;
-    }
-
-    _saveUserDeletedToPrefs();
-    _saveUserClearedToPrefs();
-    _convController.add(null);
-    _msgController.add(null);
+  Map<String, dynamic>? getConversation(String convId) {
+    return _conversations[convId] ?? _draftConversations[convId];
   }
 
-  Map<String, dynamic> getOrCreate({
+  void registerDraft(Map<String, dynamic> draft) {
+    final id = draft['id']?.toString() ?? '';
+    if (id.isNotEmpty) {
+      _draftConversations[id] = Map<String, dynamic>.from(draft);
+    }
+  }
+
+  Map<String, dynamic>? findExisting({
     required String userA,
     required String userB,
   }) {
@@ -664,28 +713,62 @@ class _LocalChatStore {
       final matchRevA = (pa == userB || _isActorMatch(pa, userB));
       final matchRevB = (pb == userA || _isActorMatch(pb, userA));
       if ((matchA && matchB) || (matchRevA && matchRevB)) {
-        undeleteForUser(id, userA);
         return c;
       }
+    }
+    return null;
+  }
+
+  void deleteConversation({
+    required String conversationId,
+    required String userId,
+  }) {
+    final now = DateTime.now().toUtc();
+    for (final k in _allUserKeys(userId)) {
+      _deletedConvsByUser
+          .putIfAbsent(k, () => <String>{})
+          .add(conversationId);
+      _clearedTimestampsByUser
+          .putIfAbsent(k, () => <String, DateTime>{})[conversationId] = now;
+      try {
+        AppPersistenceService.instance.markConvDeletedForUser(conversationId, k);
+      } catch (_) {}
+    }
+
+    _conversations.remove(conversationId);
+    _draftConversations.remove(conversationId);
+    _messages.remove(conversationId);
+
+    _saveConvsToPrefs();
+    _saveMsgsToPrefs();
+    _saveUserDeletedToPrefs();
+    _saveUserClearedToPrefs();
+    _convController.add(null);
+    _msgController.add(null);
+  }
+
+  Map<String, dynamic> getOrCreate({
+    required String userA,
+    required String userB,
+  }) {
+    final existing = findExisting(userA: userA, userB: userB);
+    if (existing != null) {
+      return existing;
     }
 
     final id = ChatRepository.generateUuid();
     final now = DateTime.now().toUtc().toIso8601String();
-    final newConv = {
+    final draftConv = {
       'id': id,
       'participant_a': userA,
       'participant_b': userB,
       'last_message': '',
       'last_message_at': now,
       'created_at': now,
+      'is_draft': true,
     };
-    undeleteForUser(id, userA);
-    undeleteForUser(id, userB);
-
-    _conversations[id] = newConv;
-    _saveConvsToPrefs();
-    _convController.add(null);
-    return newConv;
+    _draftConversations[id] = draftConv;
+    return draftConv;
   }
 
   Map<String, Map<String, dynamic>> getConversationsForMap(String uid) {
@@ -693,6 +776,10 @@ class _LocalChatStore {
     for (final entry in _conversations.entries) {
       if (isDeletedForUser(entry.key, uid)) continue;
       final c = entry.value;
+      final msgs = getMessages(entry.key, userId: uid);
+      // Only list active conversations with messages
+      if (msgs.isEmpty) continue;
+
       final pa = c['participant_a'] as String? ?? '';
       final pb = c['participant_b'] as String? ?? '';
       if (pa == uid ||
@@ -769,7 +856,13 @@ class _LocalChatStore {
       list.add(msg);
     }
 
-    if (_conversations.containsKey(convId)) {
+    if (_draftConversations.containsKey(convId)) {
+      final draft = _draftConversations.remove(convId)!;
+      draft['last_message'] = msg['text'] ?? '';
+      draft['last_message_at'] = msg['created_at'] ?? DateTime.now().toUtc().toIso8601String();
+      _conversations[convId] = draft;
+      _saveConvsToPrefs();
+    } else if (_conversations.containsKey(convId)) {
       _conversations[convId] = {
         ..._conversations[convId]!,
         'last_message': msg['text'] ?? '',

@@ -188,15 +188,15 @@ class CastingCallCard extends StatelessWidget {
                       ),
                     ),
 
-                    // Top Action Icons
+                    // Top Action Icons (Decongested)
                     if (isMyCall && onEdit != null) ...[
                       // Edit Icon
                       InkWell(
                         onTap: onEdit,
                         borderRadius: BorderRadius.circular(16),
                         child: Container(
-                          width: 32,
-                          height: 32,
+                          width: 34,
+                          height: 34,
                           decoration: const BoxDecoration(
                             color: Color(0xFFE8F2FD),
                             shape: BoxShape.circle,
@@ -208,72 +208,16 @@ class CastingCallCard extends StatelessWidget {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 6),
-                    ],
-                    if (isMyCall && onDelete != null) ...[
-                      // Trash Icon
-                      InkWell(
-                        onTap: () {
-                          DeleteCastingModal.show(
-                            context,
-                            call: call,
-                            onConfirmDelete: onDelete!,
-                          );
-                        },
-                        borderRadius: BorderRadius.circular(16),
-                        child: Container(
-                          width: 32,
-                          height: 32,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFFFEBEE),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.delete_outline_rounded,
-                            size: 17,
-                            color: Color(0xFFE53935),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
+                      const SizedBox(width: 8),
                     ],
 
-                    // Share Icon
-                    InkWell(
-                      onTap: () {
-                        Clipboard.setData(ClipboardData(
-                          text: 'https://youtooart.com/casting/${call.id}',
-                        ));
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content: Text('Casting link copied to clipboard')),
-                        );
-                      },
-                      borderRadius: BorderRadius.circular(16),
-                      child: Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                              color: const Color(0xFFEAEAEA), width: 0.8),
-                        ),
-                        child: const Icon(
-                          Icons.reply_rounded,
-                          size: 18,
-                          color: Color(0xFF3899F3),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-
-                    // 3-Dots More Icon
+                    // More Options Icon (opens complete options sheet with Delete, Copy Link/Share, Save)
                     InkWell(
                       onTap: () => _showOptionsModal(context),
                       borderRadius: BorderRadius.circular(16),
                       child: Container(
-                        width: 32,
-                        height: 32,
+                        width: 34,
+                        height: 34,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           border: Border.all(
@@ -281,7 +225,7 @@ class CastingCallCard extends StatelessWidget {
                         ),
                         child: const Icon(
                           Icons.more_vert_rounded,
-                          size: 16,
+                          size: 17,
                           color: Color(0xFF757575),
                         ),
                       ),
@@ -297,7 +241,7 @@ class CastingCallCard extends StatelessWidget {
                         ? call.shootDuration
                         : (call.shootDetails.isNotEmpty ? call.shootDetails : 'TBD');
 
-                    if (constraints.maxWidth < 300) {
+                    if (constraints.maxWidth < 360) {
                       return Column(
                         children: [
                           Row(

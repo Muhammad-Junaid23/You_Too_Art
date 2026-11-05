@@ -355,7 +355,7 @@ class _CreateCastingCallScreenState
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          _buildLabel('Role Title'),
+                          Flexible(child: _buildLabel('Role Title')),
                           const Text(
                             '(Optional)',
                             style: TextStyle(
@@ -520,11 +520,14 @@ class _CreateCastingCallScreenState
                                     color: Colors.white,
                                   ),
                                 )
-                              : Text(
-                                  widget.callToEdit != null ? 'Save Changes' : 'Submit',
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w700,
+                              : FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    widget.callToEdit != null ? 'Save Changes' : 'Submit',
+                                    style: const TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700,
+                                    ),
                                   ),
                                 ),
                         ),

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
+import 'package:you_too_art/core/repositories/chat_repository.dart';
+import 'package:you_too_art/core/repositories/connection_repository.dart';
 import 'package:you_too_art/core/repositories/storage_repository.dart';
 import 'package:you_too_art/features/profile/providers/user_portfolio_provider.dart';
 
@@ -169,8 +171,10 @@ class _EditWorkMediaSheetState extends State<_EditWorkMediaSheet> {
     }
 
     final newItem = WorkMediaItem(
-      id: widget.existingItem?.id ??
-          '${widget.isVideo ? 'vid' : 'photo'}_${DateTime.now().millisecondsSinceEpoch}',
+      id: (widget.existingItem != null &&
+              ConnectionRepository.isValidUuid(widget.existingItem!.id))
+          ? widget.existingItem!.id
+          : ChatRepository.generateUuid(),
       title: title,
       url: url.isNotEmpty
           ? url

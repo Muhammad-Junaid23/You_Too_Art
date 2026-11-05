@@ -279,9 +279,7 @@ class _TalentScreenState extends ConsumerState<TalentScreen> {
                                   );
                                 },
                                 onConnect: () {
-                                  final isProd = talent.isProductionHouse ||
-                                      talent.roles.toLowerCase().contains('production') ||
-                                      talent.roles.toLowerCase().contains('studio');
+                                  final isProd = talent.isProductionHouse;
                                   if (isProd) {
                                     ref
                                         .read(talentListProvider.notifier)
@@ -354,9 +352,7 @@ class _TalentScreenState extends ConsumerState<TalentScreen> {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
                                         content: Text(
-                                          talent.isProductionHouse
-                                              ? 'Follow ${talent.name} first to start chatting!'
-                                              : 'Connect with ${talent.name} first to start chatting!',
+                                          'Connect with ${talent.name} first to start chatting!',
                                         ),
                                         behavior: SnackBarBehavior.floating,
                                         backgroundColor: const Color(0xFF1E293B),

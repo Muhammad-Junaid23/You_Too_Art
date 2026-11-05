@@ -10,7 +10,7 @@ import 'package:you_too_art/features/home/models/post_item.dart';
 /// Provider for the current logged-in user's profile.
 final currentUserProfileProvider = StreamProvider<UserModel?>((ref) async* {
   final uid = ref.watch(currentUidProvider);
-  if (uid == null || TestAccounts.isTestId(uid)) {
+  if (uid == null || uid.trim().isEmpty || TestAccounts.isTestId(uid)) {
     yield null;
     return;
   }
