@@ -62,7 +62,7 @@ final currentUidProvider = Provider<String?>((ref) {
   final isTestRole = prefs.getBool('is_test_role_logged_in') ?? false;
 
   if (isTestRole || TestAccounts.isTestId(activePersona.id)) {
-    return activePersona.id;
+    return activePersona.id.isNotEmpty ? activePersona.id : null;
   }
 
   final authState = ref.watch(authStateChangesProvider);
@@ -74,7 +74,7 @@ final currentUidProvider = Provider<String?>((ref) {
     return activeUser.id;
   }
 
-  return activePersona.id;
+  return activePersona.id.isNotEmpty ? activePersona.id : null;
 });
 
 /// Stream of whether the current user's email has been verified.

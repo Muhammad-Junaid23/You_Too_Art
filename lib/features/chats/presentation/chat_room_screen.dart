@@ -52,6 +52,22 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
     final text = _textCtrl.text.trim();
     if (text.isEmpty) return;
 
+    final peer = widget.args.peerTalent;
+    final canMessage =
+        ref.read(chatListProvider.notifier).canMessageUser(peer.id);
+    if (!canMessage) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'You must be connected with ${peer.name} to send messages.',
+          ),
+          backgroundColor: const Color(0xFFE02424),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     _textCtrl.clear();
     setState(() => _isComposing = false);
 

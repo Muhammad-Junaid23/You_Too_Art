@@ -94,47 +94,44 @@ class UserPersonaNotifier extends Notifier<UserPersona> {
 
   static const personaActor = UserPersona(
     id: actorDefaultId,
-    name: 'Hamza Ali',
+    name: 'Ahmed Ali',
     email: 'actor@youtooart.com',
-    role: 'Actor | Performing Artist',
+    role: 'actor',
     avatarUrl:
-        'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',
+        'https://res.cloudinary.com/dsxhrelpu/image/upload/v1793547618/avatars/68f958bd-015f-4d74-ab42-98c224240537/wvudfqw8ke0vsgvo9qjr.png',
     isProductionHouse: false,
-    bio:
-        'Trained theater and screen actor specializing in dramatic monologues, character studies, and cinematic narratives.',
-    website: 'www.hamzaali.art',
-    experience: '5+ Years',
-    location: 'Islamabad, Pakistan',
+    bio: '',
+    website: '',
+    experience: '',
+    location: '',
   );
 
   static const personaAlexander = UserPersona(
     id: alexanderId,
-    name: 'Zaid Khan',
+    name: 'Tommy Don',
     email: 'director@youtooart.com',
-    role: 'Director | Filmmaker',
+    role: 'Director',
     avatarUrl:
-        'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=400&q=80',
+        'https://res.cloudinary.com/dsxhrelpu/image/upload/v1793470261/posts/363152eb-78b7-4625-9f6e-e13dc8da45d2/oqlc9tc0nfbcirkrd5bm.jpg',
     isProductionHouse: false,
-    bio:
-        'Award-winning independent filmmaker and commercial director with a passion for authentic storytelling, festival cinema, and discovering new talent.',
-    website: 'www.zaidkhanfilms.com',
-    experience: '7+ Years',
-    location: 'Lahore, Pakistan',
+    bio: '',
+    website: '',
+    experience: '',
+    location: '',
   );
 
   static const personaFilmFare = UserPersona(
     id: filmfareId,
-    name: 'SkyPulse Studios',
+    name: 'skypulse studio',
     email: 'production@youtooart.com',
     role: 'Production House',
     avatarUrl:
-        'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=400&q=80',
+        'https://res.cloudinary.com/dsxhrelpu/image/upload/v1793356951/posts/4f668c94-c9df-4db2-b844-b7ad0a981fde/zdfmhy6cauwtc0msvz7u.png',
     isProductionHouse: true,
-    bio:
-        'Leading digital film studio producing groundbreaking feature films, digital web series, and high-impact commercial cinema. We connect bold emerging talent with top industry directors.',
-    website: 'www.skypulsestudios.com',
-    experience: '8+ Years',
-    location: 'Islamabad, Pakistan',
+    bio: '',
+    website: '',
+    experience: '',
+    location: '',
   );
 
   static const personaJeremiah = UserPersona(

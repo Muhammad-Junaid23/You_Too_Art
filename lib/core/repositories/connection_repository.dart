@@ -6,7 +6,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:you_too_art/core/constants/supabase_tables.dart';
 import 'package:you_too_art/core/constants/talent_directory.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
+import 'package:you_too_art/core/repositories/chat_repository.dart';
 import 'package:you_too_art/core/repositories/notification_repository.dart';
+import 'package:you_too_art/core/services/app_persistence_service.dart';
 import 'package:you_too_art/features/notifications/models/notification_item.dart';
 
 /// Centralized repository for managing user connections and follows.
@@ -48,8 +50,6 @@ class ConnectionRepository {
 
   List<String> _actorIds() {
     final ids = <String>{UserPersonaNotifier.actorDefaultId};
-    final currentUid = _client.auth.currentUser?.id;
-    if (currentUid != null && currentUid.isNotEmpty) ids.add(currentUid);
     try {
       final actorPersona = UserPersonaNotifier.buildActorPersona();
       ids.add(actorPersona.id);
@@ -63,6 +63,8 @@ class ConnectionRepository {
 
   bool _isUserMatch(String a, String b) {
     if (a == b) return true;
+    // Two distinct valid UUIDs are separate individual accounts and must NEVER match
+    if (isValidUuid(a) && isValidUuid(b) && a != b) return false;
     if (_isActorId(a) && _isActorId(b)) return true;
     return false;
   }
@@ -663,40 +665,177 @@ class ConnectionRepository {
     return status == 'accepted';
   }
 
+  /// Get accepted connections count for any user
+  Future<int> getConnectionsCount(String userId) async {
+    final accepted = await fetchAcceptedConnections(userId);
+    return accepted.length;
+  }
+
   /// Following set for production houses
   Future<Set<String>> getFollowingIds(String userId) async {
+    final persistentSet = AppPersistenceService.instance.getFollowingSet(userId);
     final prefs = await SharedPreferences.getInstance();
     final key = '$_followingPrefKeyPrefix$userId';
     final list = prefs.getStringList(key) ?? [];
-    return list.toSet();
+    final set = {...persistentSet, ...list};
+
+    if (_isSupabaseTableAvailable != false && isValidUuid(userId)) {
+      try {
+        final rows = await _client
+            .from('notifications')
+            .select('recipient_id')
+            .eq('actor_id', userId)
+            .eq('entity_type', 'follow');
+        for (final r in rows) {
+          final rid = r['recipient_id']?.toString();
+          if (rid != null && rid.isNotEmpty) {
+            set.add(rid);
+          }
+        }
+      } catch (_) {}
+    }
+
+    AppPersistenceService.instance.setFollowingSet(userId, set);
+    return set;
   }
 
   static const String _followersCountPrefKey = 'yt_prod_followers_count_';
 
+  List<String> _prodAliases(String targetId) {
+    final aliases = <String>{targetId};
+    if (targetId == UserPersonaNotifier.filmfareId ||
+        targetId == 'filmfare' ||
+        targetId == '4f668c94-c9df-4db2-b844-b7ad0a981fde' ||
+        targetId == 'b2222222-2222-2222-2222-222222222222') {
+      aliases.add(UserPersonaNotifier.filmfareId);
+      aliases.add('filmfare');
+      aliases.add('4f668c94-c9df-4db2-b844-b7ad0a981fde');
+      aliases.add('b2222222-2222-2222-2222-222222222222');
+    }
+    return aliases.toList();
+  }
+
   /// Get total followers count for a production house
   Future<int> getFollowersCount(String targetId) async {
     final prefs = await SharedPreferences.getInstance();
-    final count = prefs.getInt('$_followersCountPrefKey$targetId');
-    if (count != null) return count;
-    return 0;
+    final aliases = _prodAliases(targetId);
+
+    int maxStored = 0;
+    for (final a in aliases) {
+      final pCount = AppPersistenceService.instance.getFollowersCount(a);
+      if (pCount > maxStored) maxStored = pCount;
+      final c = prefs.getInt('$_followersCountPrefKey$a');
+      if (c != null && c > maxStored) maxStored = c;
+    }
+
+    // Dynamic count from all active user following sets
+    int dynamicCount = 0;
+    for (final key in prefs.getKeys()) {
+      if (key.startsWith(_followingPrefKeyPrefix)) {
+        final list = prefs.getStringList(key) ?? [];
+        if (aliases.any((a) => list.contains(a))) {
+          dynamicCount++;
+        }
+      }
+    }
+
+    // Check cloud notifications table for durable follower count
+    int cloudCount = 0;
+    if (_isSupabaseTableAvailable != false) {
+      try {
+        final validAliases = aliases.where(isValidUuid).toList();
+        if (validAliases.isNotEmpty) {
+          final res = await _client
+              .from('notifications')
+              .select('actor_id')
+              .inFilter('recipient_id', validAliases)
+              .eq('entity_type', 'follow');
+          final uniqueActors = res.map((r) => r['actor_id']?.toString()).toSet();
+          cloudCount = uniqueActors.length;
+        }
+      } catch (_) {}
+    }
+
+    int bestCount = dynamicCount > maxStored ? dynamicCount : maxStored;
+    if (cloudCount > bestCount) bestCount = cloudCount;
+
+    for (final a in aliases) {
+      AppPersistenceService.instance.setFollowersCount(a, bestCount);
+      prefs.setInt('$_followersCountPrefKey$a', bestCount);
+    }
+
+    return bestCount;
   }
 
   Future<void> toggleFollowing(String userId, String targetId) async {
     final prefs = await SharedPreferences.getInstance();
     final key = '$_followingPrefKeyPrefix$userId';
-    final countKey = '$_followersCountPrefKey$targetId';
-    final set = (prefs.getStringList(key) ?? []).toSet();
-    int followers = prefs.getInt(countKey) ?? 0;
+    final set = (await getFollowingIds(userId)).toSet();
+    final aliases = _prodAliases(targetId);
 
-    if (set.contains(targetId)) {
-      set.remove(targetId);
-      followers = (followers - 1).clamp(0, 999999);
+    final isCurrentlyFollowing = aliases.any((a) => set.contains(a));
+    int currentFollowers = await getFollowersCount(targetId);
+
+    final canonicalTarget = UserPersonaNotifier.isProductionId(targetId)
+        ? AppPersistenceService.realProductionId
+        : targetId;
+    final canonicalUser = UserPersonaNotifier.isDirectorId(userId)
+        ? AppPersistenceService.realDirectorId
+        : (UserPersonaNotifier.isActorId(userId)
+            ? AppPersistenceService.realActorId
+            : userId);
+
+    if (isCurrentlyFollowing) {
+      for (final a in aliases) {
+        set.remove(a);
+      }
+      currentFollowers = (currentFollowers - 1).clamp(0, 999999);
+
+      if (_isSupabaseTableAvailable != false && isValidUuid(canonicalUser)) {
+        try {
+          final validAliases = aliases.where(isValidUuid).toList();
+          if (validAliases.isNotEmpty) {
+            await _client
+                .from('notifications')
+                .delete()
+                .inFilter('recipient_id', validAliases)
+                .eq('actor_id', canonicalUser)
+                .eq('entity_type', 'follow');
+          }
+        } catch (_) {}
+      }
     } else {
       set.add(targetId);
-      followers = followers + 1;
+      set.add(canonicalTarget);
+      currentFollowers = currentFollowers + 1;
+
+      if (_isSupabaseTableAvailable != false &&
+          isValidUuid(canonicalUser) &&
+          isValidUuid(canonicalTarget)) {
+        try {
+          final followerName =
+              AppPersistenceService.instance.getPersona(canonicalUser).name;
+          await _client.from('notifications').insert({
+            'id': ChatRepository.generateUuid(),
+            'recipient_id': canonicalTarget,
+            'actor_id': canonicalUser,
+            'type': 'post_like',
+            'entity_type': 'follow',
+            'primary_subject': followerName.isNotEmpty ? followerName : 'User',
+            'action_text': 'started following you',
+            'created_at': DateTime.now().toUtc().toIso8601String(),
+          });
+        } catch (_) {}
+      }
     }
+
     await prefs.setStringList(key, set.toList());
-    await prefs.setInt(countKey, followers);
+    AppPersistenceService.instance.setFollowingSet(userId, set);
+
+    for (final a in aliases) {
+      await prefs.setInt('$_followersCountPrefKey$a', currentFollowers);
+      AppPersistenceService.instance.setFollowersCount(a, currentFollowers);
+    }
     notifyChanges();
   }
 

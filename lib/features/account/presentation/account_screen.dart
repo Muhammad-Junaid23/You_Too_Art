@@ -193,10 +193,17 @@ class AccountScreen extends ConsumerWidget {
             // ─── Settings / Navigation Options ─────────────────
             Expanded(
               child: ListView(
+                padding: EdgeInsets.zero,
                 children: [
                   _buildOptionTile(
                     context: context,
-                    icon: Icons.receipt_long_outlined,
+                    icon: Icons.check_circle_outline_rounded,
+                    title: 'Verify Account',
+                    onTap: () => AccountSheets.showVerifyAccount(context),
+                  ),
+                  _buildOptionTile(
+                    context: context,
+                    icon: Icons.swap_horiz_rounded,
                     title: 'Transaction History',
                     onTap: () {
                       Navigator.of(context).push(
@@ -208,20 +215,8 @@ class AccountScreen extends ConsumerWidget {
                   ),
                   _buildOptionTile(
                     context: context,
-                    icon: Icons.shield_outlined,
-                    title: 'Privacy Policy',
-                    onTap: () => AccountSheets.showPrivacyPolicy(context),
-                  ),
-                  _buildOptionTile(
-                    context: context,
-                    icon: Icons.description_outlined,
-                    title: 'Terms of Use',
-                    onTap: () => AccountSheets.showTermsConditions(context),
-                  ),
-                  _buildOptionTile(
-                    context: context,
-                    icon: Icons.headset_mic_outlined,
-                    title: 'Help & Support',
+                    icon: Icons.support_outlined,
+                    title: 'Support',
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
@@ -232,41 +227,28 @@ class AccountScreen extends ConsumerWidget {
                   ),
                   _buildOptionTile(
                     context: context,
-                    icon: Icons.delete_outline_rounded,
-                    title: 'Delete Account',
-                    iconColor: const Color(0xFFFF5252),
-                    titleColor: const Color(0xFFFF5252),
-                    onTap: () {
-                      showDialog(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          title: const Text('Delete Account'),
-                          content: const Text(
-                              'Are you sure you want to delete your account? This action cannot be undone.'),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(ctx),
-                              child: const Text('Cancel'),
-                            ),
-                            TextButton(
-                              onPressed: () {
-                                Navigator.pop(ctx);
-                                ref.read(authProvider.notifier).logout();
-                              },
-                              child: const Text(
-                                'Delete',
-                                style: TextStyle(color: Colors.red),
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
+                    icon: Icons.info_outline_rounded,
+                    title: 'About us',
+                    onTap: () => AccountSheets.showAboutUs(context),
+                  ),
+                  _buildOptionTile(
+                    context: context,
+                    icon: Icons.article_outlined,
+                    title: 'Terms & Conditions',
+                    onTap: () => AccountSheets.showTermsConditions(context),
+                  ),
+                  _buildOptionTile(
+                    context: context,
+                    icon: Icons.article_outlined,
+                    title: 'Privacy Policy',
+                    onTap: () => AccountSheets.showPrivacyPolicy(context),
                   ),
                   _buildOptionTile(
                     context: context,
                     icon: Icons.logout_rounded,
                     title: 'Logout',
+                    iconColor: const Color(0xFFFF4D4F),
+                    titleColor: const Color(0xFFFF4D4F),
                     onTap: () => AccountSheets.showLogoutModal(
                       context,
                       onLogout: () {
@@ -288,7 +270,7 @@ class AccountScreen extends ConsumerWidget {
     required IconData icon,
     required String title,
     required VoidCallback onTap,
-    Color iconColor = const Color(0xFF9E9E9E),
+    Color iconColor = const Color(0xFF8E95A0),
     Color titleColor = const Color(0xFF1A1A2E),
   }) {
     return Column(
@@ -323,9 +305,7 @@ class AccountScreen extends ConsumerWidget {
         const Divider(
           height: 1,
           thickness: 1,
-          color: Color(0xFFF5F5F5),
-          indent: 20,
-          endIndent: 20,
+          color: Color(0xFFF0F0F0),
         ),
       ],
     );

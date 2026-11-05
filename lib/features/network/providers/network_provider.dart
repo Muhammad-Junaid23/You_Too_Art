@@ -6,8 +6,8 @@ import 'package:you_too_art/core/models/user_model.dart';
 import 'package:you_too_art/core/providers/supabase_providers.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
 import 'package:you_too_art/core/repositories/connection_repository.dart';
+import 'package:you_too_art/core/services/app_persistence_service.dart';
 import 'package:you_too_art/features/auth/providers/auth_provider.dart';
-import 'package:you_too_art/features/home/models/post_item.dart';
 import 'package:you_too_art/features/network/models/network_item.dart';
 import 'package:you_too_art/features/chats/providers/chat_provider.dart';
 import 'package:you_too_art/features/talent/models/talent_model.dart';
@@ -92,44 +92,90 @@ class NetworkNotifier extends Notifier<NetworkState> {
   }
 
   TalentModel _resolveTalent(String id) {
-    final direct = TalentDirectory.findById(id);
-    if (direct != null) return direct;
+    if (UserPersonaNotifier.hasPersona(id)) {
+      final persona = UserPersonaNotifier.getPersonaById(id);
+      return TalentModel.fromPersona(persona);
+    }
 
     if (UserPersonaNotifier.isActorId(id)) {
       final persona = UserPersonaNotifier.getActorPersona();
       return TalentModel.fromPersona(persona);
     }
 
-    if (UserPersonaNotifier.hasPersona(id)) {
-      final persona = UserPersonaNotifier.getPersonaById(id);
-      return TalentModel.fromPersona(persona);
+    final direct = TalentDirectory.findById(id);
+    if (direct != null &&
+        direct.name != 'Artist' &&
+        direct.name != 'Creative Artist') {
+      return direct;
     }
+
+    try {
+      final fromTalentList = ref.read(talentListProvider).findById(id);
+      if (fromTalentList != null) {
+        return fromTalentList;
+      }
+    } catch (_) {}
 
     return TalentModel(
       id: id,
-      name: 'Creative Artist',
-      roles: 'Actor | Creator',
-      avatarUrl:
-          'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
+      name: 'Artist',
+      roles: 'Performing Artist',
+      avatarUrl: '',
       bio: 'Artist on You Too Art.',
-      posts: [
-        PostItem(
-          id: 'post-$id',
-          authorId: id,
-          authorName: 'Creative Artist',
-          authorAvatar:
-              'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
-          caption: 'Exciting work on upcoming projects!',
-          createdAt: DateTime.now().subtract(const Duration(days: 1)),
-        ),
-      ],
     );
   }
 
   Future<void> _loadNetworkData() async {
+    if (_activePersona.id.trim().isEmpty) {
+      state = const NetworkState(isLoading: false);
+      return;
+    }
+
     // 1. Fetch incoming requests
     final incomingRaw =
         await _connectionRepo.fetchIncomingRequests(_activePersona.id);
+
+    // 2. Fetch accepted connections
+    final acceptedRaw =
+        await _connectionRepo.fetchAcceptedConnections(_activePersona.id);
+
+    // Asynchronously resolve real profiles from Supabase for any unknown UUIDs
+    final allPeerIds = <String>{
+      for (final r in incomingRaw) r['user_id'] as String,
+      for (final a in acceptedRaw)
+        (a['user_id'] == _activePersona.id
+            ? a['connected_user_id']
+            : a['user_id']) as String,
+    };
+
+    for (final pid in allPeerIds) {
+      if (ConnectionRepository.isValidUuid(pid) &&
+          !UserPersonaNotifier.hasPersona(pid)) {
+        try {
+          final client = ref.read(supabaseClientProvider);
+          final row =
+              await client.from('users').select().eq('id', pid).maybeSingle();
+          if (row != null) {
+            final u = UserModel.fromJson(row);
+            final persona = UserPersona(
+              id: u.id,
+              name: u.name.isNotEmpty
+                  ? u.name
+                  : (u.firstName.isNotEmpty
+                      ? '${u.firstName} ${u.lastName}'.trim()
+                      : 'Artist'),
+              email: u.email,
+              role: u.role != 'unset' ? u.role : 'Artist',
+              avatarUrl: u.profileImagePath ?? '',
+              bio: u.bio ?? '',
+              location: u.location ?? '',
+            );
+            AppPersistenceService.instance.savePersona(persona);
+          }
+        } catch (_) {}
+      }
+    }
+
     final requestItems = incomingRaw.map((row) {
       final senderId = row['user_id'] as String;
       final talent = _resolveTalent(senderId);
@@ -143,9 +189,6 @@ class NetworkNotifier extends Notifier<NetworkState> {
       );
     }).toList();
 
-    // 2. Fetch accepted connections
-    final acceptedRaw =
-        await _connectionRepo.fetchAcceptedConnections(_activePersona.id);
     final connectionItems = acceptedRaw.map((row) {
       final senderId = row['user_id'] as String;
       final targetId = row['connected_user_id'] as String;
@@ -170,11 +213,12 @@ class NetworkNotifier extends Notifier<NetworkState> {
     final candidateMap = <String, TalentModel>{};
     try {
       final client = ref.read(supabaseClientProvider);
-      final response = await client
-          .from(SupabaseTables.users)
-          .select()
-          .neq('id', _activePersona.id)
-          .limit(20);
+      var query = client.from(SupabaseTables.users).select();
+      if (_activePersona.id.isNotEmpty &&
+          ConnectionRepository.isValidUuid(_activePersona.id)) {
+        query = query.neq('id', _activePersona.id);
+      }
+      final response = await query.limit(20);
       final list = response as List;
       for (final data in list) {
         final u = UserModel.fromJson(data as Map<String, dynamic>);
@@ -186,6 +230,21 @@ class NetworkNotifier extends Notifier<NetworkState> {
         }
       }
     } catch (_) {}
+
+    // Include platform candidate personas in network suggestions
+    final platformPersonas = [
+      UserPersonaNotifier.getActorPersona(),
+      UserPersonaNotifier.getPersonaById(AppPersistenceService.realDirectorId),
+      UserPersonaNotifier.getPersonaById(AppPersistenceService.realProductionId),
+    ];
+    for (final p in platformPersonas) {
+      final isSelf = UserPersonaNotifier.isSamePersona(p.id, _activePersona.id);
+      final isConnected = connectedIds.any((cid) => UserPersonaNotifier.isSamePersona(cid, p.id));
+      final isRequested = requestedIds.any((rid) => UserPersonaNotifier.isSamePersona(rid, p.id));
+      if (!isSelf && !isConnected && !isRequested) {
+        candidateMap[p.id] = TalentModel.fromPersona(p);
+      }
+    }
     final candidateTalents = candidateMap.values.toList();
 
     final followingIds =

@@ -409,7 +409,7 @@ class TalentDirectory {
   static TalentModel? findById(String id) {
     if (UserPersonaNotifier.isActorId(id)) {
       final persona = UserPersonaNotifier.getActorPersona();
-      final portfolio = AppPersistenceService.instance.getPortfolio('actor');
+      final portfolio = AppPersistenceService.instance.getPortfolio(id);
       final photos = portfolio.photos.map((p) => p.mediaUrl).toList();
       return TalentModel.fromPersona(
         persona,
@@ -420,15 +420,12 @@ class TalentDirectory {
     }
     if (UserPersonaNotifier.hasPersona(id)) {
       final persona = UserPersonaNotifier.getPersonaById(id);
-      final base = _byId[id] ?? _byId[persona.id];
-      final portfolio = AppPersistenceService.instance.getPortfolio(id);
+      final portfolio = AppPersistenceService.instance.getPortfolio(persona.id);
       final photos = portfolio.photos.map((p) => p.mediaUrl).toList();
       return TalentModel.fromPersona(
         persona,
-        connectsCount: base?.connectsCount ?? '0',
+        connectsCount: '0',
         postsCount: '${portfolio.videos.length + portfolio.photos.length}',
-        posts: base?.posts ?? [],
-        aboutInfo: base?.aboutInfo,
         workPortfolio: photos,
       );
     }

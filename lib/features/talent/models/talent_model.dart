@@ -17,7 +17,15 @@ class TalentModel {
   final String roles;
   final ConnectionStatus connectionStatus;
   final bool isFollowing;
-  final bool isProductionHouse;
+  final bool _isProductionHouse;
+  bool get isProductionHouse =>
+      _isProductionHouse ||
+      roles.toLowerCase().contains('production') ||
+      roles.toLowerCase().contains('studio') ||
+      roles.toLowerCase().contains('house') ||
+      name.toLowerCase().contains('studio') ||
+      name.toLowerCase().contains('production');
+
   final String connectsCount;
   final String postsCount;
   final String followersCount;
@@ -35,7 +43,7 @@ class TalentModel {
     required this.roles,
     this.connectionStatus = ConnectionStatus.none,
     this.isFollowing = false,
-    this.isProductionHouse = false,
+    bool? isProductionHouse,
     this.connectsCount = '0',
     this.postsCount = '0',
     this.followersCount = '0',
@@ -45,7 +53,7 @@ class TalentModel {
     this.posts = const [],
     this.aboutInfo = const {},
     this.workPortfolio = const [],
-  });
+  }) : _isProductionHouse = isProductionHouse ?? false;
 
   bool get isConnected => connectionStatus == ConnectionStatus.connected;
   bool get isPending =>
@@ -176,6 +184,10 @@ class TalentModel {
 
     final role = json['role'] as String? ?? '';
     final isProd = role.toLowerCase().contains('production') ||
+        role.toLowerCase().contains('studio') ||
+        role.toLowerCase().contains('house') ||
+        name.toLowerCase().contains('studio') ||
+        name.toLowerCase().contains('production') ||
         json['incorporation_number'] != null;
 
     final rolesStr = (role.isNotEmpty && role.toLowerCase() != 'unset')

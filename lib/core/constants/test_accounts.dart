@@ -57,11 +57,11 @@ class TestAccount {
       email: email,
       role: role,
       profileImagePath: avatarUrl,
-      bio: bio,
-      location: location,
-      incorporationNumber: isProductionHouse ? 'PK-REG-84920' : null,
-      establishedYear: isProductionHouse ? 2019 : null,
-      address: isProductionHouse ? 'Blue Area, Islamabad' : null,
+      bio: bio.isNotEmpty ? bio : null,
+      location: location.isNotEmpty ? location : null,
+      incorporationNumber: null,
+      establishedYear: null,
+      address: null,
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
     );
@@ -73,63 +73,60 @@ class TestAccounts {
 
   static const String masterTestOtp = '123456';
 
-  static const String productionId = 'b2222222-2222-2222-2222-222222222222';
-  static const String actorId = '00000000-0000-0000-0000-000000000001';
-  static const String directorId = 'a1111111-1111-1111-1111-111111111111';
+  static const String productionId = '4f668c94-c9df-4db2-b844-b7ad0a981fde';
+  static const String actorId = '68f958bd-015f-4d74-ab42-98c224240537';
+  static const String directorId = '363152eb-78b7-4625-9f6e-e13dc8da45d2';
   static const String cinematographerId = 'c3333333-3333-3333-3333-333333333333';
   static const String singerId = 'd4444444-4444-4444-4444-444444444444';
 
   static const productionHouse = TestAccount(
     id: productionId,
     email: 'production@youtooart.com',
-    name: 'SkyPulse Studios',
-    firstName: 'SkyPulse',
-    lastName: 'Studios',
+    name: 'skypulse studio',
+    firstName: 'skypulse',
+    lastName: 'studio',
     role: 'production_house',
     roleDisplay: 'Production House',
     avatarUrl:
-        'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=400&q=80',
-    location: 'Islamabad, Pakistan',
-    bio:
-        'Leading digital film studio producing groundbreaking feature films, digital web series, and high-impact commercial cinema. We connect bold emerging talent with top industry directors.',
-    website: 'www.skypulsestudios.com',
-    experience: '8+ Years',
+        'https://res.cloudinary.com/dsxhrelpu/image/upload/v1793356951/posts/4f668c94-c9df-4db2-b844-b7ad0a981fde/zdfmhy6cauwtc0msvz7u.png',
+    location: '',
+    bio: '',
+    website: '',
+    experience: '',
     isProductionHouse: true,
   );
 
   static const actor = TestAccount(
     id: actorId,
     email: 'actor@youtooart.com',
-    name: 'Hamza Ali',
-    firstName: 'Hamza',
+    name: 'Ahmed Ali',
+    firstName: 'Ahmed',
     lastName: 'Ali',
     role: 'actor',
-    roleDisplay: 'Actor | Performing Artist',
+    roleDisplay: 'actor',
     avatarUrl:
-        'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',
-    location: 'Islamabad, Pakistan',
-    bio:
-        'Trained theater and screen actor specializing in dramatic monologues, character studies, and cinematic narratives.',
-    website: 'www.hamzaali.art',
-    experience: '5+ Years',
+        'https://res.cloudinary.com/dsxhrelpu/image/upload/v1793547618/avatars/68f958bd-015f-4d74-ab42-98c224240537/wvudfqw8ke0vsgvo9qjr.png',
+    location: '',
+    bio: '',
+    website: '',
+    experience: '',
     isProductionHouse: false,
   );
 
   static const director = TestAccount(
     id: directorId,
     email: 'director@youtooart.com',
-    name: 'Zaid Khan',
-    firstName: 'Zaid',
-    lastName: 'Khan',
+    name: 'Tommy Don',
+    firstName: 'Tommy',
+    lastName: 'Don',
     role: 'director',
-    roleDisplay: 'Director | Filmmaker',
+    roleDisplay: 'Director',
     avatarUrl:
-        'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=400&q=80',
-    location: 'Lahore, Pakistan',
-    bio:
-        'Award-winning independent filmmaker and commercial director with a passion for authentic storytelling, festival cinema, and discovering new talent.',
-    website: 'www.zaidkhanfilms.com',
-    experience: '7+ Years',
+        'https://res.cloudinary.com/dsxhrelpu/image/upload/v1793470261/posts/363152eb-78b7-4625-9f6e-e13dc8da45d2/oqlc9tc0nfbcirkrd5bm.jpg',
+    location: '',
+    bio: '',
+    website: '',
+    experience: '',
     isProductionHouse: false,
   );
 

@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
+import 'package:you_too_art/core/repositories/chat_repository.dart';
+import 'package:you_too_art/core/repositories/connection_repository.dart';
 import 'package:you_too_art/core/services/app_persistence_driver.dart';
 import 'package:you_too_art/features/profile/providers/user_portfolio_provider.dart';
 import 'package:you_too_art/features/casting/models/casting_application_model.dart';
@@ -20,11 +22,97 @@ import 'package:you_too_art/features/casting/models/casting_call_model.dart';
 class AppPersistenceService {
   static const String _masterKey = 'you_too_art_master_state_v4';
 
-  static const String actorDefaultId = '00000000-0000-0000-0000-000000000001';
-  static const String alexanderId = 'a1111111-1111-1111-1111-111111111111';
-  static const String filmfareId = 'b2222222-2222-2222-2222-222222222222';
+  static const String actorDefaultId = '68f958bd-015f-4d74-ab42-98c224240537';
+  static const String alexanderId = '363152eb-78b7-4625-9f6e-e13dc8da45d2';
+  static const String filmfareId = '4f668c94-c9df-4db2-b844-b7ad0a981fde';
   static const String jeremiahId = 'c3333333-3333-3333-3333-333333333333';
   static const String singerId = 'd4444444-4444-4444-4444-444444444444';
+
+  static const String realDirectorId = '363152eb-78b7-4625-9f6e-e13dc8da45d2';
+  static const String realActorId = '68f958bd-015f-4d74-ab42-98c224240537';
+  static const String realProductionId = '4f668c94-c9df-4db2-b844-b7ad0a981fde';
+
+  static UserPortfolioState get defaultActorPortfolio => _defaultActorPortfolio;
+  static UserPortfolioState get defaultDirectorPortfolio => _defaultDirectorPortfolio;
+  static UserPortfolioState get defaultProductionPortfolio => _defaultProductionPortfolio;
+
+  static final UserPortfolioState _defaultActorPortfolio = UserPortfolioState(
+    videos: [
+      WorkMediaItem(
+        id: '11111111-0000-0000-0000-000000000001',
+        title: 'Dramatic Monologue - Character Study',
+        url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+        mediaUrl:
+            'https://res.cloudinary.com/dsxhrelpu/image/upload/v1793547862/posts/68f958bd-015f-4d74-ab42-98c224240537/ktn2ebeepmuo7qe8zqem.png',
+        isVideo: true,
+        lastUpdated: 'Recently',
+      ),
+    ],
+    photos: [
+      WorkMediaItem(
+        id: '11111111-0000-0000-0000-000000000002',
+        title: 'Dramatic Portrait Still',
+        url:
+            'https://res.cloudinary.com/dsxhrelpu/image/upload/v1793547862/posts/68f958bd-015f-4d74-ab42-98c224240537/ktn2ebeepmuo7qe8zqem.png',
+        mediaUrl:
+            'https://res.cloudinary.com/dsxhrelpu/image/upload/v1793547862/posts/68f958bd-015f-4d74-ab42-98c224240537/ktn2ebeepmuo7qe8zqem.png',
+        isVideo: false,
+        lastUpdated: 'Recently',
+      ),
+    ],
+  );
+
+  static final UserPortfolioState _defaultDirectorPortfolio = UserPortfolioState(
+    videos: [
+      WorkMediaItem(
+        id: '22222222-0000-0000-0000-000000000001',
+        title: 'Director Narrative Showreel',
+        url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+        mediaUrl:
+            'https://res.cloudinary.com/dsxhrelpu/image/upload/v1793470261/posts/363152eb-78b7-4625-9f6e-e13dc8da45d2/oqlc9tc0nfbcirkrd5bm.jpg',
+        isVideo: true,
+        lastUpdated: 'Recently',
+      ),
+    ],
+    photos: [
+      WorkMediaItem(
+        id: '22222222-0000-0000-0000-000000000002',
+        title: 'Behind The Scenes - On Set',
+        url:
+            'https://res.cloudinary.com/dsxhrelpu/image/upload/v1793470261/posts/363152eb-78b7-4625-9f6e-e13dc8da45d2/oqlc9tc0nfbcirkrd5bm.jpg',
+        mediaUrl:
+            'https://res.cloudinary.com/dsxhrelpu/image/upload/v1793470261/posts/363152eb-78b7-4625-9f6e-e13dc8da45d2/oqlc9tc0nfbcirkrd5bm.jpg',
+        isVideo: false,
+        lastUpdated: 'Recently',
+      ),
+    ],
+  );
+
+  static final UserPortfolioState _defaultProductionPortfolio = UserPortfolioState(
+    videos: [
+      WorkMediaItem(
+        id: '33333333-0000-0000-0000-000000000001',
+        title: 'Production House Showreel',
+        url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+        mediaUrl:
+            'https://res.cloudinary.com/dsxhrelpu/image/upload/v1793356951/posts/4f668c94-c9df-4db2-b844-b7ad0a981fde/zdfmhy6cauwtc0msvz7u.png',
+        isVideo: true,
+        lastUpdated: 'Recently',
+      ),
+    ],
+    photos: [
+      WorkMediaItem(
+        id: '33333333-0000-0000-0000-000000000002',
+        title: 'Studio Facilities & Soundstage',
+        url:
+            'https://res.cloudinary.com/dsxhrelpu/image/upload/v1793356951/posts/4f668c94-c9df-4db2-b844-b7ad0a981fde/zdfmhy6cauwtc0msvz7u.png',
+        mediaUrl:
+            'https://res.cloudinary.com/dsxhrelpu/image/upload/v1793356951/posts/4f668c94-c9df-4db2-b844-b7ad0a981fde/zdfmhy6cauwtc0msvz7u.png',
+        isVideo: false,
+        lastUpdated: 'Recently',
+      ),
+    ],
+  );
 
   static AppPersistenceService? _instance;
   static AppPersistenceService get instance {
@@ -39,6 +127,9 @@ class AppPersistenceService {
   final SharedPreferences _prefs;
   final Map<String, UserPersona> _personas = {};
   final Map<String, UserPortfolioState> _portfolios = {};
+  final Map<String, int> _followersCounts = {};
+  final Map<String, Set<String>> _followingSets = {};
+  final Map<String, Set<String>> _deletedConvsByUser = {};
   final List<CastingCallModel> _castingCalls = [];
   final List<CastingApplicationModel> _castingApplications = [];
   String _activePersonaId = actorDefaultId;
@@ -72,34 +163,6 @@ class AppPersistenceService {
   static Future<AppPersistenceService> initialize(
     SharedPreferences prefs,
   ) async {
-    final hasPurgedV5 = prefs.getBool('purged_seed_personas_v5') ?? false;
-    if (!hasPurgedV5) {
-      PlatformStorageDriver.clearRawData();
-      prefs.remove('active_user_persona_id');
-      prefs.remove('is_test_role_logged_in');
-      prefs.remove(_masterKey);
-      prefs.remove('you_too_art_master_state_v3');
-      for (final k in prefs.getKeys().where((k) => k.startsWith('persona_profile_') || k.startsWith('user_work_portfolio_')).toList()) {
-        prefs.remove(k);
-      }
-      prefs.setBool('purged_seed_personas_v5', true);
-    }
-    final hasPurgedV4 = prefs.getBool('purged_seed_personas_v4') ?? false;
-    if (!hasPurgedV4) {
-      prefs.remove('active_user_persona_id');
-      prefs.remove('is_test_role_logged_in');
-      for (final k in prefs.getKeys().where((k) => k.startsWith('persona_profile_') || k.startsWith('user_work_portfolio_')).toList()) {
-        prefs.remove(k);
-      }
-      prefs.setBool('purged_seed_personas_v4', true);
-    }
-    final hasPurgedV3 = prefs.getBool('purged_seed_data_v3') ?? false;
-    if (!hasPurgedV3) {
-      prefs.remove('you_too_art_casting_calls_v2');
-      prefs.remove('you_too_art_casting_apps_v2');
-      prefs.remove('saved_post_ids');
-      prefs.setBool('purged_seed_data_v3', true);
-    }
     final service = AppPersistenceService._(prefs);
     await service._loadAll();
     _instance = service;
@@ -128,58 +191,106 @@ class AppPersistenceService {
   // ─── Persona Queries ────────────────────────────────────────
 
   bool isActorId(String id) {
-    return id == 'actor' || id == actorDefaultId;
+    final clean = id.trim();
+    return clean == 'actor' ||
+        clean == actorDefaultId ||
+        clean == realActorId ||
+        clean == '00000000-0000-0000-0000-000000000001';
+  }
+
+  bool isDirectorId(String id) {
+    final clean = id.trim();
+    return clean == alexanderId ||
+        clean == realDirectorId ||
+        clean == 'a1111111-1111-1111-1111-111111111111';
+  }
+
+  bool isProductionId(String id) {
+    final clean = id.trim();
+    return clean == filmfareId ||
+        clean == realProductionId ||
+        clean == 'filmfare' ||
+        clean == 'b2222222-2222-2222-2222-222222222222';
   }
 
   bool isSamePersona(String id1, String id2) {
     if (id1 == id2) return true;
+    final clean1 = id1.trim();
+    final clean2 = id2.trim();
+    if (clean1 == clean2) return true;
+
+    final actorAliases = {
+      actorDefaultId,
+      'actor',
+      realActorId,
+      '00000000-0000-0000-0000-000000000001',
+    };
+    if (actorAliases.contains(clean1) && actorAliases.contains(clean2)) return true;
+
+    final dirAliases = {
+      alexanderId,
+      realDirectorId,
+      'a1111111-1111-1111-1111-111111111111',
+    };
+    if (dirAliases.contains(clean1) && dirAliases.contains(clean2)) return true;
+
+    final prodAliases = {
+      filmfareId,
+      'filmfare',
+      realProductionId,
+      'b2222222-2222-2222-2222-222222222222',
+    };
+    if (prodAliases.contains(clean1) && prodAliases.contains(clean2)) return true;
+
     final user = Supabase.instance.client.auth.currentUser;
     if (user != null) {
-      if (id1 == user.id && (isActorId(id2) || id2 == _activePersonaId)) return true;
-      if (id2 == user.id && (isActorId(id1) || id1 == _activePersonaId)) return true;
+      if (clean1 == user.id && clean2 == _activePersonaId) return true;
+      if (clean2 == user.id && clean1 == _activePersonaId) return true;
     }
-    return isActorId(id1) && isActorId(id2);
+    return false;
   }
 
   UserPersona getActorPersona() {
     final user = Supabase.instance.client.auth.currentUser;
-    if (user != null && _personas.containsKey(user.id)) {
-      final p = _personas[user.id]!;
-      if (p.name.trim().isNotEmpty && p.name != 'Hamza Ali' && p.name != 'Muhammad Wajahat') {
-        return p;
+    if (user != null && isActorId(user.id)) {
+      if (_personas.containsKey(user.id)) {
+        final p = _personas[user.id]!;
+        if (p.name.trim().isNotEmpty && p.name != 'Muhammad Wajahat') {
+          return p;
+        }
       }
     }
-    if (user != null) {
-      final handle = user.email != null && user.email!.contains('@')
-          ? user.email!.split('@').first
-          : 'User';
-      final p = UserPersona(
-        id: user.id,
-        name: user.userMetadata?['name'] as String? ?? handle,
-        email: user.email ?? '',
-        role: user.userMetadata?['role'] as String? ?? '',
-        avatarUrl: user.userMetadata?['avatar_url'] as String? ?? '',
-      );
-      _personas[user.id] = p;
-      return p;
-    }
-    return const UserPersona(
-      id: '',
-      name: '',
-      email: '',
-      role: '',
-      avatarUrl: '',
-    );
+    return _personas[realActorId] ??
+        _personas[actorDefaultId] ??
+        _personas['actor'] ??
+        UserPersonaNotifier.personaActor;
   }
 
   UserPersona getPersona(String id) {
     if (isActorId(id)) return getActorPersona();
+    if (isDirectorId(id)) {
+      return _personas[realDirectorId] ??
+          _personas[alexanderId] ??
+          UserPersonaNotifier.personaAlexander;
+    }
+    if (isProductionId(id)) {
+      return _personas[realProductionId] ??
+          _personas[filmfareId] ??
+          UserPersonaNotifier.personaFilmFare;
+    }
     if (_personas.containsKey(id)) return _personas[id]!;
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user != null && user.id == id) {
+      return getActorPersona();
+    }
     return getActorPersona();
   }
 
   bool hasPersona(String id) {
-    return _personas.containsKey(id);
+    return isActorId(id) ||
+        isDirectorId(id) ||
+        isProductionId(id) ||
+        _personas.containsKey(id);
   }
 
   UserPersona getActivePersona() {
@@ -194,9 +305,40 @@ class AppPersistenceService {
   }
 
   List<UserPersona> get allPersonas {
+    final list = <UserPersona>[];
     final active = getActivePersona();
-    if (active.id.isEmpty) return [];
-    return [active];
+    if (active.id.isNotEmpty) {
+      list.add(active);
+    }
+    for (final id in [realActorId, realDirectorId, realProductionId]) {
+      final p = getPersona(id);
+      if (p.id.isNotEmpty && !list.any((x) => isSamePersona(x.id, p.id))) {
+        list.add(p);
+      }
+    }
+    return list;
+  }
+
+  // ─── Follower & Following Queries ────────────────────────────
+
+  int getFollowersCount(String targetId) {
+    return _followersCounts[targetId] ?? 0;
+  }
+
+  void setFollowersCount(String targetId, int count) {
+    _followersCounts[targetId] = count;
+    _flush();
+    notifyListeners();
+  }
+
+  Set<String> getFollowingSet(String userId) {
+    return _followingSets[userId] ?? <String>{};
+  }
+
+  void setFollowingSet(String userId, Set<String> targetIds) {
+    _followingSets[userId] = Set<String>.from(targetIds);
+    _flush();
+    notifyListeners();
   }
 
   void setActivePersonaId(String id) {
@@ -204,27 +346,57 @@ class AppPersistenceService {
     _flush();
   }
 
+  bool isConvDeletedForUser(String convId, String userId) {
+    return _deletedConvsByUser[userId]?.contains(convId) ?? false;
+  }
+
+  void markConvDeletedForUser(String convId, String userId) {
+    _deletedConvsByUser.putIfAbsent(userId, () => <String>{}).add(convId);
+    _flush();
+  }
+
+  void unmarkConvDeletedForUser(String convId, String userId) {
+    _deletedConvsByUser[userId]?.remove(convId);
+    _flush();
+  }
+
+  Set<String> getDeletedConvsForUser(String userId) {
+    return _deletedConvsByUser[userId] ?? <String>{};
+  }
+
   void savePersona(UserPersona updated) {
     final user = Supabase.instance.client.auth.currentUser;
-    final isActor = isActorId(updated.id);
+    final isDir = isDirectorId(updated.id);
+    final isProd = isProductionId(updated.id);
     final jsonStr = jsonEncode(updated.toJson());
 
-    if (isActor) {
-      _personas['actor'] = updated;
-      _personas[actorDefaultId] = updated;
-      if (user != null) {
-        _personas[user.id] = updated.copyWith(id: user.id);
-        _prefs.setString('persona_profile_${user.id}', jsonStr);
-      }
-      _prefs.setString('persona_profile_actor', jsonStr);
-      _prefs.setString('persona_profile_$actorDefaultId', jsonStr);
+    if (isDir) {
+      _personas[updated.id] = updated;
+      _personas[realDirectorId] = updated;
+      _personas[alexanderId] = updated;
+      _prefs.setString('persona_profile_${updated.id}', jsonStr);
+      _prefs.setString('persona_profile_$realDirectorId', jsonStr);
+      _prefs.setString('persona_profile_$alexanderId', jsonStr);
+    } else if (isProd) {
+      _personas[updated.id] = updated;
+      _personas[realProductionId] = updated;
+      _personas[filmfareId] = updated;
+      _prefs.setString('persona_profile_${updated.id}', jsonStr);
+      _prefs.setString('persona_profile_$realProductionId', jsonStr);
+      _prefs.setString('persona_profile_$filmfareId', jsonStr);
     } else {
       _personas[updated.id] = updated;
+      _personas[realActorId] = updated;
+      _personas[actorDefaultId] = updated;
+      _personas['actor'] = updated;
       _prefs.setString('persona_profile_${updated.id}', jsonStr);
+      _prefs.setString('persona_profile_$realActorId', jsonStr);
+      _prefs.setString('persona_profile_$actorDefaultId', jsonStr);
+      _prefs.setString('persona_profile_actor', jsonStr);
     }
 
     _flush();
-    if (isActor) {
+    if (user != null && (user.id == updated.id || isSamePersona(user.id, updated.id))) {
       _syncActorToCloud(updated);
     } else {
       _syncMockPersonasToCloud();
@@ -234,40 +406,116 @@ class AppPersistenceService {
 
   // ─── Portfolio Queries ──────────────────────────────────────
 
+  UserPortfolioState _resolveDefaultPortfolio(String id) {
+    if (isDirectorId(id)) return _defaultDirectorPortfolio;
+    if (isProductionId(id)) return _defaultProductionPortfolio;
+    if (isActorId(id)) return _defaultActorPortfolio;
+
+    final p = _personas[id];
+    if (p != null) {
+      final role = p.role.toLowerCase();
+      if (role.contains('director') || role.contains('filmmaker')) {
+        return _defaultDirectorPortfolio;
+      }
+      if (role.contains('production') || role.contains('studio')) {
+        return _defaultProductionPortfolio;
+      }
+      if (role.contains('actor')) {
+        return _defaultActorPortfolio;
+      }
+    }
+    return _defaultActorPortfolio;
+  }
+
   UserPortfolioState getPortfolio(String id) {
+    final defaultPort = _resolveDefaultPortfolio(id);
+
+    UserPortfolioState? candidate;
     if (_portfolios.containsKey(id)) {
-      return _portfolios[id]!;
+      candidate = _portfolios[id]!;
+    } else {
+      final fromPrefs = _prefs.getString('user_work_portfolio_$id');
+      if (fromPrefs != null && fromPrefs.isNotEmpty) {
+        try {
+          candidate = UserPortfolioState.fromJson(
+            jsonDecode(fromPrefs) as Map<String, dynamic>,
+          );
+        } catch (_) {}
+      }
     }
-    final fromPrefs = _prefs.getString('user_work_portfolio_$id') ??
-        _prefs.getString('user_work_portfolio_');
-    if (fromPrefs != null && fromPrefs.isNotEmpty) {
-      try {
-        final decoded = UserPortfolioState.fromJson(
-          jsonDecode(fromPrefs) as Map<String, dynamic>,
-        );
-        _portfolios[id] = decoded;
-        return decoded;
-      } catch (_) {}
+
+    if (candidate != null) {
+      final effectiveVideos =
+          candidate.videos.isNotEmpty ? candidate.videos : defaultPort.videos;
+      final effectivePhotos =
+          candidate.photos.isNotEmpty ? candidate.photos : defaultPort.photos;
+      final merged = candidate.copyWith(
+        videos: effectiveVideos,
+        photos: effectivePhotos,
+      );
+      _portfolios[id] = merged;
+      return merged;
     }
-    return const UserPortfolioState(videos: [], photos: []);
+
+    if (isDirectorId(id)) {
+      if (_portfolios.containsKey(realDirectorId)) {
+        return getPortfolio(realDirectorId);
+      }
+      return _defaultDirectorPortfolio;
+    }
+    if (isProductionId(id)) {
+      if (_portfolios.containsKey(realProductionId)) {
+        return getPortfolio(realProductionId);
+      }
+      return _defaultProductionPortfolio;
+    }
+    if (isActorId(id)) {
+      if (_portfolios.containsKey(realActorId)) {
+        return getPortfolio(realActorId);
+      }
+      return _defaultActorPortfolio;
+    }
+
+    return defaultPort;
   }
 
   void savePortfolio(String id, UserPortfolioState updated) {
     final user = Supabase.instance.client.auth.currentUser;
-    final jsonStr = jsonEncode(updated.toJson());
+    final defaultPort = _resolveDefaultPortfolio(id);
 
-    _portfolios[id] = updated;
+    final safeVideos =
+        updated.videos.isNotEmpty ? updated.videos : defaultPort.videos;
+    final safePhotos =
+        updated.photos.isNotEmpty ? updated.photos : defaultPort.photos;
+    final safeUpdated =
+        updated.copyWith(videos: safeVideos, photos: safePhotos);
+
+    // Ensure all media items have valid RFC 4122 v4 UUIDs for Postgres compatibility
+    final sanitizedVideos = safeUpdated.videos.map((v) {
+      if (ConnectionRepository.isValidUuid(v.id)) return v;
+      return v.copyWith(id: ChatRepository.generateUuid());
+    }).toList();
+    final sanitizedPhotos = safeUpdated.photos.map((p) {
+      if (ConnectionRepository.isValidUuid(p.id)) return p;
+      return p.copyWith(id: ChatRepository.generateUuid());
+    }).toList();
+    final cleanUpdated = UserPortfolioState(videos: sanitizedVideos, photos: sanitizedPhotos);
+
+    final jsonStr = jsonEncode(cleanUpdated.toJson());
+
+    _portfolios[id] = cleanUpdated;
     _prefs.setString('user_work_portfolio_$id', jsonStr);
 
     if (isActorId(id)) {
-      _portfolios['actor'] = updated;
-      _portfolios[actorDefaultId] = updated;
+      _portfolios['actor'] = cleanUpdated;
+      _portfolios[actorDefaultId] = cleanUpdated;
       _prefs.setString('user_work_portfolio_actor', jsonStr);
+      _prefs.setString('user_work_portfolio_$actorDefaultId', jsonStr);
     }
 
     _flush();
     if (user != null && (id == user.id || id == _activePersonaId || isActorId(id))) {
-      _syncActorPortfolioToCloud(updated);
+      _syncActorPortfolioToCloud(cleanUpdated);
     }
     notifyListeners();
   }
@@ -340,24 +588,9 @@ class AppPersistenceService {
               final p = UserPersona.fromJson(
                 entry.value as Map<String, dynamic>,
               );
-              if (p.name == 'Hamza Ali' ||
-                  p.name == 'Muhammad Wajahat' ||
-                  p.name == 'Zaid Khan' ||
-                  p.name == 'Alexander Vance' ||
-                  p.name == 'Sara Ahmed' ||
-                  p.name == 'Jeremiah Cole' ||
-                  p.name == 'Bilal Tariq' ||
-                  p.name == 'Aria Montgomery' ||
-                  p.name == 'Filmfare Productions' ||
-                  p.email.contains('@youtooart.com') ||
-                  p.id == actorDefaultId ||
-                  p.id == alexanderId ||
-                  p.id == filmfareId ||
-                  p.id == jeremiahId ||
-                  p.id == singerId) {
-                continue;
+              if (p.name.trim().isNotEmpty && p.name != 'Muhammad Wajahat') {
+                _personas[entry.key] = p;
               }
-              _personas[entry.key] = p;
             } catch (_) {}
           }
         }
@@ -371,6 +604,39 @@ class AppPersistenceService {
                 entry.value as Map<String, dynamic>,
               );
             } catch (_) {}
+          }
+        }
+
+        // Followers Counts
+        if (decoded['followers_counts'] is Map) {
+          final fMap = decoded['followers_counts'] as Map<String, dynamic>;
+          for (final entry in fMap.entries) {
+            final val = int.tryParse(entry.value.toString());
+            if (val != null) _followersCounts[entry.key] = val;
+          }
+        }
+
+        // Following Sets
+        if (decoded['following_sets'] is Map) {
+          final sMap = decoded['following_sets'] as Map<String, dynamic>;
+          for (final entry in sMap.entries) {
+            if (entry.value is List) {
+              _followingSets[entry.key] = (entry.value as List)
+                  .map((e) => e.toString())
+                  .toSet();
+            }
+          }
+        }
+
+        // Deleted conversations by user
+        if (decoded['deleted_convs_by_user'] is Map) {
+          final dMap = decoded['deleted_convs_by_user'] as Map<String, dynamic>;
+          for (final entry in dMap.entries) {
+            if (entry.value is List) {
+              _deletedConvsByUser[entry.key] = (entry.value as List)
+                  .map((e) => e.toString())
+                  .toSet();
+            }
           }
         }
 
@@ -417,7 +683,17 @@ class AppPersistenceService {
 
   void _loadIndividualPrefs() {
     final user = Supabase.instance.client.auth.currentUser;
-    final ids = ['actor', actorDefaultId, alexanderId, filmfareId, jeremiahId];
+    final ids = [
+      'actor',
+      actorDefaultId,
+      realActorId,
+      alexanderId,
+      realDirectorId,
+      filmfareId,
+      realProductionId,
+      jeremiahId,
+      singerId,
+    ];
     if (user != null && !ids.contains(user.id)) {
       ids.insert(0, user.id);
     }
@@ -425,9 +701,12 @@ class AppPersistenceService {
       final pStr = _prefs.getString('persona_profile_$id');
       if (pStr != null && pStr.trim().isNotEmpty) {
         try {
-          _personas[id] = UserPersona.fromJson(
+          final p = UserPersona.fromJson(
             jsonDecode(pStr) as Map<String, dynamic>,
           );
+          if (p.name.isNotEmpty && p.name != 'Muhammad Wajahat') {
+            _personas[id] = p;
+          }
         } catch (_) {}
       }
 
@@ -438,6 +717,38 @@ class AppPersistenceService {
             jsonDecode(portStr) as Map<String, dynamic>,
           );
         } catch (_) {}
+      }
+    }
+
+    // Also scan all dynamically saved personas and portfolios
+    for (final k in _prefs.getKeys()) {
+      if (k.startsWith('persona_profile_')) {
+        final id = k.substring('persona_profile_'.length);
+        if (!_personas.containsKey(id)) {
+          final pStr = _prefs.getString(k);
+          if (pStr != null && pStr.trim().isNotEmpty) {
+            try {
+              final p = UserPersona.fromJson(
+                jsonDecode(pStr) as Map<String, dynamic>,
+              );
+              if (p.name.isNotEmpty && p.name != 'Muhammad Wajahat') {
+                _personas[id] = p;
+              }
+            } catch (_) {}
+          }
+        }
+      } else if (k.startsWith('user_work_portfolio_')) {
+        final id = k.substring('user_work_portfolio_'.length);
+        if (!_portfolios.containsKey(id)) {
+          final portStr = _prefs.getString(k);
+          if (portStr != null && portStr.trim().isNotEmpty) {
+            try {
+              _portfolios[id] = UserPortfolioState.fromJson(
+                jsonDecode(portStr) as Map<String, dynamic>,
+              );
+            } catch (_) {}
+          }
+        }
       }
     }
 
@@ -508,39 +819,69 @@ class AppPersistenceService {
   }
 
   void _ensureDefaultsLoaded() {
-    // 1. Purge legacy dummy personas
-    _personas.removeWhere((key, p) =>
-        p.name == 'Hamza Ali' ||
-        p.name == 'Zaid Khan' ||
-        p.name == 'SkyPulse Studios' ||
-        p.name == 'Sara Ahmed' ||
-        p.name == 'Bilal Tariq' ||
-        p.name == 'Muhammad Wajahat' ||
-        p.email == 'actor@youtooart.com' ||
-        p.email == 'director@youtooart.com' ||
-        p.email == 'production@youtooart.com' ||
-        p.email == 'crew@youtooart.com' ||
-        p.email == 'singer@youtooart.com');
+    final actor = UserPersonaNotifier.personaActor;
+    final director = UserPersonaNotifier.personaAlexander;
+    final prod = UserPersonaNotifier.personaFilmFare;
 
-    // 2. Purge legacy dummy portfolios
-    _portfolios.removeWhere((key, port) =>
-        port.videos.any((v) => v.title.contains('Gilgit-Baltistan')) ||
-        port.videos.any((v) => v.title.contains('Dramatic Monologue')) ||
-        key == 'actor' ||
-        key == actorDefaultId ||
-        key == alexanderId ||
-        key == filmfareId ||
-        key == jeremiahId ||
-        key == singerId);
+    // Ensure real test profiles are never overwritten by stale/dummy persona data
+    for (final id in [actorDefaultId, 'actor', realActorId]) {
+      final existing = _personas[id];
+      if (existing == null || existing.name == 'Hamza Ali' || existing.name.isEmpty) {
+        _personas[id] = actor.copyWith(id: id);
+      }
+    }
 
-    // 3. Purge legacy dummy casting calls
-    _castingCalls.removeWhere((c) => isSeedCall(c.id, c.projectTitle, c.authorId));
+    for (final id in [alexanderId, realDirectorId]) {
+      final existing = _personas[id];
+      if (existing == null || existing.name == 'Zaid Khan' || existing.name.isEmpty) {
+        _personas[id] = director.copyWith(id: id);
+      }
+    }
 
-    // 4. Purge legacy dummy casting applications
-    _castingApplications.removeWhere((a) => isSeedApp(a.id, a.castingCallId, a.projectTitle));
+    for (final id in [filmfareId, realProductionId]) {
+      final existing = _personas[id];
+      if (existing == null || existing.name == 'SkyPulse Studios' || existing.name.isEmpty) {
+        _personas[id] = prod.copyWith(id: id);
+      }
+    }
+
+    _personas.putIfAbsent(jeremiahId, () => UserPersonaNotifier.personaJeremiah);
+    _personas.putIfAbsent(singerId, () => UserPersonaNotifier.personaSinger);
+
+    // Populate default portfolios if missing or empty
+    for (final id in [actorDefaultId, 'actor', realActorId]) {
+      final p = _portfolios[id];
+      if (p == null || (p.videos.isEmpty && p.photos.isEmpty)) {
+        _portfolios[id] = _defaultActorPortfolio;
+      } else {
+        final videos = p.videos.isNotEmpty ? p.videos : _defaultActorPortfolio.videos;
+        final photos = p.photos.isNotEmpty ? p.photos : _defaultActorPortfolio.photos;
+        _portfolios[id] = p.copyWith(videos: videos, photos: photos);
+      }
+    }
+
+    for (final id in [alexanderId, realDirectorId]) {
+      final p = _portfolios[id];
+      if (p == null || (p.videos.isEmpty && p.photos.isEmpty)) {
+        _portfolios[id] = _defaultDirectorPortfolio;
+      } else {
+        final videos = p.videos.isNotEmpty ? p.videos : _defaultDirectorPortfolio.videos;
+        final photos = p.photos.isNotEmpty ? p.photos : _defaultDirectorPortfolio.photos;
+        _portfolios[id] = p.copyWith(videos: videos, photos: photos);
+      }
+    }
+
+    for (final id in [filmfareId, realProductionId]) {
+      final p = _portfolios[id];
+      if (p == null || (p.videos.isEmpty && p.photos.isEmpty)) {
+        _portfolios[id] = _defaultProductionPortfolio;
+      } else {
+        final videos = p.videos.isNotEmpty ? p.videos : _defaultProductionPortfolio.videos;
+        final photos = p.photos.isNotEmpty ? p.photos : _defaultProductionPortfolio.photos;
+        _portfolios[id] = p.copyWith(videos: videos, photos: photos);
+      }
+    }
   }
-
-
 
   void _flush() {
     try {
@@ -551,6 +892,13 @@ class AppPersistenceService {
         },
         'portfolios': {
           for (final e in _portfolios.entries) e.key: e.value.toJson(),
+        },
+        'followers_counts': _followersCounts,
+        'following_sets': {
+          for (final e in _followingSets.entries) e.key: e.value.toList(),
+        },
+        'deleted_convs_by_user': {
+          for (final e in _deletedConvsByUser.entries) e.key: e.value.toList(),
         },
         'casting_calls': _castingCalls.map((c) => c.toJson()).toList(),
         'casting_applications':
@@ -724,23 +1072,35 @@ class AppPersistenceService {
             }
           }
           final dbPort = UserPortfolioState(videos: videos, photos: photos);
-          _portfolios['actor'] = dbPort;
-          _portfolios[actorDefaultId] = dbPort;
-          _portfolios[user.id] = dbPort;
+          final userRole = ((user.userMetadata?['role'] as String?) ?? '').toLowerCase();
+
+          if (user.id == realDirectorId || userRole.contains('director')) {
+            _portfolios[user.id] = dbPort;
+            _portfolios[realDirectorId] = dbPort;
+            _portfolios[alexanderId] = dbPort;
+          } else if (user.id == realProductionId || userRole.contains('production') || userRole.contains('studio')) {
+            _portfolios[user.id] = dbPort;
+            _portfolios[realProductionId] = dbPort;
+            _portfolios[filmfareId] = dbPort;
+          } else if (user.id == realActorId) {
+            _portfolios['actor'] = dbPort;
+            _portfolios[actorDefaultId] = dbPort;
+            _portfolios[realActorId] = dbPort;
+            _portfolios[user.id] = dbPort;
+          } else {
+            _portfolios[user.id] = dbPort;
+          }
         } else {
-          // If the authenticated user has a completed profile in users table,
-          // do NOT display the dummy actor seed portfolio. Use clean empty portfolio.
-          final row = await client.from('users').select().eq('id', user.id).maybeSingle();
-          if (row != null && (row['first_name'] != null || row['name'] != null)) {
-            const emptyPort = UserPortfolioState(videos: [], photos: []);
-            _portfolios['actor'] = emptyPort;
-            _portfolios[actorDefaultId] = emptyPort;
-            _portfolios[user.id] = emptyPort;
+          // If remote portfolio_items is empty, do NOT wipe local portfolio.
+          // Check if local portfolio has items and push them to Supabase!
+          final localPort = getPortfolio(user.id);
+          if (localPort.videos.isNotEmpty || localPort.photos.isNotEmpty) {
+            _syncActorPortfolioToCloud(localPort);
           }
         }
       } catch (_) {}
 
-      // 2. Merge non-empty user metadata fields into Actor persona
+      // 2. Merge non-empty user metadata fields into persona
       final metaName = user.userMetadata?['name'] as String?;
       final metaRole = user.userMetadata?['role'] as String?;
       final metaAvatar = user.userMetadata?['avatar_url'] as String?;
@@ -755,6 +1115,10 @@ class AppPersistenceService {
           ? user.email!.split('@').first
           : 'User';
 
+      final userRoleStr = ((metaRole != null && metaRole.isNotEmpty) ? metaRole : '').toLowerCase();
+      final isDir = user.id == realDirectorId || user.id == alexanderId || userRoleStr.contains('director');
+      final isProd = user.id == realProductionId || user.id == filmfareId || userRoleStr.contains('production') || userRoleStr.contains('studio');
+
       var currentPersona = UserPersona(
         id: user.id,
         name: (metaName != null && metaName.trim().isNotEmpty)
@@ -763,19 +1127,34 @@ class AppPersistenceService {
         email: user.email ?? '',
         role: (metaRole != null && metaRole.trim().isNotEmpty)
             ? metaRole
-            : '',
+            : (isProd ? 'Production House' : (isDir ? 'Director' : 'actor')),
         avatarUrl: (metaAvatar != null && metaAvatar.trim().isNotEmpty)
             ? metaAvatar
             : '',
+        isProductionHouse: isProd,
         bio: metaBio ?? '',
         website: metaWebsite ?? '',
         experience: metaExp ?? '',
         location: metaLoc ?? '',
       );
 
-      _personas[user.id] = currentPersona;
-      _personas['actor'] = currentPersona;
-      _personas[actorDefaultId] = currentPersona;
+      if (user.id == realDirectorId || userRoleStr.contains('director')) {
+        _personas[user.id] = currentPersona;
+        _personas[realDirectorId] = currentPersona;
+        _personas[alexanderId] = currentPersona;
+      } else if (user.id == realProductionId || userRoleStr.contains('production') || userRoleStr.contains('studio')) {
+        final p = currentPersona.copyWith(isProductionHouse: true);
+        _personas[user.id] = p;
+        _personas[realProductionId] = p;
+        _personas[filmfareId] = p;
+      } else if (user.id == realActorId) {
+        _personas[user.id] = currentPersona;
+        _personas[realActorId] = currentPersona;
+        _personas[actorDefaultId] = currentPersona;
+        _personas['actor'] = currentPersona;
+      } else {
+        _personas[user.id] = currentPersona;
+      }
 
       // 3. Check Supabase users table for persistent profile data
       try {
@@ -802,10 +1181,42 @@ class AppPersistenceService {
                 ? row['profile_image_path'] as String
                 : currentPersona.avatarUrl,
           );
-          _personas[user.id] = updatedWithRow;
-          _personas['actor'] = updatedWithRow;
-          _personas[actorDefaultId] = updatedWithRow;
+
+          if (user.id == realDirectorId || userRoleStr.contains('director')) {
+            _personas[user.id] = updatedWithRow;
+            _personas[realDirectorId] = updatedWithRow;
+            _personas[alexanderId] = updatedWithRow;
+          } else if (user.id == realProductionId || userRoleStr.contains('production') || userRoleStr.contains('studio')) {
+            final p = updatedWithRow.copyWith(isProductionHouse: true);
+            _personas[user.id] = p;
+            _personas[realProductionId] = p;
+            _personas[filmfareId] = p;
+          } else if (user.id == realActorId) {
+            _personas[user.id] = updatedWithRow;
+            _personas[realActorId] = updatedWithRow;
+            _personas[actorDefaultId] = updatedWithRow;
+            _personas['actor'] = updatedWithRow;
+          } else {
+            _personas[user.id] = updatedWithRow;
+          }
         }
+
+        // Auto-upsert to users table with authenticated token
+        final names = currentPersona.name.trim().split(' ');
+        final firstName = names.first;
+        final lastName = names.length > 1 ? names.skip(1).join(' ') : '';
+        await client.from('users').upsert({
+          'id': user.id,
+          'name': currentPersona.name,
+          'first_name': firstName,
+          'last_name': lastName,
+          'email': user.email ?? currentPersona.email,
+          'role': currentPersona.role.isNotEmpty ? currentPersona.role : (isProd ? 'production_house' : (isDir ? 'director' : 'actor')),
+          'bio': currentPersona.bio,
+          'profile_image_path': currentPersona.avatarUrl,
+          'location': currentPersona.location,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        });
       } catch (_) {}
 
       _ensureDefaultsLoaded();
@@ -907,29 +1318,46 @@ class AppPersistenceService {
     } catch (_) {}
 
     try {
-      for (final video in portfolio.videos) {
-        if (video.id.isNotEmpty && video.id.length >= 30 && !video.id.startsWith('port_')) {
-          await client.from('portfolio_items').upsert({
-            'id': video.id,
-            'user_id': user.id,
-            'title': video.title,
-            'media_url': video.mediaUrl,
-            'media_type': 'video',
-            'created_at': DateTime.now().toUtc().toIso8601String(),
-          });
+      final remoteRows = await client
+          .from('portfolio_items')
+          .select('id')
+          .eq('user_id', user.id);
+      final currentIds = {
+        ...portfolio.videos.map((v) => v.id),
+        ...portfolio.photos.map((p) => p.id),
+      };
+      for (final row in remoteRows) {
+        final rId = row['id']?.toString() ?? '';
+        if (rId.isNotEmpty && !currentIds.contains(rId)) {
+          await client.from('portfolio_items').delete().eq('id', rId);
         }
       }
+
+      for (final video in portfolio.videos) {
+        final vId = ConnectionRepository.isValidUuid(video.id)
+            ? video.id
+            : ChatRepository.generateUuid();
+        await client.from('portfolio_items').upsert({
+          'id': vId,
+          'user_id': user.id,
+          'title': video.title,
+          'media_url': video.mediaUrl,
+          'media_type': 'video',
+          'created_at': DateTime.now().toUtc().toIso8601String(),
+        });
+      }
       for (final photo in portfolio.photos) {
-        if (photo.id.isNotEmpty && photo.id.length >= 30 && !photo.id.startsWith('port_')) {
-          await client.from('portfolio_items').upsert({
-            'id': photo.id,
-            'user_id': user.id,
-            'title': photo.title,
-            'media_url': photo.mediaUrl,
-            'media_type': 'photo',
-            'created_at': DateTime.now().toUtc().toIso8601String(),
-          });
-        }
+        final pId = ConnectionRepository.isValidUuid(photo.id)
+            ? photo.id
+            : ChatRepository.generateUuid();
+        await client.from('portfolio_items').upsert({
+          'id': pId,
+          'user_id': user.id,
+          'title': photo.title,
+          'media_url': photo.mediaUrl,
+          'media_type': 'photo',
+          'created_at': DateTime.now().toUtc().toIso8601String(),
+        });
       }
     } catch (_) {}
   }
