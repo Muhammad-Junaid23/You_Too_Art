@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'package:you_too_art/core/providers/supabase_providers.dart';
+import 'package:you_too_art/core/providers/user_persona_provider.dart';
 import 'package:you_too_art/core/widgets/app_avatar.dart';
 import 'package:you_too_art/features/auth/providers/auth_provider.dart';
 import 'package:you_too_art/features/home/models/post_item.dart';
@@ -161,12 +162,23 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final activePersona = ref.watch(userPersonaProvider);
     final userAsync = ref.watch(currentUserProfileProvider);
     final user = userAsync.value;
 
-    final displayName = user?.name.isNotEmpty == true
+    final displayName = (user?.name.isNotEmpty == true)
         ? user!.name
-        : 'Muhammad Wajahat';
+        : (user?.firstName.isNotEmpty == true
+            ? '${user!.firstName} ${user.lastName}'.trim()
+            : (activePersona.name.isNotEmpty && !activePersona.name.toLowerCase().contains('wajahat')
+                ? activePersona.name
+                : (user?.email.split('@').first ?? 'User')));
+    final userImg = user?.profileImagePath;
+    final avatarUrl = (userImg != null && userImg.isNotEmpty)
+        ? userImg
+        : (!activePersona.name.toLowerCase().contains('wajahat')
+            ? activePersona.avatarUrl
+            : null);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -199,7 +211,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                     Row(
                       children: [
                         AppAvatar(
-                          imageUrl: user?.profileImagePath,
+                          imageUrl: avatarUrl,
                           name: displayName,
                           radius: 24,
                         ),
@@ -241,8 +253,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                         height: 1.4,
                       ),
                       decoration: const InputDecoration(
-                        hintText:
-                            'One Day To Go! Get Ready for a Huge Surprise.\n\n#Reveal\n#Audition\n#FawadKhan',
+                        hintText: 'What do you want to talk about?',
                         hintStyle: TextStyle(
                           fontSize: 16,
                           color: Color(0xFF9B9B9B),

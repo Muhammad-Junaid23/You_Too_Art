@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:you_too_art/core/providers/user_persona_provider.dart';
 import 'package:you_too_art/core/widgets/app_avatar.dart';
 import 'package:you_too_art/features/home/providers/home_feed_provider.dart';
 
@@ -19,8 +20,23 @@ class QuickShareBox extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final activePersona = ref.watch(userPersonaProvider);
     final userAsync = ref.watch(currentUserProfileProvider);
     final user = userAsync.value;
+
+    final displayName = (user?.name.isNotEmpty == true)
+        ? user!.name
+        : (user?.firstName.isNotEmpty == true
+            ? '${user!.firstName} ${user.lastName}'.trim()
+            : (activePersona.name.isNotEmpty && !activePersona.name.toLowerCase().contains('wajahat')
+                ? activePersona.name
+                : (user?.email.split('@').first ?? 'User')));
+    final userImg = user?.profileImagePath;
+    final avatarUrl = (userImg != null && userImg.isNotEmpty)
+        ? userImg
+        : (!activePersona.name.toLowerCase().contains('wajahat')
+            ? activePersona.avatarUrl
+            : null);
 
     return Column(
       children: [
@@ -38,10 +54,8 @@ class QuickShareBox extends ConsumerWidget {
                   child: Row(
                     children: [
                       AppAvatar(
-                        imageUrl: user?.profileImagePath,
-                        name: user?.name.isNotEmpty == true
-                            ? user!.name
-                            : (user?.email.split('@').first ?? 'User'),
+                        imageUrl: avatarUrl,
+                        name: displayName,
                         radius: 20,
                       ),
                       const SizedBox(width: 12),

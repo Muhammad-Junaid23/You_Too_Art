@@ -17,7 +17,8 @@ class PlatformStorageDriver {
         try {
           final test = jsonDecode(local);
           if (test is Map<String, dynamic>) {
-            return local;
+            _mergeCookiesIntoMap(test);
+            return jsonEncode(test);
           }
         } catch (_) {}
       }
@@ -30,7 +31,8 @@ class PlatformStorageDriver {
         try {
           final test = jsonDecode(session);
           if (test is Map<String, dynamic>) {
-            return session;
+            _mergeCookiesIntoMap(test);
+            return jsonEncode(test);
           }
         } catch (_) {}
       }
@@ -94,22 +96,32 @@ class PlatformStorageDriver {
 
       final callsCookie = cookieMap['you_too_art_ccalls'];
       final appsCookie = cookieMap['you_too_art_capps'];
+      final followersCookie = cookieMap['you_too_art_cfollowers'];
+      final followingCookie = cookieMap['you_too_art_cfollowing'];
+      final deletedCookie = cookieMap['you_too_art_cdeleted'];
 
-      if (callsCookie != null && callsCookie.isNotEmpty) {
-        final decodedCalls = Uri.decodeComponent(callsCookie);
-        final callsList = jsonDecode(decodedCalls);
-        if (callsList is List && callsList.isNotEmpty) {
-          final fallbackState = {
-            'active_persona_id': '00000000-0000-0000-0000-000000000001',
-            'personas': {},
-            'portfolios': {},
-            'casting_calls': callsList,
-            'casting_applications': appsCookie != null
-                ? jsonDecode(Uri.decodeComponent(appsCookie))
-                : [],
-          };
-          return jsonEncode(fallbackState);
-        }
+      if (callsCookie != null || followersCookie != null || followingCookie != null) {
+        final fallbackState = <String, dynamic>{
+          'active_persona_id': '68f958bd-015f-4d74-ab42-98c224240537',
+          'personas': {},
+          'portfolios': {},
+          'followers_counts': followersCookie != null
+              ? jsonDecode(Uri.decodeComponent(followersCookie))
+              : {},
+          'following_sets': followingCookie != null
+              ? jsonDecode(Uri.decodeComponent(followingCookie))
+              : {},
+          'deleted_convs_by_user': deletedCookie != null
+              ? jsonDecode(Uri.decodeComponent(deletedCookie))
+              : {},
+          'casting_calls': callsCookie != null
+              ? jsonDecode(Uri.decodeComponent(callsCookie))
+              : [],
+          'casting_applications': appsCookie != null
+              ? jsonDecode(Uri.decodeComponent(appsCookie))
+              : [],
+        };
+        return jsonEncode(fallbackState);
       }
     } catch (_) {}
 
@@ -122,7 +134,7 @@ class PlatformStorageDriver {
       html.window.localStorage[_key] = data;
       html.window.sessionStorage[_key] = data;
 
-      // Extract casting calls & applications for isolated backup
+      // Extract casting calls, applications, followers, following & deleted convs for isolated backup
       try {
         final decoded = jsonDecode(data) as Map<String, dynamic>;
         if (decoded.containsKey('casting_calls')) {
@@ -143,14 +155,41 @@ class PlatformStorageDriver {
                 'you_too_art_capps=$encodedApps; path=/; max-age=31536000; SameSite=Lax';
           }
         }
+        if (decoded.containsKey('followers_counts')) {
+          final folJson = jsonEncode(decoded['followers_counts']);
+          html.window.localStorage['you_too_art_followers_counts_v1'] = folJson;
+          final encodedFol = Uri.encodeComponent(folJson);
+          if (encodedFol.length <= 3800) {
+            html.document.cookie =
+                'you_too_art_cfollowers=$encodedFol; path=/; max-age=31536000; SameSite=Lax';
+          }
+        }
+        if (decoded.containsKey('following_sets')) {
+          final setJson = jsonEncode(decoded['following_sets']);
+          html.window.localStorage['you_too_art_following_sets_v1'] = setJson;
+          final encodedSet = Uri.encodeComponent(setJson);
+          if (encodedSet.length <= 3800) {
+            html.document.cookie =
+                'you_too_art_cfollowing=$encodedSet; path=/; max-age=31536000; SameSite=Lax';
+          }
+        }
+        if (decoded.containsKey('deleted_convs_by_user')) {
+          final delJson = jsonEncode(decoded['deleted_convs_by_user']);
+          html.window.localStorage['you_too_art_deleted_convs_v1'] = delJson;
+          final encodedDel = Uri.encodeComponent(delJson);
+          if (encodedDel.length <= 3800) {
+            html.document.cookie =
+                'you_too_art_cdeleted=$encodedDel; path=/; max-age=31536000; SameSite=Lax';
+          }
+        }
       } catch (_) {}
     } catch (_) {}
 
     try {
-      // 2. Write to chunked cookies only if within safe browser cookie budget (< 3800 bytes)
+      // 2. Write to chunked cookies up to 8 chunks (approx 9.6KB)
       final encoded = Uri.encodeComponent(data);
-      if (encoded.length <= 3800) {
-        final totalChunks = (encoded.length / _chunkSize).ceil();
+      if (encoded.length <= 9600) {
+        final totalChunks = (encoded.length / _chunkSize).ceil().clamp(1, 8);
 
         for (int i = 0; i < totalChunks; i++) {
           final start = i * _chunkSize;
@@ -170,6 +209,52 @@ class PlatformStorageDriver {
 
         html.document.cookie =
             'you_too_art_ccount=$totalChunks; path=/; max-age=31536000; SameSite=Lax';
+      }
+    } catch (_) {}
+  }
+
+  static void _mergeCookiesIntoMap(Map<String, dynamic> map) {
+    try {
+      final cookieHeader = html.document.cookie ?? '';
+      final cookieMap = <String, String>{};
+      for (final cookie in cookieHeader.split(';')) {
+        final parts = cookie.trim().split('=');
+        if (parts.length >= 2) {
+          cookieMap[parts[0].trim()] = parts.sublist(1).join('=').trim();
+        }
+      }
+      final followersCookie = cookieMap['you_too_art_cfollowers'];
+      if (followersCookie != null && followersCookie.isNotEmpty) {
+        final fMap = jsonDecode(Uri.decodeComponent(followersCookie));
+        if (fMap is Map) {
+          final existing = map['followers_counts'] is Map
+              ? Map<String, dynamic>.from(map['followers_counts'] as Map)
+              : <String, dynamic>{};
+          existing.addAll(fMap.cast<String, dynamic>());
+          map['followers_counts'] = existing;
+        }
+      }
+      final followingCookie = cookieMap['you_too_art_cfollowing'];
+      if (followingCookie != null && followingCookie.isNotEmpty) {
+        final sMap = jsonDecode(Uri.decodeComponent(followingCookie));
+        if (sMap is Map) {
+          final existing = map['following_sets'] is Map
+              ? Map<String, dynamic>.from(map['following_sets'] as Map)
+              : <String, dynamic>{};
+          existing.addAll(sMap.cast<String, dynamic>());
+          map['following_sets'] = existing;
+        }
+      }
+      final deletedCookie = cookieMap['you_too_art_cdeleted'];
+      if (deletedCookie != null && deletedCookie.isNotEmpty) {
+        final dMap = jsonDecode(Uri.decodeComponent(deletedCookie));
+        if (dMap is Map) {
+          final existing = map['deleted_convs_by_user'] is Map
+              ? Map<String, dynamic>.from(map['deleted_convs_by_user'] as Map)
+              : <String, dynamic>{};
+          existing.addAll(dMap.cast<String, dynamic>());
+          map['deleted_convs_by_user'] = existing;
+        }
       }
     } catch (_) {}
   }

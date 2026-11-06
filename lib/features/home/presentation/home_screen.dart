@@ -27,7 +27,7 @@ class HomeScreen extends ConsumerWidget {
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
-              // Top Greeting Header: "Hi Wajahat!" + Blue Bell
+              // Top Greeting Header: "Hi [Name]!" + Blue Bell
               const SliverToBoxAdapter(
                 child: HomeHeader(),
               ),

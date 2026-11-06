@@ -209,7 +209,7 @@ class ConnectionRepository {
 
     final name = actorTalent?.name ??
         actorPersona?.name ??
-        (_isActorId(effectiveUserId) ? 'Wajahat Ali (Actor)' : 'A fellow artist');
+        'A fellow artist';
     final avatarUrl = actorTalent?.avatarUrl ?? actorPersona?.avatarUrl;
     final isFilmfare = effectiveUserId == UserPersonaNotifier.filmfareId ||
         actorPersona?.isProductionHouse == true;
@@ -296,7 +296,7 @@ class ConnectionRepository {
 
     final name = actorTalent?.name ??
         actorPersona?.name ??
-        (_isActorId(effectiveUserId) ? 'Wajahat Ali (Actor)' : 'A fellow artist');
+        'A fellow artist';
     final avatarUrl = actorTalent?.avatarUrl ?? actorPersona?.avatarUrl;
     final isFilmfare = effectiveUserId == UserPersonaNotifier.filmfareId ||
         actorPersona?.isProductionHouse == true;
@@ -791,7 +791,10 @@ class ConnectionRepository {
       }
       currentFollowers = (currentFollowers - 1).clamp(0, 999999);
 
-      if (_isSupabaseTableAvailable != false && isValidUuid(canonicalUser)) {
+      if (_isSupabaseTableAvailable != false &&
+          _client.auth.currentUser != null &&
+          _client.auth.currentUser!.id == canonicalUser &&
+          isValidUuid(canonicalUser)) {
         try {
           final validAliases = aliases.where(isValidUuid).toList();
           if (validAliases.isNotEmpty) {
@@ -810,6 +813,8 @@ class ConnectionRepository {
       currentFollowers = currentFollowers + 1;
 
       if (_isSupabaseTableAvailable != false &&
+          _client.auth.currentUser != null &&
+          _client.auth.currentUser!.id == canonicalUser &&
           isValidUuid(canonicalUser) &&
           isValidUuid(canonicalTarget)) {
         try {

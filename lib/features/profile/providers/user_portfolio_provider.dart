@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
 import 'package:you_too_art/core/services/app_persistence_service.dart';
-import 'package:you_too_art/features/auth/providers/auth_provider.dart';
 
 /// Extracts the 11-character YouTube video ID from various YouTube URL formats.
 /// Supports standard watch, short-links, embeds, YouTube Shorts, and thumbnail URLs.
@@ -234,14 +233,10 @@ class UserPortfolioNotifier extends Notifier<UserPortfolioState> {
   @override
   UserPortfolioState build() {
     final activePersona = ref.watch(userPersonaProvider);
-    final currentUid = ref.watch(currentUidProvider);
-    final effectiveUid = (currentUid != null && currentUid.isNotEmpty)
-        ? currentUid
-        : activePersona.id;
+    final effectiveUid = activePersona.id;
     void listener() {
       final active = ref.read(userPersonaProvider);
-      final uid = ref.read(currentUidProvider) ?? active.id;
-      state = AppPersistenceService.instance.getPortfolio(uid);
+      state = AppPersistenceService.instance.getPortfolio(active.id);
     }
     AppPersistenceService.instance.addListener(listener);
     ref.onDispose(() => AppPersistenceService.instance.removeListener(listener));
@@ -250,8 +245,6 @@ class UserPortfolioNotifier extends Notifier<UserPortfolioState> {
 
   String _resolveUid(String? targetUserId) {
     if (targetUserId != null && targetUserId.isNotEmpty) return targetUserId;
-    final currentUid = ref.read(currentUidProvider);
-    if (currentUid != null && currentUid.isNotEmpty) return currentUid;
     return ref.read(userPersonaProvider).id;
   }
 

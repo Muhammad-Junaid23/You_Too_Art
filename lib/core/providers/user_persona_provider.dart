@@ -92,13 +92,12 @@ class UserPersonaNotifier extends Notifier<UserPersona> {
   static const String jeremiahId = AppPersistenceService.jeremiahId;
   static const String singerId = AppPersistenceService.singerId;
 
-  static const personaActor = UserPersona(
-    id: actorDefaultId,
-    name: 'Ahmed Ali',
-    email: 'actor@youtooart.com',
-    role: 'actor',
-    avatarUrl:
-        'https://res.cloudinary.com/dsxhrelpu/image/upload/v1793547618/avatars/68f958bd-015f-4d74-ab42-98c224240537/wvudfqw8ke0vsgvo9qjr.png',
+  static const personaEmpty = UserPersona(
+    id: '',
+    name: '',
+    email: '',
+    role: '',
+    avatarUrl: '',
     isProductionHouse: false,
     bio: '',
     website: '',
@@ -106,66 +105,18 @@ class UserPersonaNotifier extends Notifier<UserPersona> {
     location: '',
   );
 
-  static const personaAlexander = UserPersona(
-    id: alexanderId,
-    name: 'Tommy Don',
-    email: 'director@youtooart.com',
-    role: 'Director',
-    avatarUrl:
-        'https://res.cloudinary.com/dsxhrelpu/image/upload/v1793470261/posts/363152eb-78b7-4625-9f6e-e13dc8da45d2/oqlc9tc0nfbcirkrd5bm.jpg',
-    isProductionHouse: false,
-    bio: '',
-    website: '',
-    experience: '',
-    location: '',
-  );
-
-  static const personaFilmFare = UserPersona(
-    id: filmfareId,
-    name: 'skypulse studio',
-    email: 'production@youtooart.com',
-    role: 'Production House',
-    avatarUrl:
-        'https://res.cloudinary.com/dsxhrelpu/image/upload/v1793356951/posts/4f668c94-c9df-4db2-b844-b7ad0a981fde/zdfmhy6cauwtc0msvz7u.png',
-    isProductionHouse: true,
-    bio: '',
-    website: '',
-    experience: '',
-    location: '',
-  );
-
-  static const personaJeremiah = UserPersona(
-    id: jeremiahId,
-    name: 'Sara Ahmed',
-    email: 'crew@youtooart.com',
-    role: 'Cinematographer | DoP',
-    avatarUrl:
-        'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
-    isProductionHouse: false,
-    bio:
-        'Cinematographer and camera operator specializing in Arri & RED camera workflows, anamorphic lighting design, and cinematic commercial aesthetics.',
-    website: 'www.sara-cinematography.com',
-    experience: '6+ Years',
-    location: 'Karachi, Pakistan',
-  );
-
-  static const personaSinger = UserPersona(
-    id: singerId,
-    name: 'Bilal Tariq',
-    email: 'singer@youtooart.com',
-    role: 'Singer | Composer',
-    avatarUrl:
-        'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80',
-    isProductionHouse: false,
-    bio:
-        'Vocalist, playback singer, and music composer for independent films and drama soundtracks. Open for film scores and original collaborations.',
-    website: 'www.bilaltariqmusic.com',
-    experience: '4+ Years',
-    location: 'Islamabad, Pakistan',
-  );
+  static const personaActor = personaEmpty;
+  static const personaAlexander = personaEmpty;
+  static const personaFilmFare = personaEmpty;
 
   static bool isActorId(String id) =>
       AppPersistenceService.instance.isActorId(id);
+
+  static bool isDirectorId(String id) =>
+      AppPersistenceService.instance.isDirectorId(id);
+
+  static bool isProductionId(String id) =>
+      AppPersistenceService.instance.isProductionId(id);
 
   static bool isSamePersona(String id1, String id2) =>
       AppPersistenceService.instance.isSamePersona(id1, id2);

@@ -222,6 +222,13 @@ class NetworkNotifier extends Notifier<NetworkState> {
       final list = response as List;
       for (final data in list) {
         final u = UserModel.fromJson(data as Map<String, dynamic>);
+        final name = '${u.firstName} ${u.lastName} ${u.name}'.toLowerCase().trim();
+        if (name.contains('sara ahmed') ||
+            name.contains('bilal tariq') ||
+            u.id == 'c3333333-3333-3333-3333-333333333333' ||
+            u.id == 'd4444444-4444-4444-4444-444444444444') {
+          continue;
+        }
         if (!UserPersonaNotifier.isSamePersona(u.id, _activePersona.id) &&
             !connectedIds.contains(u.id) &&
             !requestedIds.contains(u.id)) {
@@ -231,20 +238,6 @@ class NetworkNotifier extends Notifier<NetworkState> {
       }
     } catch (_) {}
 
-    // Include platform candidate personas in network suggestions
-    final platformPersonas = [
-      UserPersonaNotifier.getActorPersona(),
-      UserPersonaNotifier.getPersonaById(AppPersistenceService.realDirectorId),
-      UserPersonaNotifier.getPersonaById(AppPersistenceService.realProductionId),
-    ];
-    for (final p in platformPersonas) {
-      final isSelf = UserPersonaNotifier.isSamePersona(p.id, _activePersona.id);
-      final isConnected = connectedIds.any((cid) => UserPersonaNotifier.isSamePersona(cid, p.id));
-      final isRequested = requestedIds.any((rid) => UserPersonaNotifier.isSamePersona(rid, p.id));
-      if (!isSelf && !isConnected && !isRequested) {
-        candidateMap[p.id] = TalentModel.fromPersona(p);
-      }
-    }
     final candidateTalents = candidateMap.values.toList();
 
     final followingIds =
