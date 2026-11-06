@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:you_too_art/core/constants/supabase_tables.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
+import 'package:you_too_art/core/services/app_persistence_service.dart';
 
 /// Repository for 1:1 chat conversations and messages.
 /// Backed by Supabase Postgres with Realtime, plus resilient local-sync
@@ -139,7 +140,8 @@ class ChatRepository {
         final convId = conv['id'].toString();
         final visibleMsgs =
             _LocalChatStore.instance.getMessages(convId, userId: uid);
-        return visibleMsgs.isNotEmpty;
+        final lastMsg = (conv['last_message'] as String?)?.trim() ?? '';
+        return visibleMsgs.isNotEmpty || lastMsg.isNotEmpty;
       }).toList()
         ..sort((a, b) {
           final timeA = a['last_message_at'] as String? ?? '';
@@ -705,7 +707,6 @@ class _LocalChatStore {
     required String userB,
   }) {
     for (final c in _conversations.values) {
-      final id = c['id']?.toString() ?? '';
       final pa = c['participant_a'] as String? ?? '';
       final pb = c['participant_b'] as String? ?? '';
       final matchA = (pa == userA || _isActorMatch(pa, userA));

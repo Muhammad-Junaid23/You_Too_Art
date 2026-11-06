@@ -100,6 +100,14 @@ class TalentNotifier extends Notifier<TalentState> {
           fetchedList = list.map((data) {
             final user = UserModel.fromJson(data as Map<String, dynamic>);
             return TalentModel.fromUser(user);
+          }).where((t) {
+            final n = t.name.toLowerCase().trim();
+            final isFake = n.contains('sara ahmed') ||
+                n.contains('bilal tariq') ||
+                n.contains('jeremiah') ||
+                t.id == 'c3333333-3333-3333-3333-333333333333' ||
+                t.id == 'd4444444-4444-4444-4444-444444444444';
+            return !isFake;
           }).toList();
         }
       } catch (_) {}
@@ -107,23 +115,18 @@ class TalentNotifier extends Notifier<TalentState> {
       // Pure real talents directory from registered users and platform personas
       final combined = <TalentModel>[];
       for (final fetched in fetchedList) {
+        final n = fetched.name.toLowerCase().trim();
+        if (n.contains('sara ahmed') ||
+            n.contains('bilal tariq') ||
+            fetched.id == 'c3333333-3333-3333-3333-333333333333' ||
+            fetched.id == 'd4444444-4444-4444-4444-444444444444') {
+          continue;
+        }
         if (UserPersonaNotifier.hasPersona(fetched.id)) {
           final p = UserPersonaNotifier.getPersonaById(fetched.id);
           combined.add(TalentModel.fromPersona(p));
         } else {
           combined.add(fetched);
-        }
-      }
-
-      // Always include platform candidate personas if not already in combined
-      final platformPersonas = [
-        UserPersonaNotifier.getActorPersona(),
-        UserPersonaNotifier.getPersonaById(AppPersistenceService.realDirectorId),
-        UserPersonaNotifier.getPersonaById(AppPersistenceService.realProductionId),
-      ];
-      for (final p in platformPersonas) {
-        if (!combined.any((t) => UserPersonaNotifier.isSamePersona(t.id, p.id))) {
-          combined.add(TalentModel.fromPersona(p));
         }
       }
 

@@ -1,16 +1,16 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:you_too_art/core/constants/test_accounts.dart';
 import 'package:you_too_art/core/models/user_model.dart';
 import 'package:you_too_art/core/providers/supabase_providers.dart';
+import 'package:you_too_art/core/providers/user_persona_provider.dart';
 import 'package:you_too_art/features/auth/providers/auth_provider.dart';
 import 'package:you_too_art/features/home/models/post_item.dart';
 
 /// Provider for the current logged-in user's profile.
 final currentUserProfileProvider = StreamProvider<UserModel?>((ref) async* {
   final uid = ref.watch(currentUidProvider);
-  if (uid == null || uid.trim().isEmpty || TestAccounts.isTestId(uid)) {
+  if (uid == null || uid.trim().isEmpty) {
     yield null;
     return;
   }
@@ -95,7 +95,6 @@ class HomeFeedNotifier extends AsyncNotifier<List<PostItem>> {
 
     if (currentUid != null &&
         !isSample &&
-        !TestAccounts.isTestId(currentUid) &&
         ref.read(supabaseClientProvider).auth.currentUser != null) {
       try {
         await ref.read(postRepositoryProvider).toggleLike(
@@ -172,7 +171,6 @@ class HomeFeedNotifier extends AsyncNotifier<List<PostItem>> {
 
     String? createdId;
     if (currentUid != null &&
-        !TestAccounts.isTestId(currentUid) &&
         ref.read(supabaseClientProvider).auth.currentUser != null) {
       try {
         final repo = ref.read(postRepositoryProvider);
@@ -194,15 +192,27 @@ class HomeFeedNotifier extends AsyncNotifier<List<PostItem>> {
       await prefs.setStringList('post_tags_$postUuid', taggedUsers);
     }
 
+    final activePersona = ref.read(userPersonaProvider);
+    final resolvedAuthorName = activePersona.name.isNotEmpty
+        ? activePersona.name
+        : (userProfile?.name.isNotEmpty == true ? userProfile!.name : 'User');
+    final resolvedAuthorAvatar = activePersona.avatarUrl.isNotEmpty
+        ? activePersona.avatarUrl
+        : (userProfile?.profileImagePath ??
+            'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150');
+    final resolvedAuthorRole = activePersona.role.isNotEmpty
+        ? activePersona.role
+        : (userProfile?.role ?? 'Actor');
+    final resolvedAuthorId = activePersona.id.isNotEmpty
+        ? activePersona.id
+        : (currentUid ?? 'local-user');
+
     final newPost = PostItem(
       id: postUuid,
-      authorId: currentUid ?? 'local-user',
-      authorName: userProfile?.name.isNotEmpty == true
-          ? userProfile!.name
-          : 'Muhammad Wajahat',
-      authorAvatar: userProfile?.profileImagePath ??
-          'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
-      authorRole: userProfile?.role ?? 'Actor',
+      authorId: resolvedAuthorId,
+      authorName: resolvedAuthorName,
+      authorAvatar: resolvedAuthorAvatar,
+      authorRole: resolvedAuthorRole,
       caption: caption,
       mediaUrl: mediaUrl,
       mediaType: mediaType ?? 'image',

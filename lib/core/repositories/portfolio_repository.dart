@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:you_too_art/core/constants/supabase_tables.dart';
-import 'package:you_too_art/core/constants/test_accounts.dart';
 
 /// Repository for user portfolio item operations.
 class PortfolioRepository {
@@ -28,7 +27,7 @@ class PortfolioRepository {
     required String mediaUrl,
     required String mediaType,
   }) async {
-    if (_client.auth.currentUser == null || TestAccounts.isTestId(userId)) {
+    if (_client.auth.currentUser == null) {
       return {
         'id': 'local-portfolio-${DateTime.now().millisecondsSinceEpoch}',
         'user_id': userId,

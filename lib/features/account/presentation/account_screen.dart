@@ -19,21 +19,26 @@ class AccountScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final activePersona = ref.watch(userPersonaProvider);
     final userAsync = ref.watch(currentUserProfileProvider);
     final currentUser = userAsync.value;
-    final activePersona = ref.watch(userPersonaProvider);
     final netState = ref.watch(networkProvider);
     final feedPosts = ref.watch(homeFeedProvider).value ?? [];
 
-    final displayName = currentUser?.name.isNotEmpty == true
+    final displayName = (currentUser?.name.isNotEmpty == true)
         ? currentUser!.name
         : (currentUser?.firstName.isNotEmpty == true
             ? '${currentUser!.firstName} ${currentUser.lastName}'.trim()
-            : (activePersona.name.isNotEmpty
+            : (activePersona.name.isNotEmpty && !activePersona.name.toLowerCase().contains('wajahat')
                 ? activePersona.name
                 : (currentUser?.email.split('@').first ?? 'User')));
 
-    final avatarUrl = currentUser?.profileImagePath ?? activePersona.avatarUrl;
+    final userImg = currentUser?.profileImagePath;
+    final avatarUrl = (userImg != null && userImg.isNotEmpty)
+        ? userImg
+        : (!activePersona.name.toLowerCase().contains('wajahat')
+            ? activePersona.avatarUrl
+            : '');
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -319,7 +324,16 @@ class AccountScreen extends ConsumerWidget {
     List<dynamic> feedPosts,
   ) {
     TalentModel talent;
-    if (user != null) {
+    if (persona.name.isNotEmpty) {
+      final portfolio = AppPersistenceService.instance.getPortfolio(persona.id);
+      final userPosts = feedPosts.where((p) => p.authorId == persona.id).length;
+      talent = TalentModel.fromPersona(
+        persona,
+        connectsCount: '${netState.connections.length}',
+        postsCount: '$userPosts',
+        workPortfolio: portfolio.photos.map((p) => p.mediaUrl).toList(),
+      );
+    } else if (user != null) {
       final userPosts = feedPosts.where((p) => p.authorId == user.id).length;
       final portfolio = AppPersistenceService.instance.getPortfolio(user.id);
       talent = TalentModel.fromUser(

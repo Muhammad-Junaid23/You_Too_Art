@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 
 import 'package:you_too_art/app/constants/app_colors.dart';
 import 'package:you_too_art/core/providers/supabase_providers.dart';
+import 'package:you_too_art/core/providers/user_persona_provider.dart';
 import 'package:you_too_art/core/widgets/app_avatar.dart';
 import 'package:you_too_art/features/auth/providers/auth_provider.dart';
 import 'package:you_too_art/features/home/providers/home_feed_provider.dart';
@@ -131,8 +132,23 @@ class _CreatePostSheetState extends ConsumerState<CreatePostSheet> {
   @override
   Widget build(BuildContext context) {
     final colors = AppColors.of(context);
+    final activePersona = ref.watch(userPersonaProvider);
     final userAsync = ref.watch(currentUserProfileProvider);
     final user = userAsync.value;
+
+    final displayName = (user?.name.isNotEmpty == true)
+        ? user!.name
+        : (user?.firstName.isNotEmpty == true
+            ? '${user!.firstName} ${user.lastName}'.trim()
+            : (activePersona.name.isNotEmpty && !activePersona.name.toLowerCase().contains('wajahat')
+                ? activePersona.name
+                : (user?.email.split('@').first ?? 'You')));
+    final userImg = user?.profileImagePath;
+    final avatarUrl = (userImg != null && userImg.isNotEmpty)
+        ? userImg
+        : (!activePersona.name.toLowerCase().contains('wajahat')
+            ? activePersona.avatarUrl
+            : null);
 
     return Container(
       margin: EdgeInsets.only(
@@ -212,8 +228,8 @@ class _CreatePostSheetState extends ConsumerState<CreatePostSheet> {
             child: Row(
               children: [
                 AppAvatar(
-                  imageUrl: user?.profileImagePath,
-                  name: user?.name.isNotEmpty == true ? user!.name : 'User',
+                  imageUrl: avatarUrl,
+                  name: displayName,
                   radius: 20,
                 ),
                 const SizedBox(width: 12),
@@ -221,7 +237,7 @@ class _CreatePostSheetState extends ConsumerState<CreatePostSheet> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      user?.name.isNotEmpty == true ? user!.name : 'You',
+                      displayName,
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
                         color: colors.textPrimary,

@@ -94,24 +94,19 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
         final photos = <WorkMediaItem>[];
         for (final row in pRows) {
           final item = WorkMediaItem.fromJson(row);
+          if (item.title.contains('Dramatic Monologue') ||
+              item.title.contains('Dramatic Portrait') ||
+              item.mediaUrl.contains('cloudinary')) {
+            continue;
+          }
           if (item.isVideo) {
             videos.add(item);
           } else {
             photos.add(item);
           }
         }
-        final defaultPort = UserPersonaNotifier.isDirectorId(targetId)
-            ? AppPersistenceService.defaultDirectorPortfolio
-            : (UserPersonaNotifier.isProductionId(targetId)
-                ? AppPersistenceService.defaultProductionPortfolio
-                : AppPersistenceService.defaultActorPortfolio);
-        final effectiveVideos =
-            videos.isNotEmpty ? videos : defaultPort.videos;
-        final effectivePhotos =
-            photos.isNotEmpty ? photos : defaultPort.photos;
-        final cloudPort =
-            UserPortfolioState(videos: effectiveVideos, photos: effectivePhotos);
-        AppPersistenceService.instance.savePortfolio(targetId, cloudPort);
+        final cloudPort = UserPortfolioState(videos: videos, photos: photos);
+        AppPersistenceService.instance.setCachedPortfolio(targetId, cloudPort);
       }
     } catch (_) {}
 
@@ -291,12 +286,10 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
     final currentUserAsync = ref.watch(currentUserProfileProvider);
     final currentUser = currentUserAsync.value;
 
-    final isOwnProfile = (currentUid != null && widget.initialTalent.id == currentUid) ||
-        (currentUser != null && widget.initialTalent.id == currentUser.id) ||
-        UserPersonaNotifier.isSamePersona(
-          widget.initialTalent.id,
-          activePersona.id,
-        );
+    final isOwnProfile = UserPersonaNotifier.isSamePersona(
+      widget.initialTalent.id,
+      activePersona.id,
+    );
 
     final isActor = UserPersonaNotifier.isActorId(widget.initialTalent.id);
     final targetPersona = isOwnProfile
@@ -1156,7 +1149,10 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
         rawBio.contains('Award-winning independent filmmaker') ||
         rawBio.contains('Passionate actor and performing artist') ||
         rawBio.contains('Official production house and studio') ||
-        rawBio.contains('Passionate performing artist and creator');
+        rawBio.contains('Passionate performing artist and creator') ||
+        rawBio.contains('Cinematographer and camera operator') ||
+        rawBio.contains('Vocalist, playback singer') ||
+        rawBio.contains('Professional performing artist');
 
     final bioText = (!isSeedBio && rawBio.trim().isNotEmpty)
         ? rawBio.trim()
@@ -1173,13 +1169,16 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
     final isSeedLocation = rawLocation == 'Islamabad, Pakistan' ||
         rawLocation == 'Lahore, Pakistan' ||
         rawLocation == 'Karachi, Pakistan';
-    final locationText = (isOwnProfile && currentUser != null && currentUser.location != null && currentUser.location!.isNotEmpty)
-        ? currentUser.location!
-        : (!isSeedLocation ? rawLocation : '');
+    final locationText = (!isSeedLocation && rawLocation.trim().isNotEmpty) ? rawLocation.trim() : '';
 
-    final website = (effective?.website.isNotEmpty ?? false)
+    final rawWebsite = (effective?.website.isNotEmpty ?? false)
         ? effective!.website
         : (talent.aboutInfo['Website'] ?? talent.aboutInfo['Personal Website'] ?? '');
+    final isSeedWebsite = rawWebsite.contains('sara-cinematography') ||
+        rawWebsite.contains('bilaltariqmusic') ||
+        rawWebsite.contains('youtooart.test') ||
+        rawWebsite.contains('example.com');
+    final website = !isSeedWebsite ? rawWebsite.trim() : '';
 
     final rawEstablished = (isOwnProfile && currentUser != null && currentUser.establishedYear != null)
         ? '${currentUser.establishedYear}'
@@ -1202,6 +1201,8 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
     final isSeedExp = rawExp == '5+ Years' ||
         rawExp == '7+ Years' ||
         rawExp == '8+ Years' ||
+        rawExp == '6+ Years' ||
+        rawExp == '4+ Years' ||
         rawExp.contains('Experience');
     final experienceText = (!isSeedExp && rawExp.isNotEmpty) ? rawExp : '';
 

@@ -8,7 +8,6 @@ import 'package:you_too_art/core/services/storage_service.dart';
 import 'package:you_too_art/core/services/app_persistence_service.dart';
 import 'package:you_too_art/core/utils/error_messages.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
-import 'package:you_too_art/core/constants/test_accounts.dart';
 import 'package:you_too_art/core/models/user_model.dart';
 import 'package:you_too_art/core/providers/shared_preferences_provider.dart';
 import 'package:you_too_art/features/notifications/providers/notification_provider.dart';
@@ -57,14 +56,6 @@ final authStateChangesProvider = StreamProvider<supabase.AuthState>((ref) {
 /// Provider that emits the current user's UID, watching auth state reactively,
 /// while respecting active developer testing personas when selected.
 final currentUidProvider = Provider<String?>((ref) {
-  final activePersona = ref.watch(userPersonaProvider);
-  final prefs = ref.watch(sharedPreferencesProvider);
-  final isTestRole = prefs.getBool('is_test_role_logged_in') ?? false;
-
-  if (isTestRole || TestAccounts.isTestId(activePersona.id)) {
-    return activePersona.id.isNotEmpty ? activePersona.id : null;
-  }
-
   final authState = ref.watch(authStateChangesProvider);
   final sessionUser = authState.value?.session?.user;
   final clientUser = ref.watch(supabaseClientProvider).auth.currentUser;
@@ -74,7 +65,7 @@ final currentUidProvider = Provider<String?>((ref) {
     return activeUser.id;
   }
 
-  return activePersona.id.isNotEmpty ? activePersona.id : null;
+  return null;
 });
 
 /// Stream of whether the current user's email has been verified.
@@ -225,16 +216,9 @@ class AuthNotifier extends Notifier<AppAuthState> {
     }
   }
 
-  /// Send an email OTP to [email].
-  /// Returns true if Supabase accepted the request (or instantly for test accounts).
+  /// Send an email OTP to [email] via Supabase Auth.
   Future<bool> sendEmailOtp({required String email}) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
-
-    // Bypass external network email dispatch for pre-configured test roles
-    if (TestAccounts.isTestEmail(email)) {
-      state = state.copyWith(isLoading: false);
-      return true;
-    }
 
     try {
       await _authRepo.sendEmailOtp(email: email);
@@ -247,36 +231,12 @@ class AuthNotifier extends Notifier<AppAuthState> {
     }
   }
 
-  // Verifies the OTP, returns the user row, but does NOT set isLoggedIn yet.
+  // Verifies the OTP with Supabase, returns the user row, but does NOT set isLoggedIn yet.
   Future<UserModel?> verifyEmailOtpOnly({
     required String email,
     required String token,
   }) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
-
-    // Handle test accounts instantly with master OTP (123456)
-    if (TestAccounts.isTestEmail(email)) {
-      if (token == TestAccounts.masterTestOtp || token == '000000' || token.length == 6) {
-        final testAcc = TestAccounts.findByEmail(email)!;
-        final persona = testAcc.toPersona();
-        AppPersistenceService.instance.savePersona(persona);
-        AppPersistenceService.instance.setActivePersonaId(persona.id);
-        await ref.read(userPersonaProvider.notifier).switchPersona(persona);
-
-        final prefs = ref.read(sharedPreferencesProvider);
-        await prefs.setBool('is_test_role_logged_in', true);
-
-        final userModel = testAcc.toUserModel();
-        state = state.copyWith(isLoading: false);
-        return userModel;
-      } else {
-        state = state.copyWith(
-          isLoading: false,
-          errorMessage: 'Invalid test OTP code. Use ${TestAccounts.masterTestOtp}',
-        );
-        return null;
-      }
-    }
 
     try {
       final response = await _authRepo.verifyEmailOtp(
@@ -295,7 +255,7 @@ class AuthNotifier extends Notifier<AppAuthState> {
         ),
       );
 
-      // Bind persona immediately to the authenticated user (no fallback to dummy mock personas)
+      // Bind persona immediately to the authenticated Supabase user
       final emailPrefix = email.contains('@') ? email.split('@').first : 'User';
       final persona = UserPersona(
         id: response.user!.id,
@@ -334,21 +294,6 @@ class AuthNotifier extends Notifier<AppAuthState> {
     ref.invalidate(userWorkPortfolioProvider);
   }
 
-  /// 1-Tap Instant Login for role testing
-  Future<void> loginAsTestRole(TestAccount account) async {
-    state = state.copyWith(isLoading: true, errorMessage: null);
-    final persona = account.toPersona();
-    AppPersistenceService.instance.savePersona(persona);
-    AppPersistenceService.instance.setActivePersonaId(persona.id);
-    await ref.read(userPersonaProvider.notifier).switchPersona(persona);
-
-    final prefs = ref.read(sharedPreferencesProvider);
-    await prefs.setBool('is_test_role_logged_in', true);
-
-    state = state.copyWith(isLoading: false, isLoggedIn: true);
-    _invalidateUserScopedProviders();
-  }
-
   /// Set the active role in auth state.
   void setRole(String role) {
     state = state.copyWith(role: role);
@@ -356,11 +301,6 @@ class AuthNotifier extends Notifier<AppAuthState> {
 
   // Called AFTER routing is decided.
   void markLoggedIn() {
-    final activePersona = ref.read(userPersonaProvider);
-    if (TestAccounts.isTestId(activePersona.id)) {
-      final prefs = ref.read(sharedPreferencesProvider);
-      prefs.setBool('is_test_role_logged_in', true);
-    }
     state = state.copyWith(isLoggedIn: true);
     _invalidateUserScopedProviders();
   }
@@ -370,7 +310,7 @@ class AuthNotifier extends Notifier<AppAuthState> {
     state = state.copyWith(isLoading: true, errorMessage: null, role: null);
     try {
       final prefs = ref.read(sharedPreferencesProvider);
-      await prefs.setBool('is_test_role_logged_in', false);
+      await prefs.remove('is_test_role_logged_in');
       AppPersistenceService.instance.setActivePersonaId('');
       await _authRepo.logout();
       state = state.copyWith(isLoggedIn: false, isLoading: false, role: null);

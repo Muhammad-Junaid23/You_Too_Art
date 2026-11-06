@@ -3,7 +3,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:you_too_art/core/constants/supabase_tables.dart';
 import 'package:you_too_art/core/constants/talent_directory.dart';
-import 'package:you_too_art/core/constants/test_accounts.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
 
 /// Repository for social feed post operations.
@@ -62,7 +61,7 @@ class PostRepository {
     String? mediaUrl,
     String? mediaType,
   }) async {
-    if (_client.auth.currentUser == null || TestAccounts.isTestId(authorId)) {
+    if (_client.auth.currentUser == null) {
       return {
         'id': 'local-${DateTime.now().millisecondsSinceEpoch}',
         'author_id': authorId,
@@ -140,7 +139,7 @@ class PostRepository {
     required String postId,
     required String userId,
   }) async {
-    if (_client.auth.currentUser == null || TestAccounts.isTestId(userId)) {
+    if (_client.auth.currentUser == null) {
       // Test accounts or unauthenticated users store likes in-memory / locally
       return;
     }
@@ -190,9 +189,7 @@ class PostRepository {
 
       final name = likingTalent?.name ??
           likingPersona?.name ??
-          (likingUserId == UserPersonaNotifier.actorDefaultId
-              ? 'Wajahat Ali (Actor)'
-              : 'A fellow artist');
+          'A fellow artist';
       final avatarUrl = likingTalent?.avatarUrl ?? likingPersona?.avatarUrl;
       final isFilmfare = likingUserId == UserPersonaNotifier.filmfareId ||
           likingPersona?.isProductionHouse == true;
@@ -221,7 +218,7 @@ class PostRepository {
     required String authorId,
     required String text,
   }) async {
-    if (_client.auth.currentUser == null || TestAccounts.isTestId(authorId)) {
+    if (_client.auth.currentUser == null) {
       return {
         'id': 'local-cmt-${DateTime.now().millisecondsSinceEpoch}',
         'post_id': postId,

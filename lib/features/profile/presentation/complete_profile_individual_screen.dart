@@ -102,11 +102,18 @@ class _CompleteProfileIndividualScreenState
 
     final allItems = portfolioAsync.value ?? const <Map<String, dynamic>>[];
 
-    // Deduplicate any repeated items by title and media type
+    // Deduplicate any repeated items by title and media type, and exclude any legacy dummy items
     final seen = <String>{};
     final uniqueItems = <Map<String, dynamic>>[];
     for (final item in allItems) {
-      final titleKey = (item['title'] ?? '').toString().toLowerCase().trim();
+      final title = (item['title'] ?? '').toString();
+      final mediaUrl = (item['media_url'] ?? '').toString();
+      if (title.contains('Dramatic Monologue') ||
+          title.contains('Dramatic Portrait') ||
+          mediaUrl.contains('cloudinary')) {
+        continue;
+      }
+      final titleKey = title.toLowerCase().trim();
       final typeKey = (item['media_type'] ?? '').toString().toLowerCase().trim();
       final key = '$typeKey:$titleKey';
       if (titleKey.isNotEmpty && !seen.add(key)) {
@@ -434,12 +441,11 @@ class _CompleteProfileIndividualScreenState
       );
 
       final currentPort = AppPersistenceService.instance.getPortfolio(uid);
-      final isDummy = currentPort.videos.any((v) => v.id == 'vid_1' && v.title.contains('Gilgit-Baltistan'));
-      if (isDummy) {
+      final hasLegacyDummy = currentPort.videos.any((v) => v.title.contains('Dramatic Monologue') || v.mediaUrl.contains('cloudinary')) ||
+          currentPort.photos.any((p) => p.title.contains('Dramatic Portrait') || p.mediaUrl.contains('cloudinary'));
+      if (hasLegacyDummy) {
         const emptyPort = UserPortfolioState(videos: [], photos: []);
         AppPersistenceService.instance.savePortfolio(uid, emptyPort);
-        AppPersistenceService.instance.savePortfolio('actor', emptyPort);
-        AppPersistenceService.instance.savePortfolio(AppPersistenceService.actorDefaultId, emptyPort);
       }
 
       if (isVideo) {

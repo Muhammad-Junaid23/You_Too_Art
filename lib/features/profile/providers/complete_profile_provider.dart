@@ -146,12 +146,11 @@ class CompleteProfileNotifier extends Notifier<CompleteProfileState> {
 
       // Ensure local portfolio does not retain dummy Gilgit-Baltistan seed
       final currentPort = AppPersistenceService.instance.getPortfolio(uid);
-      final isDummy = currentPort.videos.any((v) => v.id == 'vid_1' && v.title.contains('Gilgit-Baltistan'));
-      if (isDummy) {
+      final hasLegacyDummy = currentPort.videos.any((v) => v.title.contains('Dramatic Monologue') || v.mediaUrl.contains('cloudinary')) ||
+          currentPort.photos.any((p) => p.title.contains('Dramatic Portrait') || p.mediaUrl.contains('cloudinary'));
+      if (hasLegacyDummy) {
         const emptyPort = UserPortfolioState(videos: [], photos: []);
         AppPersistenceService.instance.savePortfolio(uid, emptyPort);
-        AppPersistenceService.instance.savePortfolio('actor', emptyPort);
-        AppPersistenceService.instance.savePortfolio(AppPersistenceService.actorDefaultId, emptyPort);
       }
 
       final user = Supabase.instance.client.auth.currentUser;

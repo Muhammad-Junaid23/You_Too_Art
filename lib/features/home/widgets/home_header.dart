@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:you_too_art/app/config/routes.dart';
+import 'package:you_too_art/core/providers/user_persona_provider.dart';
 import 'package:you_too_art/features/home/providers/home_feed_provider.dart';
 import 'package:you_too_art/features/notifications/providers/notification_provider.dart';
 
@@ -16,16 +17,19 @@ class HomeHeader extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final activePersona = ref.watch(userPersonaProvider);
     final userAsync = ref.watch(currentUserProfileProvider);
     final user = userAsync.value;
     final notifState = ref.watch(notificationProvider);
     final unreadCount = notifState.unreadCount;
 
-    final displayName = user?.firstName.isNotEmpty == true
+    final displayName = (user?.firstName.isNotEmpty == true)
         ? user!.firstName
         : (user?.name.isNotEmpty == true
             ? user!.name
-            : (user?.email.split('@').first ?? 'there'));
+            : (activePersona.name.isNotEmpty && !activePersona.name.toLowerCase().contains('wajahat')
+                ? activePersona.name
+                : (user?.email.split('@').first ?? 'there')));
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
