@@ -32,6 +32,23 @@ String friendlyError(Object error) {
       return 'Too many attempts. Please wait a moment and try again.';
     }
 
+    // Invalid email format specifics (before generic 400 fallback)
+    if (message.contains('unable to validate email') ||
+        message.contains('invalid format') ||
+        message.contains('invalid email') ||
+        message.contains('email address is invalid') ||
+        message.contains('provide a valid email')) {
+      return 'Please enter a valid email address.';
+    }
+    if (message.contains('signup_disabled') ||
+        message.contains('signups not allowed')) {
+      return 'New sign-ups are currently disabled. Please contact support.';
+    }
+    if (message.contains('otp_disabled') ||
+        message.contains('email provider is not enabled')) {
+      return 'Email login is currently unavailable. Please try again later.';
+    }
+
     // Fallback by status code
     if (code == '400') return 'Invalid request. Please check your input.';
     if (code == '401') return 'Session expired. Please log in again.';
