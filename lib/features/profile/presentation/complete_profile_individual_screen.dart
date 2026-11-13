@@ -599,40 +599,41 @@ class _MediaSectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = AppColors.of(context);
-    final text = Theme.of(context).textTheme;
-
     return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: text.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: colors.textPrimary,
-                ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1A1A2E),
               ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                style: text.bodySmall?.copyWith(color: colors.textSecondary),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              subtitle,
+              style: const TextStyle(
+                fontSize: 12,
+                color: Color(0xFF9E9E9E),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
-        GestureDetector(
+        InkWell(
           onTap: onAdd,
+          borderRadius: BorderRadius.circular(20),
           child: Container(
             width: 36,
             height: 36,
-            decoration: BoxDecoration(
-              color: colors.successSurface,
+            decoration: const BoxDecoration(
+              color: Color(0xFFE8F8F3),
               shape: BoxShape.circle,
             ),
-            child: Icon(Icons.add, color: colors.success, size: 20),
+            child: const Icon(Icons.add, color: Color(0xFF00C48C), size: 20),
           ),
         ),
       ],
@@ -648,85 +649,130 @@ class _PortfolioTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = AppColors.of(context);
-    final text = Theme.of(context).textTheme;
     final isVideo = item['media_type'] == 'video';
     final url = item['media_url'] as String? ?? '';
     final title = item['title'] as String? ?? '';
+    final thumbUrl = isVideo
+        ? (extractYouTubeThumbnail(url) ?? url)
+        : resolvePortfolioMediaUrl(url);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(10),
+      margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
-        border: Border.all(color: colors.border),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(14),
+        color: Colors.white,
+        border: Border.all(color: const Color(0xFFEEEEEE)),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: Container(
-              width: 56,
-              height: 56,
-              color: colors.avatarBg,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  buildPortfolioImage(
-                    isVideo
-                        ? (extractYouTubeThumbnail(url) ?? url)
-                        : resolvePortfolioMediaUrl(url),
-                    width: 56,
-                    height: 56,
-                    fit: BoxFit.cover,
-                  ),
-                  if (isVideo)
-                    Center(
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.45),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.play_arrow_rounded,
-                          color: Colors.white,
-                          size: 18,
-                        ),
-                      ),
-                    ),
-                ],
+          // ── Thumbnail ──────────────────────────────────
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              ClipRRect(
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(14),
+                ),
+                child: buildPortfolioImage(
+                  thumbUrl,
+                  height: 180,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                ),
               ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: text.bodyMedium?.copyWith(
-                    color: colors.textPrimary,
-                    fontWeight: FontWeight.w600,
+              if (isVideo)
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.88),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.15),
+                        blurRadius: 10,
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.play_arrow_rounded,
+                    size: 30,
+                    color: Color(0xFF1A1A2E),
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  url,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: text.bodySmall?.copyWith(color: colors.link),
+              if (isVideo && url.toLowerCase().contains('youtu'))
+                Positioned(
+                  bottom: 10,
+                  right: 12,
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE50914),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.play_circle_fill,
+                            size: 12, color: Colors.white),
+                        SizedBox(width: 4),
+                        Text(
+                          'YouTube',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+
+          // ── Title + URL + Delete ────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF1A1A2E),
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        url,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF3899F3),
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  onPressed: onDelete,
+                  icon: const Icon(Icons.delete_outline),
+                  color: const Color(0xFFE53935),
                 ),
               ],
             ),
-          ),
-          IconButton(
-            onPressed: onDelete,
-            icon: const Icon(Icons.delete_outline),
-            color: colors.error,
           ),
         ],
       ),
