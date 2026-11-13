@@ -220,8 +220,24 @@ class AuthNotifier extends Notifier<AppAuthState> {
   Future<bool> sendEmailOtp({required String email}) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
 
+    // Client-side email format validation
+    final trimmed = email.trim();
+    if (trimmed.isEmpty) {
+      state = state.copyWith(
+          isLoading: false, errorMessage: 'Please enter your email address.');
+      return false;
+    }
+    final emailRegex =
+        RegExp(r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$');
+    if (!emailRegex.hasMatch(trimmed)) {
+      state = state.copyWith(
+          isLoading: false,
+          errorMessage: 'Please enter a valid email address.');
+      return false;
+    }
+
     try {
-      await _authRepo.sendEmailOtp(email: email);
+      await _authRepo.sendEmailOtp(email: trimmed);
       state = state.copyWith(isLoading: false);
       return true;
     } catch (e) {
