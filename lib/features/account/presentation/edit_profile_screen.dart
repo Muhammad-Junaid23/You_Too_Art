@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:you_too_art/core/constants/geo_data.dart';
+import 'package:you_too_art/core/models/user_model.dart';
 import 'package:you_too_art/core/providers/geo_providers.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
 import 'package:you_too_art/core/services/app_persistence_service.dart';
@@ -34,51 +37,99 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   String? _selectedCity;
   bool _isSaving = false;
   bool _isProd = false;
+  bool _populated = false; // guard: only populate fields once
 
   @override
   void initState() {
     super.initState();
-    final persona = ref.read(userPersonaProvider);
-    final user = ref.read(currentUserProfileProvider).value;
+    _nameController = TextEditingController();
+    _roleController = TextEditingController();
+    _bioController = TextEditingController();
+    _emailController = TextEditingController();
+    _websiteController = TextEditingController();
+    _experienceController = TextEditingController();
+    _incorporationController = TextEditingController();
+    _establishedYearController = TextEditingController();
+    _addressController = TextEditingController();
 
-    _isProd = (user?.role.toLowerCase().contains('production') ?? false) ||
-        (user?.incorporationNumber != null &&
-            user!.incorporationNumber!.isNotEmpty) ||
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // Try the already-cached stream value first
+      final cached = ref.read(currentUserProfileProvider).value;
+      if (cached != null) {
+        _populateFromUser(cached);
+        return;
+      }
+      // Otherwise fetch directly from Supabase
+      final uid = ref.read(currentUidProvider);
+      if (uid == null) return;
+      try {
+        final user =
+            await ref.read(userRepositoryProvider).getById(uid);
+        if (user != null && mounted) _populateFromUser(user);
+      } catch (_) {}
+    });
+  }
+
+  /// Fills all form fields from [user] (Supabase UserModel).
+  /// Called once when the async profile resolves.
+  void _populateFromUser(UserModel user) {
+    if (_populated) return;
+    _populated = true;
+
+    final persona = ref.read(userPersonaProvider);
+
+    _isProd = user.role.toLowerCase().contains('production') ||
+        (user.incorporationNumber != null &&
+            user.incorporationNumber!.isNotEmpty) ||
         persona.isProductionHouse;
 
-    final initialName = user?.name.isNotEmpty == true
-        ? user!.name
-        : (user?.firstName.isNotEmpty == true
-            ? '${user!.firstName} ${user.lastName}'.trim()
+    final fullName = user.name.isNotEmpty
+        ? user.name
+        : (user.firstName.isNotEmpty
+            ? '${user.firstName} ${user.lastName}'.trim()
             : persona.name);
 
-    _nameController = TextEditingController(text: initialName);
-    _roleController = TextEditingController(
-      text: user?.role != null && user!.role != 'unset'
-          ? user.role
-          : persona.role,
-    );
-    _bioController = TextEditingController(text: user?.bio ?? persona.bio);
-    _emailController = TextEditingController(text: user?.email ?? persona.email);
-    _websiteController = TextEditingController(text: persona.website);
-    _experienceController = TextEditingController(text: persona.experience);
-    _incorporationController =
-        TextEditingController(text: user?.incorporationNumber ?? '');
-    _establishedYearController = TextEditingController(
-      text: user?.establishedYear != null ? '${user!.establishedYear}' : '',
-    );
-    _addressController = TextEditingController(text: user?.address ?? '');
-    _avatarUrl = user?.profileImagePath ?? persona.avatarUrl;
+    final clientUser = Supabase.instance.client.auth.currentUser;
+    final meta = clientUser?.userMetadata ?? {};
+    final metaWebsite = meta['website'] as String? ?? '';
+    final metaExp = meta['experience'] as String? ?? '';
 
-    // Parse location if present
-    final loc = user?.location ?? persona.location;
+    _nameController.text = fullName;
+    _roleController.text =
+        (user.role.isNotEmpty && user.role != 'unset') ? user.role : persona.role;
+    _bioController.text = user.bio?.isNotEmpty == true ? user.bio! : persona.bio;
+    _emailController.text =
+        user.email.isNotEmpty ? user.email : persona.email;
+    _websiteController.text =
+        persona.website.isNotEmpty ? persona.website : metaWebsite;
+    _experienceController.text =
+        persona.experience.isNotEmpty ? persona.experience : metaExp;
+    _incorporationController.text = user.incorporationNumber ?? '';
+    _establishedYearController.text =
+        user.establishedYear != null ? '${user.establishedYear}' : '';
+    _addressController.text = user.address ?? '';
+    _avatarUrl = user.profileImagePath?.isNotEmpty == true
+        ? user.profileImagePath
+        : persona.avatarUrl;
+
+    // Parse location: stored as "City, CountryName" or "City, CountryCode"
+    final loc = user.location?.isNotEmpty == true ? user.location! : persona.location;
     if (loc.contains(',')) {
       final parts = loc.split(',');
       if (parts.length >= 2) {
         _selectedCity = parts[0].trim();
-        _selectedCountry = parts[1].trim();
+        final rawCountry = parts[1].trim();
+        final allCountries = getCountries();
+        final match = allCountries.where((c) {
+          final code = c['code']?.toLowerCase();
+          final name = c['name']?.toLowerCase();
+          return code == rawCountry.toLowerCase() || name == rawCountry.toLowerCase();
+        }).firstOrNull;
+        _selectedCountry = match != null ? match['code'] : rawCountry;
       }
     }
+
+    if (mounted) setState(() {});
   }
 
   @override
@@ -100,49 +151,86 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
     try {
       final persona = ref.read(userPersonaProvider);
+      final uid = ref.read(currentUidProvider);
+
+      // Always fetch the latest DB row so we never overwrite existing data
+      // with an empty form field that wasn't populated yet.
+      UserModel? dbUser = ref.read(currentUserProfileProvider).value;
+      if (dbUser == null && uid != null) {
+        dbUser = await ref.read(userRepositoryProvider).getById(uid);
+      }
+
       final countries = ref.read(countriesProvider).value ?? [];
       String? countryName = _selectedCountry;
       if (_selectedCountry != null) {
         final match =
             countries.where((c) => c['code'] == _selectedCountry).firstOrNull;
-        if (match != null) {
-          countryName = match['name'] as String?;
-        }
+        if (match != null) countryName = match['name'] as String?;
       }
 
+      // Keep existing location when user didn't touch the dropdowns.
+      final existingLocation = dbUser?.location ?? persona.location;
       final locationStr = (_selectedCity != null && countryName != null)
           ? '$_selectedCity, $countryName'
-          : (countryName ?? persona.location);
+          : (countryName ??
+              (existingLocation.isNotEmpty ? existingLocation : ''));
 
-      final uid = ref.read(currentUidProvider);
+      // Helper: use form value only if non-empty, else keep DB / persona value.
+      String pick(String formVal, String? dbVal, [String fallback = '']) {
+        if (formVal.isNotEmpty) return formVal;
+        if (dbVal != null && dbVal.isNotEmpty) return dbVal;
+        return fallback;
+      }
+
+      final clientUser = Supabase.instance.client.auth.currentUser;
+      final meta = clientUser?.userMetadata ?? {};
+      final metaWebsite = meta['website'] as String? ?? '';
+      final metaExp = meta['experience'] as String? ?? '';
+
+      final nameVal = pick(_nameController.text.trim(), dbUser?.name, persona.name);
+      final bioVal = pick(_bioController.text.trim(), dbUser?.bio, persona.bio);
+      final websiteVal = _websiteController.text.trim().isNotEmpty
+          ? _websiteController.text.trim()
+          : (persona.website.isNotEmpty ? persona.website : metaWebsite);
+      final expVal = _experienceController.text.trim().isNotEmpty
+          ? _experienceController.text.trim()
+          : (persona.experience.isNotEmpty ? persona.experience : metaExp);
 
       final updates = <String, dynamic>{
-        'bio': _bioController.text.trim(),
-        'location': locationStr,
+        if (bioVal.isNotEmpty) 'bio': bioVal,
+        if (locationStr.isNotEmpty) 'location': locationStr,
         if (_avatarUrl != null) 'profile_image_path': _avatarUrl,
       };
 
       if (_isProd) {
-        updates['first_name'] = _nameController.text.trim();
-        updates['name'] = _nameController.text.trim();
-        updates['address'] = _addressController.text.trim();
-        updates['incorporation_number'] =
-            _incorporationController.text.trim();
-        final est = int.tryParse(_establishedYearController.text.trim());
-        if (est != null) updates['established_year'] = est;
-      } else {
-        final rawName = _nameController.text.trim();
-        updates['name'] = rawName;
-        updates['first_name'] =
-            rawName.contains(' ') ? rawName.split(' ').first : rawName;
-        updates['last_name'] =
-            rawName.contains(' ') ? rawName.split(' ').sublist(1).join(' ') : '';
-        if (_roleController.text.trim().isNotEmpty) {
-          updates['role'] = _roleController.text.trim();
+        if (nameVal.isNotEmpty) {
+          updates['first_name'] = nameVal;
+          updates['name'] = nameVal;
         }
+        final addrVal = pick(_addressController.text.trim(), dbUser?.address, persona.location);
+        if (addrVal.isNotEmpty) updates['address'] = addrVal;
+        final incVal = pick(
+            _incorporationController.text.trim(), dbUser?.incorporationNumber);
+        if (incVal.isNotEmpty) updates['incorporation_number'] = incVal;
+        final est = int.tryParse(_establishedYearController.text.trim());
+        final existingEst = dbUser?.establishedYear;
+        if (est != null || existingEst != null) {
+          updates['established_year'] = est ?? existingEst;
+        }
+      } else {
+        if (nameVal.isNotEmpty) {
+          updates['name'] = nameVal;
+          updates['first_name'] =
+              nameVal.contains(' ') ? nameVal.split(' ').first : nameVal;
+          updates['last_name'] = nameVal.contains(' ')
+              ? nameVal.split(' ').sublist(1).join(' ')
+              : '';
+        }
+        final roleVal = pick(_roleController.text.trim(), dbUser?.role == 'unset' ? '' : dbUser?.role, persona.role);
+        if (roleVal.isNotEmpty) updates['role'] = roleVal;
       }
 
-      // 1. Sync to Supabase PostgREST
+      // 1. Sync to Supabase PostgREST (public.users table)
       if (uid != null) {
         try {
           await ref
@@ -151,21 +239,36 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         } catch (_) {}
       }
 
-      // 2. Update local persistent persona
+      // 2. Sync to Supabase Auth user_metadata (preserves website, experience across devices & sessions)
+      if (clientUser != null) {
+        try {
+          final authData = <String, dynamic>{
+            if (nameVal.isNotEmpty) 'name': nameVal,
+            if (bioVal.isNotEmpty) 'bio': bioVal,
+            if (locationStr.isNotEmpty) 'location': locationStr,
+            if (websiteVal.isNotEmpty) 'website': websiteVal,
+            if (expVal.isNotEmpty) 'experience': expVal,
+            if (_avatarUrl != null) 'avatar_url': _avatarUrl,
+          };
+          if (authData.isNotEmpty) {
+            await Supabase.instance.client.auth.updateUser(UserAttributes(data: authData));
+          }
+        } catch (_) {}
+      }
+
+      // 3. Update local persistent persona
       final updatedPersona = persona.copyWith(
         id: uid ?? persona.id,
-        name: _nameController.text.trim().isNotEmpty
-            ? _nameController.text.trim()
-            : persona.name,
+        name: nameVal.isNotEmpty ? nameVal : persona.name,
         role: _roleController.text.trim().isNotEmpty
             ? _roleController.text.trim()
             : persona.role,
         email: _emailController.text.trim().isNotEmpty
             ? _emailController.text.trim()
             : persona.email,
-        bio: _bioController.text.trim(),
-        website: _websiteController.text.trim(),
-        experience: _experienceController.text.trim(),
+        bio: bioVal,
+        website: websiteVal,
+        experience: expVal,
         location: locationStr.isNotEmpty ? locationStr : persona.location,
         avatarUrl: _avatarUrl ?? persona.avatarUrl,
         isProductionHouse: _isProd,
@@ -174,7 +277,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       AppPersistenceService.instance.savePersona(updatedPersona);
       await ref.read(userPersonaProvider.notifier).updateProfile(updatedPersona);
 
-      // 3. Refresh feeds and directories
+      // 4. Refresh feeds and directories
       ref.invalidate(currentUserProfileProvider);
       ref.read(talentListProvider.notifier).fetchTalents();
       ref.read(networkProvider.notifier).refresh();
@@ -211,6 +314,13 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final countriesAsync = ref.watch(countriesProvider);
+
+    // Populate fields whenever the stream delivers a user (handles fresh login
+    // where the stream emits after initState has already run).
+    ref.listen<AsyncValue<UserModel?>>(currentUserProfileProvider, (prev, next) {
+      final user = next.value;
+      if (user != null && !_populated) _populateFromUser(user);
+    });
 
     // If _selectedCountry is a name rather than code, resolve to code
     if (_selectedCountry != null && countriesAsync.hasValue) {

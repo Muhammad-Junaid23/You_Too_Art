@@ -1,39 +1,17 @@
-import 'package:flutter/foundation.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:you_too_art/core/constants/geo_data.dart';
 
 /// Repository for reference geography data (countries + cities).
-/// Read-only from the client.
+/// Uses a local bundled dataset — no network call required.
 class GeoRepository {
-  final SupabaseClient _client;
+  GeoRepository();
 
-  GeoRepository(this._client);
-
-  /// Fetch all countries sorted by name.
+  /// All countries sorted by name.
   Future<List<Map<String, dynamic>>> fetchCountries() async {
-    try {
-      final data = await _client
-          .from('countries')
-          .select('code, name')
-          .order('name');
-      return List<Map<String, dynamic>>.from(data);
-    } catch (e) {
-      if (kDebugMode) debugPrint('GeoRepository.fetchCountries: $e');
-      rethrow;
-    }
+    return getCountries();
   }
 
-  /// Fetch cities for a given [countryCode], sorted by name.
+  /// Cities for a given [countryCode], sorted by name.
   Future<List<Map<String, dynamic>>> fetchCities(String countryCode) async {
-    try {
-      final data = await _client
-          .from('cities')
-          .select('id, name')
-          .eq('country_code', countryCode)
-          .order('name');
-      return List<Map<String, dynamic>>.from(data);
-    } catch (e) {
-      if (kDebugMode) debugPrint('GeoRepository.fetchCities: $e');
-      rethrow;
-    }
+    return getCities(countryCode);
   }
 }

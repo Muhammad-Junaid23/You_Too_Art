@@ -191,6 +191,8 @@ class AppPersistenceService {
     );
   }
 
+  UserPersona getPersonaById(String id) => getPersona(id);
+
   bool hasPersona(String id) {
     return _personas.containsKey(id) ||
         (Supabase.instance.client.auth.currentUser?.id == id);
@@ -903,27 +905,39 @@ class AppPersistenceService {
           ? user.email!.split('@').first
           : 'User';
 
-      final userRoleStr = ((metaRole != null && metaRole.isNotEmpty) ? metaRole : '').toLowerCase();
+      final cachedPersona = _personas[user.id];
+
+      final userRoleStr = ((metaRole != null && metaRole.isNotEmpty) ? metaRole : (cachedPersona?.role ?? '')).toLowerCase();
       final isDir = userRoleStr.contains('director');
-      final isProd = userRoleStr.contains('production') || userRoleStr.contains('studio');
+      final isProd = userRoleStr.contains('production') || userRoleStr.contains('studio') || (cachedPersona?.isProductionHouse ?? false);
 
       var currentPersona = UserPersona(
         id: user.id,
         name: (metaName != null && metaName.trim().isNotEmpty)
             ? metaName
-            : emailHandle,
-        email: user.email ?? '',
+            : (cachedPersona != null && cachedPersona.name.isNotEmpty ? cachedPersona.name : emailHandle),
+        email: user.email ?? (cachedPersona?.email ?? ''),
         role: (metaRole != null && metaRole.trim().isNotEmpty)
             ? metaRole
-            : (isProd ? 'Production House' : (isDir ? 'Director' : 'actor')),
+            : (cachedPersona != null && cachedPersona.role.isNotEmpty && cachedPersona.role != 'unset'
+                ? cachedPersona.role
+                : (isProd ? 'Production House' : (isDir ? 'Director' : 'actor'))),
         avatarUrl: (metaAvatar != null && metaAvatar.trim().isNotEmpty)
             ? metaAvatar
-            : '',
+            : (cachedPersona?.avatarUrl ?? ''),
         isProductionHouse: isProd,
-        bio: metaBio ?? '',
-        website: metaWebsite ?? '',
-        experience: metaExp ?? '',
-        location: metaLoc ?? '',
+        bio: (metaBio != null && metaBio.isNotEmpty)
+            ? metaBio
+            : (cachedPersona?.bio ?? ''),
+        website: (metaWebsite != null && metaWebsite.isNotEmpty)
+            ? metaWebsite
+            : (cachedPersona?.website ?? ''),
+        experience: (metaExp != null && metaExp.isNotEmpty)
+            ? metaExp
+            : (cachedPersona?.experience ?? ''),
+        location: (metaLoc != null && metaLoc.isNotEmpty)
+            ? metaLoc
+            : (cachedPersona?.location ?? ''),
       );
 
       _personas[user.id] = currentPersona;
@@ -938,10 +952,15 @@ class AppPersistenceService {
           final lastName = row['last_name'] as String? ?? '';
           final combinedName =
               '$firstName $lastName'.trim().isNotEmpty ? '$firstName $lastName'.trim() : row['name'] as String? ?? '';
+          final roleFromRow = row['role'] as String? ?? '';
+          final isProdFromRow = roleFromRow.toLowerCase().contains('production') ||
+              roleFromRow.toLowerCase().contains('studio') ||
+              (row['incorporation_number'] != null && (row['incorporation_number'] as String).isNotEmpty);
+
           final updatedWithRow = currentPersona.copyWith(
             name: combinedName.isNotEmpty ? combinedName : currentPersona.name,
-            role: (row['role'] as String? ?? '').isNotEmpty && row['role'] != 'unset'
-                ? row['role'] as String
+            role: roleFromRow.isNotEmpty && roleFromRow != 'unset'
+                ? roleFromRow
                 : currentPersona.role,
             bio: (row['bio'] as String? ?? '').isNotEmpty
                 ? row['bio'] as String
@@ -952,27 +971,30 @@ class AppPersistenceService {
             avatarUrl: (row['profile_image_path'] as String? ?? '').isNotEmpty
                 ? row['profile_image_path'] as String
                 : currentPersona.avatarUrl,
+            isProductionHouse: isProdFromRow || currentPersona.isProductionHouse,
           );
 
+          currentPersona = updatedWithRow;
           _personas[user.id] = updatedWithRow;
+          _prefs.setString('persona_profile_${user.id}', jsonEncode(updatedWithRow.toJson()));
+        } else {
+          // Only if user row DOES NOT exist in users table yet, create an initial record.
+          final names = currentPersona.name.trim().split(' ');
+          final firstName = names.first;
+          final lastName = names.length > 1 ? names.skip(1).join(' ') : '';
+          await client.from('users').insert({
+            'id': user.id,
+            'name': currentPersona.name,
+            'first_name': firstName,
+            'last_name': lastName,
+            'email': user.email ?? currentPersona.email,
+            'role': currentPersona.role.isNotEmpty && currentPersona.role != 'unset'
+                ? currentPersona.role
+                : (isProd ? 'production_house' : (isDir ? 'director' : 'actor')),
+            'created_at': DateTime.now().toUtc().toIso8601String(),
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+          });
         }
-
-        // Auto-upsert to users table with authenticated token
-        final names = currentPersona.name.trim().split(' ');
-        final firstName = names.first;
-        final lastName = names.length > 1 ? names.skip(1).join(' ') : '';
-        await client.from('users').upsert({
-          'id': user.id,
-          'name': currentPersona.name,
-          'first_name': firstName,
-          'last_name': lastName,
-          'email': user.email ?? currentPersona.email,
-          'role': currentPersona.role.isNotEmpty ? currentPersona.role : (isProd ? 'production_house' : (isDir ? 'director' : 'actor')),
-          'bio': currentPersona.bio,
-          'profile_image_path': currentPersona.avatarUrl,
-          'location': currentPersona.location,
-          'updated_at': DateTime.now().toUtc().toIso8601String(),
-        });
       } catch (_) {}
 
       _ensureDefaultsLoaded();
@@ -989,34 +1011,43 @@ class AppPersistenceService {
     if (user == null || user.id != persona.id) return;
 
     try {
-      await client.auth.updateUser(
-        UserAttributes(
-          data: {
-            'name': persona.name,
-            'role': persona.role,
-            'bio': persona.bio,
-            'website': persona.website,
-            'experience': persona.experience,
-            'location': persona.location,
-            'avatar_url': persona.avatarUrl,
-          },
-        ),
-      );
+      final authData = <String, dynamic>{
+        if (persona.name.trim().isNotEmpty) 'name': persona.name.trim(),
+        if (persona.role.trim().isNotEmpty && persona.role != 'unset')
+          'role': persona.role.trim(),
+        if (persona.bio.trim().isNotEmpty) 'bio': persona.bio.trim(),
+        if (persona.website.trim().isNotEmpty) 'website': persona.website.trim(),
+        if (persona.experience.trim().isNotEmpty)
+          'experience': persona.experience.trim(),
+        if (persona.location.trim().isNotEmpty)
+          'location': persona.location.trim(),
+        if (persona.avatarUrl.trim().isNotEmpty)
+          'avatar_url': persona.avatarUrl.trim(),
+      };
+      if (authData.isNotEmpty) {
+        await client.auth.updateUser(UserAttributes(data: authData));
+      }
     } catch (_) {}
 
     try {
       final names = persona.name.trim().split(' ');
       final firstName = names.first;
       final lastName = names.length > 1 ? names.skip(1).join(' ') : '';
-      await client.from('users').update({
-        'first_name': firstName,
-        'last_name': lastName,
-        'name': persona.name,
-        'role': persona.role,
-        'bio': persona.bio,
-        'location': persona.location,
-        'profile_image_path': persona.avatarUrl,
-      }).eq('id', user.id);
+      final dbUpdates = <String, dynamic>{
+        if (persona.name.trim().isNotEmpty) 'name': persona.name.trim(),
+        if (firstName.isNotEmpty) 'first_name': firstName,
+        if (lastName.isNotEmpty) 'last_name': lastName,
+        if (persona.role.trim().isNotEmpty && persona.role != 'unset')
+          'role': persona.role.trim(),
+        if (persona.bio.trim().isNotEmpty) 'bio': persona.bio.trim(),
+        if (persona.location.trim().isNotEmpty)
+          'location': persona.location.trim(),
+        if (persona.avatarUrl.trim().isNotEmpty)
+          'profile_image_path': persona.avatarUrl.trim(),
+      };
+      if (dbUpdates.isNotEmpty) {
+        await client.from('users').update(dbUpdates).eq('id', user.id);
+      }
     } catch (_) {}
   }
 
