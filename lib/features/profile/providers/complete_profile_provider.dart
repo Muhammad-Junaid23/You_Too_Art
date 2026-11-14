@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:you_too_art/core/constants/geo_data.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
 import 'package:you_too_art/core/services/app_persistence_service.dart';
 import 'package:you_too_art/features/auth/providers/auth_provider.dart';
@@ -101,7 +102,10 @@ class CompleteProfileNotifier extends Notifier<CompleteProfileState> {
 
       final fullName =
           '${state.firstName.trim()} ${state.lastName.trim()}'.trim();
-      final locationStr = '${state.city}, ${state.country}';
+      final countries = getCountries();
+      final match = countries.where((c) => c['code'] == state.country).firstOrNull;
+      final countryName = match != null ? match['name'] as String : (state.country ?? '');
+      final locationStr = '${state.city}, $countryName';
 
       String? existingRole = ref.read(authProvider).role;
       if (existingRole == null || existingRole.isEmpty || existingRole == 'unset') {

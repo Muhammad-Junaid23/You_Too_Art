@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:you_too_art/core/constants/geo_data.dart';
 import 'package:you_too_art/core/services/app_persistence_service.dart';
 import 'package:you_too_art/features/auth/providers/auth_provider.dart';
 
@@ -113,6 +114,11 @@ class ProductionProfileNotifier extends Notifier<ProductionProfileState> {
       final uid = ref.read(authProvider.notifier).currentUid;
       if (uid == null) throw StateError('Not signed in');
 
+      final countries = getCountries();
+      final match = countries.where((c) => c['code'] == state.country).firstOrNull;
+      final countryName = match != null ? match['name'] as String : (state.country ?? '');
+      final loc = '${state.city}, $countryName';
+
       await ref
           .read(userRepositoryProvider)
           .updateProfile(
@@ -124,7 +130,7 @@ class ProductionProfileNotifier extends Notifier<ProductionProfileState> {
               'incorporation_number': state.incorporationNumber.trim(),
               'established_year': state.establishedYear,
               'address': state.address.trim(),
-              'location': '${state.city}, ${state.country}',
+              'location': loc,
               'bio': state.bio.trim(),
               if (state.profileImagePath != null)
                 'profile_image_path': state.profileImagePath,
@@ -138,7 +144,7 @@ class ProductionProfileNotifier extends Notifier<ProductionProfileState> {
         name: state.companyName.trim(),
         role: 'Production House',
         isProductionHouse: true,
-        location: '${state.city}, ${state.country}',
+        location: loc,
         bio: state.bio.trim(),
         avatarUrl: state.profileImagePath ?? currentActor.avatarUrl,
       );

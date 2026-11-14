@@ -133,10 +133,10 @@ class AuthNotifier extends Notifier<AppAuthState> {
     try {
       await _authRepo.login(email: email, password: password);
 
-      // Create the user profile if it doesn't exist yet.
+      // Create or fetch the user profile.
       final user = _authRepo.currentUser;
       if (user != null) {
-        await _userRepo.createIfMissing(
+        final dbUser = await _userRepo.createIfMissing(
           UserModel(
             id: user.id,
             firstName: (user.userMetadata?['name'] as String? ?? '')
@@ -152,6 +152,49 @@ class AuthNotifier extends Notifier<AppAuthState> {
             updatedAt: DateTime.now(),
           ),
         );
+
+        final meta = user.userMetadata ?? {};
+        final cached = AppPersistenceService.instance.getPersonaById(user.id);
+        final effectiveBio = dbUser.bio?.isNotEmpty == true
+            ? dbUser.bio!
+            : (meta['bio'] as String? ?? cached.bio);
+        final effectiveLoc = dbUser.location?.isNotEmpty == true
+            ? dbUser.location!
+            : (meta['location'] as String? ?? cached.location);
+        final effectiveWebsite = (meta['website'] as String? ?? '').isNotEmpty
+            ? meta['website'] as String
+            : cached.website;
+        final effectiveExp = (meta['experience'] as String? ?? '').isNotEmpty
+            ? meta['experience'] as String
+            : cached.experience;
+        final isProd = dbUser.role.toLowerCase().contains('production') ||
+            dbUser.role.toLowerCase().contains('studio') ||
+            (dbUser.incorporationNumber != null && dbUser.incorporationNumber!.isNotEmpty) ||
+            cached.isProductionHouse;
+
+        final persona = UserPersona(
+          id: user.id,
+          name: dbUser.name.isNotEmpty
+              ? dbUser.name
+              : (dbUser.firstName.isNotEmpty
+                  ? '${dbUser.firstName} ${dbUser.lastName}'.trim()
+                  : (user.email?.split('@').first ?? 'User')),
+          email: user.email ?? email,
+          role: dbUser.role != 'unset' && dbUser.role.isNotEmpty
+              ? dbUser.role
+              : (meta['role'] as String? ?? (cached.role.isNotEmpty ? cached.role : 'actor')),
+          avatarUrl: dbUser.profileImagePath ?? (meta['avatar_url'] as String? ?? cached.avatarUrl),
+          bio: effectiveBio,
+          location: effectiveLoc,
+          website: effectiveWebsite,
+          experience: effectiveExp,
+          isProductionHouse: isProd,
+        );
+
+        AppPersistenceService.instance.savePersona(persona);
+        AppPersistenceService.instance.setActivePersonaId(persona.id);
+        await ref.read(userPersonaProvider.notifier).switchPersona(persona);
+        await AppPersistenceService.instance.syncWithSupabaseUser(user);
       }
 
       state = state.copyWith(isLoggedIn: true, isLoading: false);
@@ -272,21 +315,50 @@ class AuthNotifier extends Notifier<AppAuthState> {
       );
 
       // Bind persona immediately to the authenticated Supabase user
+      final meta = response.user!.userMetadata ?? {};
+      final cached = AppPersistenceService.instance.getPersonaById(response.user!.id);
       final emailPrefix = email.contains('@') ? email.split('@').first : 'User';
+
+      final effectiveBio = user.bio?.isNotEmpty == true
+          ? user.bio!
+          : (meta['bio'] as String? ?? cached.bio);
+      final effectiveLoc = user.location?.isNotEmpty == true
+          ? user.location!
+          : (meta['location'] as String? ?? cached.location);
+      final effectiveWebsite = (meta['website'] as String? ?? '').isNotEmpty
+          ? meta['website'] as String
+          : cached.website;
+      final effectiveExp = (meta['experience'] as String? ?? '').isNotEmpty
+          ? meta['experience'] as String
+          : cached.experience;
+
+      final isProd = user.role.toLowerCase().contains('production') ||
+          user.role.toLowerCase().contains('studio') ||
+          (user.incorporationNumber != null && user.incorporationNumber!.isNotEmpty) ||
+          cached.isProductionHouse;
+
       final persona = UserPersona(
         id: response.user!.id,
         name: user.name.isNotEmpty
             ? user.name
             : (user.firstName.isNotEmpty
                 ? '${user.firstName} ${user.lastName}'.trim()
-                : emailPrefix),
+                : (meta['name'] as String? ?? (cached.name.isNotEmpty ? cached.name : emailPrefix))),
         email: email,
-        role: user.role != 'unset' ? user.role : '',
-        avatarUrl: user.profileImagePath ?? '',
+        role: user.role != 'unset' && user.role.isNotEmpty
+            ? user.role
+            : (meta['role'] as String? ?? cached.role),
+        avatarUrl: user.profileImagePath ?? (meta['avatar_url'] as String? ?? cached.avatarUrl),
+        bio: effectiveBio,
+        location: effectiveLoc,
+        website: effectiveWebsite,
+        experience: effectiveExp,
+        isProductionHouse: isProd,
       );
       AppPersistenceService.instance.savePersona(persona);
       AppPersistenceService.instance.setActivePersonaId(persona.id);
       await ref.read(userPersonaProvider.notifier).switchPersona(persona);
+      await AppPersistenceService.instance.syncWithSupabaseUser(response.user!);
 
       state = state.copyWith(isLoading: false);
       return user;

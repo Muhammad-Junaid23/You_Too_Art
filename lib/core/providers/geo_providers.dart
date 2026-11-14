@@ -1,12 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:you_too_art/core/providers/supabase_providers.dart';
 import 'package:you_too_art/core/repositories/geo_repository.dart';
 
-/// Provides the [GeoRepository] backed by Supabase.
+/// Provides the [GeoRepository] backed by local bundled geo data.
 final geoRepositoryProvider = Provider<GeoRepository>((ref) {
-  final client = ref.watch(supabaseClientProvider);
-  return GeoRepository(client);
+  return GeoRepository();
 });
 
 /// All countries.

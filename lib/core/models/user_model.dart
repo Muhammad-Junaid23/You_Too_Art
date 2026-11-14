@@ -13,6 +13,8 @@ class UserModel {
   final String? incorporationNumber;
   final int? establishedYear;
   final String? address;
+  final String? website;
+  final String? experience;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -29,6 +31,8 @@ class UserModel {
     this.incorporationNumber,
     this.establishedYear,
     this.address,
+    this.website,
+    this.experience,
     this.createdAt,
     this.updatedAt,
   });
@@ -50,6 +54,8 @@ class UserModel {
       incorporationNumber: json['incorporation_number'] as String?,
       establishedYear: json['established_year'] as int?,
       address: json['address'] as String?,
+      website: (json['website'] ?? json['raw_user_meta_data']?['website']) as String?,
+      experience: (json['experience'] ?? json['raw_user_meta_data']?['experience']) as String?,
       createdAt: parseDateTime(json['created_at'] ?? json['createdAt']),
       updatedAt: parseDateTime(json['updated_at'] ?? json['updatedAt']),
     );
@@ -88,6 +94,8 @@ class UserModel {
     String? incorporationNumber,
     int? establishedYear,
     String? address,
+    String? website,
+    String? experience,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -104,6 +112,8 @@ class UserModel {
       incorporationNumber: incorporationNumber ?? this.incorporationNumber,
       establishedYear: establishedYear ?? this.establishedYear,
       address: address ?? this.address,
+      website: website ?? this.website,
+      experience: experience ?? this.experience,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
