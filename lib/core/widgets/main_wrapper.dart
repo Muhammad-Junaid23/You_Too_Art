@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:you_too_art/app/config/routes.dart';
 import 'package:you_too_art/features/chats/providers/chat_provider.dart';
 
 class _NavItem {
@@ -46,6 +47,32 @@ class MainWrapper extends ConsumerWidget {
       svgPath: 'assets/icons/account_svg.svg',
     ),
   ];
+
+  void _onTabTapped(int index) {
+    // 1. Pop any modal route or pushed full-screen page on rootNavigator
+    if (AppRoutes.rootNavigatorKey.currentState?.canPop() == true) {
+      try {
+        AppRoutes.rootNavigatorKey.currentState
+            ?.popUntil((route) => route.isFirst);
+      } catch (_) {}
+    }
+
+    // 2. Pop all pushed subpages (MaterialPageRoute) across all branch navigators
+    for (final navKey in AppRoutes.branchNavKeys) {
+      final navState = navKey.currentState;
+      if (navState != null && navState.canPop()) {
+        try {
+          navState.popUntil((route) => route.isFirst);
+        } catch (_) {}
+      }
+    }
+
+    // 3. Switch GoRouter branch and reset to its initial location
+    navigationShell.goBranch(
+      index,
+      initialLocation: true,
+    );
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -128,12 +155,7 @@ class MainWrapper extends ConsumerWidget {
                   flex: isSelected ? 2 : 1,
                   child: Center(
                     child: GestureDetector(
-                      onTap: () {
-                        navigationShell.goBranch(
-                          index,
-                          initialLocation: index == navigationShell.currentIndex,
-                        );
-                      },
+                      onTap: () => _onTabTapped(index),
                       behavior: HitTestBehavior.opaque,
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 200),

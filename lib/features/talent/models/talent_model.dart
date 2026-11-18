@@ -132,13 +132,40 @@ class TalentModel {
 
     String rolesStr = isProd ? 'Production House' : 'Actor | Model | Director';
     if (user.role.isNotEmpty && user.role.toLowerCase() != 'unset') {
-      rolesStr = user.role.split('_').map((w) => w.isEmpty ? '' : '${w[0].toUpperCase()}${w.substring(1).toLowerCase()}').join(' ');
+      if (user.role.contains(',') || user.role.contains('•') || user.role.contains('|')) {
+        rolesStr = user.role
+            .split(RegExp(r'[,•|]'))
+            .map((w) => w.trim())
+            .where((w) => w.isNotEmpty)
+            .map((w) => w
+                .split('_')
+                .map((p) => p.isEmpty
+                    ? ''
+                    : '${p[0].toUpperCase()}${p.substring(1).toLowerCase()}')
+                .join(' '))
+            .join(' • ');
+      } else {
+        rolesStr = user.role
+            .split('_')
+            .map((w) => w.isEmpty
+                ? ''
+                : '${w[0].toUpperCase()}${w.substring(1).toLowerCase()}')
+            .join(' ');
+      }
     }
     if (user.bio != null &&
         user.bio!.trim().isNotEmpty &&
         rolesStr == 'Actor | Model | Director') {
       rolesStr = user.bio!.trim();
     }
+
+    final localPersona = AppPersistenceService.instance.getPersona(user.id);
+    final effectiveWebsite = (user.website != null && user.website!.isNotEmpty)
+        ? user.website!
+        : (localPersona.id == user.id ? localPersona.website : '');
+    final effectiveExp = (user.experience != null && user.experience!.isNotEmpty)
+        ? user.experience!
+        : (localPersona.id == user.id ? localPersona.experience : '');
 
     return TalentModel(
       id: user.id,
@@ -167,6 +194,10 @@ class TalentModel {
         if (user.incorporationNumber != null &&
             user.incorporationNumber!.isNotEmpty)
           'Incorporation': user.incorporationNumber!,
+        if (effectiveWebsite.isNotEmpty) 'Website': effectiveWebsite,
+        if (effectiveWebsite.isNotEmpty)
+          (isProd ? 'Official Website' : 'Personal Website'): effectiveWebsite,
+        if (effectiveExp.isNotEmpty) 'Experience': effectiveExp,
       },
     );
   }

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:you_too_art/core/constants/geo_data.dart';
+import 'package:you_too_art/core/providers/user_persona_provider.dart';
 import 'package:you_too_art/core/services/app_persistence_service.dart';
 import 'package:you_too_art/features/auth/providers/auth_provider.dart';
 
@@ -137,21 +138,23 @@ class ProductionProfileNotifier extends Notifier<ProductionProfileState> {
             },
           );
 
-      // Immediately propagate created production profile into persistent state
-      final currentActor = AppPersistenceService.instance.getActorPersona();
-      final updatedProd = currentActor.copyWith(
+      final user = Supabase.instance.client.auth.currentUser;
+      final updatedProd = UserPersona(
         id: uid,
         name: state.companyName.trim(),
+        email: user?.email ?? '',
         role: 'Production House',
         isProductionHouse: true,
         location: loc,
         bio: state.bio.trim(),
-        avatarUrl: state.profileImagePath ?? currentActor.avatarUrl,
+        avatarUrl: state.profileImagePath ?? '',
+        website: '',
+        experience: '',
       );
       AppPersistenceService.instance.savePersona(updatedProd);
       AppPersistenceService.instance.setActivePersonaId(uid);
+      await ref.read(userPersonaProvider.notifier).switchPersona(updatedProd);
 
-      final user = Supabase.instance.client.auth.currentUser;
       if (user != null) {
         await AppPersistenceService.instance.syncWithSupabaseUser(user);
       }

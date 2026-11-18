@@ -7,6 +7,7 @@ import 'package:you_too_art/features/casting/widgets/delete_casting_modal.dart';
 class CastingCallCard extends StatelessWidget {
   final CastingCallModel call;
   final bool isMyCall;
+  final bool isProductionHouse;
   final VoidCallback onTap;
   final VoidCallback onApply;
   final VoidCallback? onViewApplications;
@@ -17,6 +18,7 @@ class CastingCallCard extends StatelessWidget {
     super.key,
     required this.call,
     this.isMyCall = false,
+    this.isProductionHouse = false,
     required this.onTap,
     required this.onApply,
     this.onViewApplications,
@@ -375,7 +377,7 @@ class CastingCallCard extends StatelessWidget {
                         ],
                       ),
                     )
-                  else
+                  else if (!isProductionHouse)
                     SizedBox(
                       height: 34,
                       child: ElevatedButton(

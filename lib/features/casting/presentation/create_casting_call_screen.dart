@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
 import 'package:you_too_art/features/casting/models/casting_call_model.dart';
 import 'package:you_too_art/features/casting/providers/casting_provider.dart';
+import 'package:you_too_art/features/home/providers/home_feed_provider.dart';
 
 /// Create Casting Call screen strictly matching Figma Image 3.
 class CreateCastingCallScreen extends ConsumerStatefulWidget {
@@ -99,6 +100,30 @@ class _CreateCastingCallScreenState
 
     try {
       final activeUser = ref.read(userPersonaProvider);
+      final currentUser = ref.read(currentUserProfileProvider).value;
+      final roleLower = '${activeUser.role} ${currentUser?.role ?? ''}'.toLowerCase();
+      final isProductionHouse = activeUser.isProductionHouse ||
+          roleLower.contains('production') ||
+          roleLower.contains('studio') ||
+          (currentUser?.incorporationNumber != null &&
+              currentUser!.incorporationNumber!.isNotEmpty);
+      final canCreateCasting = isProductionHouse ||
+          roleLower.contains('director') ||
+          roleLower.contains('producer');
+
+      if (widget.callToEdit == null && !canCreateCasting) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            backgroundColor: Colors.red,
+            content: Text(
+              'Only Production Houses, Directors, and Producers can create casting calls.',
+            ),
+          ),
+        );
+        setState(() => _isSubmitting = false);
+        return;
+      }
+
       final now = DateTime.now();
 
       final cityText = _cityController.text.trim();

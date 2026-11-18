@@ -47,15 +47,46 @@ class ChooseCategoryScreen extends ConsumerStatefulWidget {
 }
 
 class _ChooseCategoryScreenState extends ConsumerState<ChooseCategoryScreen> {
-  String? _selected;
+  final Set<String> _selectedRoles = <String>{};
   bool _saving = false;
 
+  void _toggleRole(String value) {
+    setState(() {
+      if (value == 'production_house') {
+        if (_selectedRoles.contains('production_house')) {
+          _selectedRoles.remove('production_house');
+        } else {
+          _selectedRoles
+            ..clear()
+            ..add('production_house');
+        }
+      } else {
+        _selectedRoles.remove('production_house');
+        if (_selectedRoles.contains(value)) {
+          _selectedRoles.remove(value);
+        } else {
+          if (_selectedRoles.length >= 3) {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('You can select up to 3 categories.'),
+                behavior: SnackBarBehavior.floating,
+                duration: Duration(seconds: 2),
+              ),
+            );
+            return;
+          }
+          _selectedRoles.add(value);
+        }
+      }
+    });
+  }
+
   Future<void> _onSave() async {
-    final role = _selected;
-    if (role == null) {
+    if (_selectedRoles.isEmpty) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Please select a category')));
+      ).showSnackBar(const SnackBar(content: Text('Please select at least one category')));
       return;
     }
 
@@ -68,13 +99,16 @@ class _ChooseCategoryScreenState extends ConsumerState<ChooseCategoryScreen> {
         throw StateError('No signed-in user');
       }
 
+      final isProd = _selectedRoles.contains('production_house');
+      final role = isProd ? 'production_house' : _selectedRoles.join(', ');
+
       final userRepo = ref.read(userRepositoryProvider);
       await userRepo.updateProfile(uid: uid, updates: {'role': role});
       ref.read(authProvider.notifier).setRole(role);
 
       if (!mounted) return;
       // Branch by role
-      if (role == 'production_house') {
+      if (isProd) {
         context.go(AppRoutes.completeProfileProduction);
       } else {
         context.go(AppRoutes.completeProfileIndividual);
@@ -127,7 +161,23 @@ class _ChooseCategoryScreenState extends ConsumerState<ChooseCategoryScreen> {
                         color: colors.textPrimary,
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 6),
+                    Text(
+                      _selectedRoles.contains('production_house')
+                          ? 'Production House selected (Organization Profile)'
+                          : (_selectedRoles.isEmpty
+                              ? 'Select up to 3 categories that match your talents.'
+                              : '${_selectedRoles.length} of 3 selected • Artists can select up to 3 categories.'),
+                      style: text.bodyMedium?.copyWith(
+                        color: _selectedRoles.isNotEmpty
+                            ? colors.link
+                            : colors.textSecondary,
+                        fontWeight: _selectedRoles.isNotEmpty
+                            ? FontWeight.w600
+                            : FontWeight.w400,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
 
                     // Responsive grid of category pills
                     LayoutBuilder(
@@ -148,11 +198,11 @@ class _ChooseCategoryScreenState extends ConsumerState<ChooseCategoryScreen> {
                           ),
                           itemBuilder: (context, i) {
                             final role = _roles[i];
-                            final selected = _selected == role.value;
+                            final selected = _selectedRoles.contains(role.value);
                             return _RolePill(
                               label: role.label,
                               selected: selected,
-                              onTap: () => setState(() => _selected = role.value),
+                              onTap: () => _toggleRole(role.value),
                             );
                           },
                         );
@@ -257,27 +307,23 @@ class _RolePill extends StatelessWidget {
         ),
         child: Row(
           children: [
-            // Radio circle
+            // Check circle
             Container(
               width: 20,
               height: 20,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
+                color: selected ? colors.link : Colors.transparent,
                 border: Border.all(
                   color: selected ? colors.link : colors.border,
                   width: 1.5,
                 ),
               ),
               child: selected
-                  ? Center(
-                      child: Container(
-                        width: 10,
-                        height: 10,
-                        decoration: BoxDecoration(
-                          color: colors.link,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
+                  ? const Icon(
+                      Icons.check,
+                      size: 13,
+                      color: Colors.white,
                     )
                   : null,
             ),

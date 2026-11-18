@@ -24,11 +24,17 @@ create table if not exists public.users (
   incorporation_number text,
   established_year int,
   address text,
+  website text,
+  experience text,
   is_admin boolean not null default false,
   fcm_token text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- Migration for existing databases
+alter table public.users add column if not exists website text;
+alter table public.users add column if not exists experience text;
 
 -- ─── Countries Table ────────────────────────────────────────────────────────
 create table if not exists public.countries (

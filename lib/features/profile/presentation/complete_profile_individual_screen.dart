@@ -466,6 +466,13 @@ class _CompleteProfileIndividualScreenState
 
   String _titleCase(String s) {
     if (s.isEmpty) return s;
+    if (s.contains(',')) {
+      return s
+          .split(',')
+          .map((r) => _titleCase(r.trim()))
+          .where((r) => r.isNotEmpty)
+          .join(' • ');
+    }
     return s
         .split(RegExp(r'[_ ]+'))
         .map(

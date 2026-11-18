@@ -1173,7 +1173,10 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
 
     final rawWebsite = (effective?.website.isNotEmpty ?? false)
         ? effective!.website
-        : (talent.aboutInfo['Website'] ?? talent.aboutInfo['Personal Website'] ?? '');
+        : (talent.aboutInfo['Website'] ??
+            talent.aboutInfo['Personal Website'] ??
+            talent.aboutInfo['Official Website'] ??
+            '');
     final isSeedWebsite = rawWebsite.contains('sara-cinematography') ||
         rawWebsite.contains('bilaltariqmusic') ||
         rawWebsite.contains('youtooart.test') ||
