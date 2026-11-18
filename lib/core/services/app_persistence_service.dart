@@ -265,6 +265,12 @@ class AppPersistenceService {
     _flush();
   }
 
+  void clearActiveSession() {
+    _activePersonaId = '';
+    _prefs.remove('active_user_persona_id');
+    notifyListeners();
+  }
+
   bool isConvDeletedForUser(String convId, String userId) {
     return _deletedConvsByUser[userId]?.contains(convId) ?? false;
   }
@@ -971,6 +977,12 @@ class AppPersistenceService {
             avatarUrl: (row['profile_image_path'] as String? ?? '').isNotEmpty
                 ? row['profile_image_path'] as String
                 : currentPersona.avatarUrl,
+            website: (row['website'] as String? ?? '').isNotEmpty
+                ? row['website'] as String
+                : currentPersona.website,
+            experience: (row['experience'] as String? ?? '').isNotEmpty
+                ? row['experience'] as String
+                : currentPersona.experience,
             isProductionHouse: isProdFromRow || currentPersona.isProductionHouse,
           );
 
@@ -1044,9 +1056,22 @@ class AppPersistenceService {
           'location': persona.location.trim(),
         if (persona.avatarUrl.trim().isNotEmpty)
           'profile_image_path': persona.avatarUrl.trim(),
+        if (persona.website.trim().isNotEmpty)
+          'website': persona.website.trim(),
+        if (persona.experience.trim().isNotEmpty)
+          'experience': persona.experience.trim(),
       };
       if (dbUpdates.isNotEmpty) {
-        await client.from('users').update(dbUpdates).eq('id', user.id);
+        try {
+          await client.from('users').update(dbUpdates).eq('id', user.id);
+        } catch (_) {
+          final fallbackUpdates = Map<String, dynamic>.from(dbUpdates)
+            ..remove('website')
+            ..remove('experience');
+          if (fallbackUpdates.isNotEmpty) {
+            await client.from('users').update(fallbackUpdates).eq('id', user.id);
+          }
+        }
       }
     } catch (_) {}
   }

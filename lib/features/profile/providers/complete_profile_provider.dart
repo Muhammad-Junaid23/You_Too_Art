@@ -135,14 +135,18 @@ class CompleteProfileNotifier extends Notifier<CompleteProfileState> {
           );
 
       // Immediately propagate created profile into persistent state
-      final currentActor = AppPersistenceService.instance.getActorPersona();
-      final updatedActor = currentActor.copyWith(
+      final user = Supabase.instance.client.auth.currentUser;
+      final updatedActor = UserPersona(
         id: uid,
-        name: fullName.isNotEmpty ? fullName : currentActor.name,
+        name: fullName.isNotEmpty ? fullName : 'Artist',
+        email: user?.email ?? '',
         role: roleStr,
         location: locationStr,
         bio: state.bio.trim(),
-        avatarUrl: state.profileImagePath ?? currentActor.avatarUrl,
+        avatarUrl: state.profileImagePath ?? '',
+        website: '',
+        experience: '',
+        isProductionHouse: false,
       );
       AppPersistenceService.instance.savePersona(updatedActor);
       AppPersistenceService.instance.setActivePersonaId(uid);
@@ -157,7 +161,6 @@ class CompleteProfileNotifier extends Notifier<CompleteProfileState> {
         AppPersistenceService.instance.savePortfolio(uid, emptyPort);
       }
 
-      final user = Supabase.instance.client.auth.currentUser;
       if (user != null) {
         await AppPersistenceService.instance.syncWithSupabaseUser(user);
       }

@@ -76,6 +76,8 @@ class UserModel {
       'incorporation_number': incorporationNumber,
       'established_year': establishedYear,
       'address': address,
+      'website': website,
+      'experience': experience,
       'created_at': serializeDateTime(createdAt),
       'updated_at': serializeDateTime(updatedAt),
     };

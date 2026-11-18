@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
 import 'package:you_too_art/core/services/app_persistence_service.dart';
+import 'package:you_too_art/features/home/providers/home_feed_provider.dart';
 import 'package:you_too_art/features/casting/models/casting_call_model.dart';
 import 'package:you_too_art/features/casting/presentation/apply_casting_screen.dart';
 import 'package:you_too_art/features/casting/presentation/casting_applications_screen.dart';
@@ -22,7 +23,15 @@ class CastingDetailScreen extends ConsumerWidget {
     // Watch latest state to reflect application status dynamically
     final state = ref.watch(castingProvider);
     final userPersona = ref.watch(userPersonaProvider);
+    final currentUser = ref.watch(currentUserProfileProvider).value;
     final castingNotifier = ref.read(castingProvider.notifier);
+
+    final roleLower = '${userPersona.role} ${currentUser?.role ?? ''}'.toLowerCase();
+    final isProductionHouse = userPersona.isProductionHouse ||
+        roleLower.contains('production') ||
+        roleLower.contains('studio') ||
+        (currentUser?.incorporationNumber != null &&
+            currentUser!.incorporationNumber!.isNotEmpty);
 
     final rawCall = state.calls.firstWhere(
       (c) => c.id == call.id,
@@ -400,7 +409,31 @@ class CastingDetailScreen extends ConsumerWidget {
                                 ],
                               ),
                             )
-                          : ElevatedButton(
+                          : isProductionHouse
+                              ? Container(
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF5F6F8),
+                                    borderRadius: BorderRadius.circular(26),
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: const Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.business_rounded,
+                                          color: Color(0xFF757575), size: 18),
+                                      SizedBox(width: 8),
+                                      Text(
+                                        'Production Houses cannot apply for roles',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                          color: Color(0xFF757575),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              : ElevatedButton(
                               onPressed: () {
                                 Navigator.push(
                                   context,

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
 import 'package:you_too_art/features/casting/models/casting_call_model.dart';
 import 'package:you_too_art/features/casting/providers/casting_provider.dart';
+import 'package:you_too_art/features/home/providers/home_feed_provider.dart';
 
 /// Application form screen matching Figma Image 1 (right screen).
 class ApplyCastingScreen extends ConsumerStatefulWidget {
@@ -46,6 +47,25 @@ class _ApplyCastingScreenState extends ConsumerState<ApplyCastingScreen> {
   }
 
   Future<void> _submitApplication() async {
+    final userPersona = ref.read(userPersonaProvider);
+    final currentUser = ref.read(currentUserProfileProvider).value;
+    final roleLower = '${userPersona.role} ${currentUser?.role ?? ''}'.toLowerCase();
+    final isProductionHouse = userPersona.isProductionHouse ||
+        roleLower.contains('production') ||
+        roleLower.contains('studio') ||
+        (currentUser?.incorporationNumber != null &&
+            currentUser!.incorporationNumber!.isNotEmpty);
+
+    if (isProductionHouse) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: Colors.red,
+          content: Text('Production Houses cannot apply for casting roles.'),
+        ),
+      );
+      return;
+    }
+
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isSubmitting = true);

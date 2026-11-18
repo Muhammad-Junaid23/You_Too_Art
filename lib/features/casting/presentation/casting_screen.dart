@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
 import 'package:you_too_art/core/services/app_persistence_service.dart';
+import 'package:you_too_art/features/home/providers/home_feed_provider.dart';
 import 'package:you_too_art/features/casting/models/casting_call_model.dart';
 import 'package:you_too_art/features/casting/presentation/apply_casting_screen.dart';
 import 'package:you_too_art/features/casting/presentation/casting_applications_screen.dart';
@@ -42,8 +43,20 @@ class _CastingScreenState extends ConsumerState<CastingScreen> {
   Widget build(BuildContext context) {
     final castingState = ref.watch(castingProvider);
     final userPersona = ref.watch(userPersonaProvider);
+    final currentUser = ref.watch(currentUserProfileProvider).value;
 
     final castingNotifier = ref.read(castingProvider.notifier);
+
+    final roleLower = '${userPersona.role} ${currentUser?.role ?? ''}'.toLowerCase();
+    final isProductionHouse = userPersona.isProductionHouse ||
+        roleLower.contains('production') ||
+        roleLower.contains('studio') ||
+        (currentUser?.incorporationNumber != null &&
+            currentUser!.incorporationNumber!.isNotEmpty);
+
+    final canCreateCasting = isProductionHouse ||
+        roleLower.contains('director') ||
+        roleLower.contains('producer');
 
     // Calculate feed calls with search and filter applied,
     // dynamically enriched with user-specific application status!
@@ -66,6 +79,11 @@ class _CastingScreenState extends ConsumerState<CastingScreen> {
 
     final appliedCalls = castingNotifier.getAppliedCalls(userPersona.id);
     final myCalls = castingNotifier.getMyCalls(userPersona.id);
+    final showMyCallsTab = canCreateCasting || myCalls.isNotEmpty;
+
+    if (!showMyCallsTab && _selectedTabIndex > 1) {
+      _selectedTabIndex = 0;
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFFFAFAFA),
@@ -105,7 +123,7 @@ class _CastingScreenState extends ConsumerState<CastingScreen> {
                   ),
                   const SizedBox(height: 14),
 
-                  // 3 Tab Pills: Casting Calls, Applied, My Casting Calls
+                  // Tab Pills: Casting Calls, Applied, and conditionally My Casting Calls
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
@@ -121,12 +139,14 @@ class _CastingScreenState extends ConsumerState<CastingScreen> {
                           icon: Icons.check_circle_outline_rounded,
                           label: 'Applied (${appliedCalls.length})',
                         ),
-                        const SizedBox(width: 8),
-                        _buildTabPill(
-                          index: 2,
-                          icon: Icons.auto_awesome_outlined,
-                          label: 'My Casting Calls (${myCalls.length})',
-                        ),
+                        if (showMyCallsTab) ...[
+                          const SizedBox(width: 8),
+                          _buildTabPill(
+                            index: 2,
+                            icon: Icons.auto_awesome_outlined,
+                            label: 'My Casting Calls (${myCalls.length})',
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -312,6 +332,8 @@ class _CastingScreenState extends ConsumerState<CastingScreen> {
                 appliedCalls: appliedCalls,
                 myCalls: myCalls,
                 userPersonaId: userPersona.id,
+                isProductionHouse: isProductionHouse,
+                canCreateCasting: canCreateCasting,
               ),
             ),
           ],
@@ -376,6 +398,8 @@ class _CastingScreenState extends ConsumerState<CastingScreen> {
     required List<CastingCallModel> appliedCalls,
     required List<CastingCallModel> myCalls,
     required String userPersonaId,
+    required bool isProductionHouse,
+    required bool canCreateCasting,
   }) {
     if (_selectedTabIndex == 0) {
       // ─── TAB 0: All Casting Calls Feed (Search & Filtered) ───
@@ -397,8 +421,9 @@ class _CastingScreenState extends ConsumerState<CastingScreen> {
           return CastingCallCard(
             call: call,
             isMyCall: isMyCall,
+            isProductionHouse: isProductionHouse,
             onTap: () => _openDetail(call),
-            onApply: () => _openApply(call),
+            onApply: () => _openApply(call, isProductionHouse: isProductionHouse),
             onViewApplications: isMyCall ? () => _openApplications(call) : null,
           );
         },
@@ -418,8 +443,9 @@ class _CastingScreenState extends ConsumerState<CastingScreen> {
           final call = appliedCalls[idx];
           return CastingCallCard(
             call: call,
+            isProductionHouse: isProductionHouse,
             onTap: () => _openDetail(call),
-            onApply: () => _openApply(call),
+            onApply: () => _openApply(call, isProductionHouse: isProductionHouse),
           );
         },
       );
@@ -428,30 +454,56 @@ class _CastingScreenState extends ConsumerState<CastingScreen> {
       return ListView(
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
         children: [
-          // "+ Create Casting Call" Button (Auto-switches here upon creation)
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: ElevatedButton.icon(
-              onPressed: _openCreateCall,
-              icon: const Icon(Icons.add, color: Colors.white, size: 20),
-              label: const Text(
-                'Create Casting Call',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
+          // "+ Create Casting Call" Button (only shown for authorized roles)
+          if (canCreateCasting)
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton.icon(
+                onPressed: _openCreateCall,
+                icon: const Icon(Icons.add, color: Colors.white, size: 20),
+                label: const Text(
+                  'Create Casting Call',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.black,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(24),
+                  ),
                 ),
               ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.black,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(24),
-                ),
+            )
+          else
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF5F6F8),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFE5E7EB)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.info_outline_rounded, size: 20, color: Color(0xFF757575)),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Only Production Houses, Directors, and Producers can create casting calls.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF757575),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
           const SizedBox(height: 16),
 
           if (myCalls.isEmpty)
@@ -461,8 +513,9 @@ class _CastingScreenState extends ConsumerState<CastingScreen> {
               (call) => CastingCallCard(
                 call: call,
                 isMyCall: true,
+                isProductionHouse: isProductionHouse,
                 onTap: () => _openDetail(call),
-                onApply: () => _openApply(call),
+                onApply: () => _openApply(call, isProductionHouse: isProductionHouse),
                 onViewApplications: () => _openApplications(call),
                 onEdit: () => _openEditCall(call),
                 onDelete: () {
@@ -505,7 +558,17 @@ class _CastingScreenState extends ConsumerState<CastingScreen> {
     );
   }
 
-  Future<void> _openApply(CastingCallModel call) async {
+  Future<void> _openApply(CastingCallModel call, {required bool isProductionHouse}) async {
+    if (isProductionHouse) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Production Houses cannot apply for casting roles.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     await Navigator.push(
       context,
       MaterialPageRoute(

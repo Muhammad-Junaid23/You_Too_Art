@@ -59,8 +59,19 @@ class UserRepository {
       final json = user.toJson();
       if (json['updated_at'] == null) json.remove('updated_at');
 
-      final data = await _db.insert(json).select().single();
-      return UserModel.fromJson(data);
+      try {
+        final data = await _db.insert(json).select().single();
+        return UserModel.fromJson(data);
+      } catch (insertErr) {
+        if (json.containsKey('website') || json.containsKey('experience')) {
+          final fallbackJson = Map<String, dynamic>.from(json)
+            ..remove('website')
+            ..remove('experience');
+          final data = await _db.insert(fallbackJson).select().single();
+          return UserModel.fromJson(data);
+        }
+        rethrow;
+      }
     } catch (e) {
       if (kDebugMode) debugPrint('UserRepository.createIfMissing: $e');
       return user;
@@ -77,6 +88,16 @@ class UserRepository {
       final data = await _db.update(updates).eq('id', uid).select().single();
       return UserModel.fromJson(data);
     } catch (e) {
+      if (updates.containsKey('website') || updates.containsKey('experience')) {
+        try {
+          final fallbackUpdates = Map<String, dynamic>.from(updates)
+            ..remove('website')
+            ..remove('experience');
+          final data =
+              await _db.update(fallbackUpdates).eq('id', uid).select().single();
+          return UserModel.fromJson(data);
+        } catch (_) {}
+      }
       if (kDebugMode) debugPrint('UserRepository.updateProfile: $e');
       rethrow;
     }

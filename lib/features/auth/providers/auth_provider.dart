@@ -157,20 +157,24 @@ class AuthNotifier extends Notifier<AppAuthState> {
         final cached = AppPersistenceService.instance.getPersonaById(user.id);
         final effectiveBio = dbUser.bio?.isNotEmpty == true
             ? dbUser.bio!
-            : (meta['bio'] as String? ?? cached.bio);
+            : (meta['bio'] as String? ?? (cached.id == user.id ? cached.bio : ''));
         final effectiveLoc = dbUser.location?.isNotEmpty == true
             ? dbUser.location!
-            : (meta['location'] as String? ?? cached.location);
-        final effectiveWebsite = (meta['website'] as String? ?? '').isNotEmpty
-            ? meta['website'] as String
-            : cached.website;
-        final effectiveExp = (meta['experience'] as String? ?? '').isNotEmpty
-            ? meta['experience'] as String
-            : cached.experience;
+            : (meta['location'] as String? ?? (cached.id == user.id ? cached.location : ''));
+        final effectiveWebsite = dbUser.website?.isNotEmpty == true
+            ? dbUser.website!
+            : ((meta['website'] as String? ?? '').isNotEmpty
+                ? meta['website'] as String
+                : (cached.id == user.id ? cached.website : ''));
+        final effectiveExp = dbUser.experience?.isNotEmpty == true
+            ? dbUser.experience!
+            : ((meta['experience'] as String? ?? '').isNotEmpty
+                ? meta['experience'] as String
+                : (cached.id == user.id ? cached.experience : ''));
         final isProd = dbUser.role.toLowerCase().contains('production') ||
             dbUser.role.toLowerCase().contains('studio') ||
             (dbUser.incorporationNumber != null && dbUser.incorporationNumber!.isNotEmpty) ||
-            cached.isProductionHouse;
+            (cached.id == user.id && cached.isProductionHouse);
 
         final persona = UserPersona(
           id: user.id,
@@ -321,21 +325,25 @@ class AuthNotifier extends Notifier<AppAuthState> {
 
       final effectiveBio = user.bio?.isNotEmpty == true
           ? user.bio!
-          : (meta['bio'] as String? ?? cached.bio);
+          : (meta['bio'] as String? ?? (cached.id == response.user!.id ? cached.bio : ''));
       final effectiveLoc = user.location?.isNotEmpty == true
           ? user.location!
-          : (meta['location'] as String? ?? cached.location);
-      final effectiveWebsite = (meta['website'] as String? ?? '').isNotEmpty
-          ? meta['website'] as String
-          : cached.website;
-      final effectiveExp = (meta['experience'] as String? ?? '').isNotEmpty
-          ? meta['experience'] as String
-          : cached.experience;
+          : (meta['location'] as String? ?? (cached.id == response.user!.id ? cached.location : ''));
+      final effectiveWebsite = user.website?.isNotEmpty == true
+          ? user.website!
+          : ((meta['website'] as String? ?? '').isNotEmpty
+              ? meta['website'] as String
+              : (cached.id == response.user!.id ? cached.website : ''));
+      final effectiveExp = user.experience?.isNotEmpty == true
+          ? user.experience!
+          : ((meta['experience'] as String? ?? '').isNotEmpty
+              ? meta['experience'] as String
+              : (cached.id == response.user!.id ? cached.experience : ''));
 
       final isProd = user.role.toLowerCase().contains('production') ||
           user.role.toLowerCase().contains('studio') ||
           (user.incorporationNumber != null && user.incorporationNumber!.isNotEmpty) ||
-          cached.isProductionHouse;
+          (cached.id == response.user!.id && cached.isProductionHouse);
 
       final persona = UserPersona(
         id: response.user!.id,
@@ -399,7 +407,7 @@ class AuthNotifier extends Notifier<AppAuthState> {
     try {
       final prefs = ref.read(sharedPreferencesProvider);
       await prefs.remove('is_test_role_logged_in');
-      AppPersistenceService.instance.setActivePersonaId('');
+      AppPersistenceService.instance.clearActiveSession();
       await _authRepo.logout();
       state = state.copyWith(isLoggedIn: false, isLoading: false, role: null);
       _invalidateUserScopedProviders();

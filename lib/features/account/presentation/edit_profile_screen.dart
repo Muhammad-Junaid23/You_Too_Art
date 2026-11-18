@@ -76,7 +76,17 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     if (_populated) return;
     _populated = true;
 
-    final persona = ref.read(userPersonaProvider);
+    final currentPersona = ref.read(userPersonaProvider);
+    final isMatchingPersona = currentPersona.id == user.id;
+    final persona = isMatchingPersona
+        ? currentPersona
+        : UserPersona(
+            id: user.id,
+            name: '',
+            email: user.email,
+            role: '',
+            avatarUrl: '',
+          );
 
     _isProd = user.role.toLowerCase().contains('production') ||
         (user.incorporationNumber != null &&
@@ -90,7 +100,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             : persona.name);
 
     final clientUser = Supabase.instance.client.auth.currentUser;
-    final meta = clientUser?.userMetadata ?? {};
+    final isClientCurrentUser = clientUser != null && clientUser.id == user.id;
+    final meta = isClientCurrentUser ? (clientUser.userMetadata ?? {}) : const <String, dynamic>{};
     final metaWebsite = meta['website'] as String? ?? '';
     final metaExp = meta['experience'] as String? ?? '';
 
@@ -100,17 +111,24 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     _bioController.text = user.bio?.isNotEmpty == true ? user.bio! : persona.bio;
     _emailController.text =
         user.email.isNotEmpty ? user.email : persona.email;
-    _websiteController.text =
-        persona.website.isNotEmpty ? persona.website : metaWebsite;
+    _websiteController.text = (user.website != null && user.website!.isNotEmpty)
+        ? user.website!
+        : (metaWebsite.isNotEmpty
+            ? metaWebsite
+            : persona.website);
     _experienceController.text =
-        persona.experience.isNotEmpty ? persona.experience : metaExp;
+        (user.experience != null && user.experience!.isNotEmpty)
+            ? user.experience!
+            : (metaExp.isNotEmpty
+                ? metaExp
+                : persona.experience);
     _incorporationController.text = user.incorporationNumber ?? '';
     _establishedYearController.text =
         user.establishedYear != null ? '${user.establishedYear}' : '';
     _addressController.text = user.address ?? '';
     _avatarUrl = user.profileImagePath?.isNotEmpty == true
         ? user.profileImagePath
-        : persona.avatarUrl;
+        : (persona.avatarUrl.isNotEmpty ? persona.avatarUrl : null);
 
     // Parse location: stored as "City, CountryName" or "City, CountryCode"
     final loc = user.location?.isNotEmpty == true ? user.location! : persona.location;
@@ -150,8 +168,19 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     setState(() => _isSaving = true);
 
     try {
-      final persona = ref.read(userPersonaProvider);
+      final currentPersona = ref.read(userPersonaProvider);
       final uid = ref.read(currentUidProvider);
+      final clientUser = Supabase.instance.client.auth.currentUser;
+      final isMatchingPersona = currentPersona.id == uid;
+      final persona = isMatchingPersona
+          ? currentPersona
+          : UserPersona(
+              id: uid ?? '',
+              name: '',
+              email: clientUser?.email ?? '',
+              role: '',
+              avatarUrl: '',
+            );
 
       // Always fetch the latest DB row so we never overwrite existing data
       // with an empty form field that wasn't populated yet.
@@ -182,8 +211,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         return fallback;
       }
 
-      final clientUser = Supabase.instance.client.auth.currentUser;
-      final meta = clientUser?.userMetadata ?? {};
+      final isClientCurrentUser = clientUser != null && clientUser.id == uid;
+      final meta = isClientCurrentUser ? (clientUser.userMetadata ?? {}) : const <String, dynamic>{};
       final metaWebsite = meta['website'] as String? ?? '';
       final metaExp = meta['experience'] as String? ?? '';
 
@@ -191,15 +220,21 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       final bioVal = pick(_bioController.text.trim(), dbUser?.bio, persona.bio);
       final websiteVal = _websiteController.text.trim().isNotEmpty
           ? _websiteController.text.trim()
-          : (persona.website.isNotEmpty ? persona.website : metaWebsite);
+          : (dbUser?.website?.isNotEmpty == true
+              ? dbUser!.website!
+              : (metaWebsite.isNotEmpty ? metaWebsite : persona.website));
       final expVal = _experienceController.text.trim().isNotEmpty
           ? _experienceController.text.trim()
-          : (persona.experience.isNotEmpty ? persona.experience : metaExp);
+          : (dbUser?.experience?.isNotEmpty == true
+              ? dbUser!.experience!
+              : (metaExp.isNotEmpty ? metaExp : persona.experience));
 
       final updates = <String, dynamic>{
         if (bioVal.isNotEmpty) 'bio': bioVal,
         if (locationStr.isNotEmpty) 'location': locationStr,
         if (_avatarUrl != null) 'profile_image_path': _avatarUrl,
+        if (websiteVal.isNotEmpty) 'website': websiteVal,
+        if (expVal.isNotEmpty) 'experience': expVal,
       };
 
       if (_isProd) {
