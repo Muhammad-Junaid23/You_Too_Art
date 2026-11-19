@@ -15,6 +15,7 @@ class ProductionProfileState {
   final String? city;
   final String address;
   final String bio;
+  final String website;
   final String? profileImagePath;
   final bool isSaving;
   final String? errorMessage;
@@ -27,6 +28,7 @@ class ProductionProfileState {
     this.city,
     this.address = '',
     this.bio = '',
+    this.website = '',
     this.profileImagePath,
     this.isSaving = false,
     this.errorMessage,
@@ -49,6 +51,7 @@ class ProductionProfileState {
     String? city,
     String? address,
     String? bio,
+    String? website,
     String? profileImagePath,
     bool? isSaving,
     String? errorMessage,
@@ -62,6 +65,7 @@ class ProductionProfileState {
       city: city ?? this.city,
       address: address ?? this.address,
       bio: bio ?? this.bio,
+      website: website ?? this.website,
       profileImagePath: profileImagePath ?? this.profileImagePath,
       isSaving: isSaving ?? this.isSaving,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
@@ -85,6 +89,7 @@ class ProductionProfileNotifier extends Notifier<ProductionProfileState> {
   void setAddress(String v) =>
       state = state.copyWith(address: v, clearError: true);
   void setBio(String v) => state = state.copyWith(bio: v, clearError: true);
+  void setWebsite(String v) => state = state.copyWith(website: v, clearError: true);
   void setProfileImage(String url) =>
       state = state.copyWith(profileImagePath: url, clearError: true);
 
@@ -98,6 +103,7 @@ class ProductionProfileNotifier extends Notifier<ProductionProfileState> {
       city: null,
       address: state.address,
       bio: state.bio,
+      website: state.website,
       profileImagePath: state.profileImagePath,
       isSaving: state.isSaving,
       errorMessage: state.errorMessage,
@@ -133,6 +139,7 @@ class ProductionProfileNotifier extends Notifier<ProductionProfileState> {
               'address': state.address.trim(),
               'location': loc,
               'bio': state.bio.trim(),
+              'website': state.website.trim(),
               if (state.profileImagePath != null)
                 'profile_image_path': state.profileImagePath,
             },
@@ -148,7 +155,7 @@ class ProductionProfileNotifier extends Notifier<ProductionProfileState> {
         location: loc,
         bio: state.bio.trim(),
         avatarUrl: state.profileImagePath ?? '',
-        website: '',
+        website: state.website.trim(),
         experience: '',
       );
       AppPersistenceService.instance.savePersona(updatedProd);

@@ -26,12 +26,16 @@ class _CompleteProfileIndividualScreenState
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
   final _bioController = TextEditingController();
+  final _experienceController = TextEditingController();
+  final _websiteController = TextEditingController();
 
   @override
   void dispose() {
     _firstNameController.dispose();
     _lastNameController.dispose();
     _bioController.dispose();
+    _experienceController.dispose();
+    _websiteController.dispose();
     super.dispose();
   }
 
@@ -272,6 +276,28 @@ class _CompleteProfileIndividualScreenState
                       onChanged: (v) =>
                           ref.read(completeProfileProvider.notifier).setBio(v),
                     ),
+                    const SizedBox(height: 16),
+
+                    _RequiredField(
+                      label: 'Experience',
+                      controller: _experienceController,
+                      hintText: 'e.g. 5+ Years in Narrative Film & Theatre',
+                      isRequired: false,
+                      onChanged: (v) => ref
+                          .read(completeProfileProvider.notifier)
+                          .setExperience(v),
+                    ),
+                    const SizedBox(height: 16),
+
+                    _RequiredField(
+                      label: 'Official Website',
+                      controller: _websiteController,
+                      hintText: 'e.g. www.artistportfolio.com',
+                      isRequired: false,
+                      onChanged: (v) => ref
+                          .read(completeProfileProvider.notifier)
+                          .setWebsite(v),
+                    ),
                     const SizedBox(height: 24),
 
                     _MediaSectionHeader(
@@ -491,12 +517,16 @@ class _RequiredField extends StatelessWidget {
   final TextEditingController controller;
   final int maxLines;
   final void Function(String) onChanged;
+  final bool isRequired;
+  final String? hintText;
 
   const _RequiredField({
     required this.label,
     required this.controller,
     this.maxLines = 1,
     required this.onChanged,
+    this.isRequired = true,
+    this.hintText,
   });
 
   @override
@@ -515,10 +545,11 @@ class _RequiredField extends StatelessWidget {
             ),
             children: [
               TextSpan(text: label),
-              TextSpan(
-                text: ' *',
-                style: TextStyle(color: colors.required),
-              ),
+              if (isRequired)
+                TextSpan(
+                  text: ' *',
+                  style: TextStyle(color: colors.required),
+                ),
             ],
           ),
         ),
@@ -528,6 +559,8 @@ class _RequiredField extends StatelessWidget {
           maxLines: maxLines,
           onChanged: onChanged,
           decoration: InputDecoration(
+            hintText: hintText,
+            hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF9E9E9E)),
             contentPadding: EdgeInsets.symmetric(
               horizontal: 14,
               vertical: maxLines > 1 ? 14 : 0,

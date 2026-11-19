@@ -14,6 +14,8 @@ class CompleteProfileState {
   final String? country;
   final String? city;
   final String bio;
+  final String experience;
+  final String website;
   final String? profileImagePath; // Cloudinary URL after upload
   final bool isSaving;
   final String? errorMessage;
@@ -24,6 +26,8 @@ class CompleteProfileState {
     this.country,
     this.city,
     this.bio = '',
+    this.experience = '',
+    this.website = '',
     this.profileImagePath,
     this.isSaving = false,
     this.errorMessage,
@@ -42,6 +46,8 @@ class CompleteProfileState {
     String? country,
     String? city,
     String? bio,
+    String? experience,
+    String? website,
     String? profileImagePath,
     bool? isSaving,
     String? errorMessage,
@@ -53,6 +59,8 @@ class CompleteProfileState {
       country: country ?? this.country,
       city: city ?? this.city,
       bio: bio ?? this.bio,
+      experience: experience ?? this.experience,
+      website: website ?? this.website,
       profileImagePath: profileImagePath ?? this.profileImagePath,
       isSaving: isSaving ?? this.isSaving,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
@@ -72,6 +80,10 @@ class CompleteProfileNotifier extends Notifier<CompleteProfileState> {
       state = state.copyWith(country: v, clearError: true);
   void setCity(String? v) => state = state.copyWith(city: v, clearError: true);
   void setBio(String v) => state = state.copyWith(bio: v, clearError: true);
+  void setExperience(String v) =>
+      state = state.copyWith(experience: v, clearError: true);
+  void setWebsite(String v) =>
+      state = state.copyWith(website: v, clearError: true);
   void setProfileImage(String url) =>
       state = state.copyWith(profileImagePath: url, clearError: true);
 
@@ -82,6 +94,8 @@ class CompleteProfileNotifier extends Notifier<CompleteProfileState> {
       country: state.country,
       city: null, // explicitly null
       bio: state.bio,
+      experience: state.experience,
+      website: state.website,
       profileImagePath: state.profileImagePath,
       isSaving: state.isSaving,
       errorMessage: state.errorMessage,
@@ -129,6 +143,8 @@ class CompleteProfileNotifier extends Notifier<CompleteProfileState> {
               'location': locationStr,
               'bio': state.bio.trim(),
               'role': roleStr,
+              'experience': state.experience.trim(),
+              'website': state.website.trim(),
               if (state.profileImagePath != null)
                 'profile_image_path': state.profileImagePath,
             },
@@ -144,8 +160,8 @@ class CompleteProfileNotifier extends Notifier<CompleteProfileState> {
         location: locationStr,
         bio: state.bio.trim(),
         avatarUrl: state.profileImagePath ?? '',
-        website: '',
-        experience: '',
+        website: state.website.trim(),
+        experience: state.experience.trim(),
         isProductionHouse: false,
       );
       AppPersistenceService.instance.savePersona(updatedActor);

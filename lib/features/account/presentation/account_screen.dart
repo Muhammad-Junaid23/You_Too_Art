@@ -204,7 +204,13 @@ class AccountScreen extends ConsumerWidget {
                     context: context,
                     icon: Icons.check_circle_outline_rounded,
                     title: 'Verify Account',
-                    onTap: () => AccountSheets.showVerifyAccount(context),
+                    onTap: () => AccountSheets.showVerifyAccount(
+                      context,
+                      email: currentUser?.email.isNotEmpty == true
+                          ? currentUser!.email
+                          : activePersona.email,
+                      isEmailVerified: true,
+                    ),
                   ),
                   _buildOptionTile(
                     context: context,

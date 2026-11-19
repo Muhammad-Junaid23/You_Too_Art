@@ -6,6 +6,7 @@ import 'package:you_too_art/core/providers/supabase_providers.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
 import 'package:you_too_art/features/auth/providers/auth_provider.dart';
 import 'package:you_too_art/features/home/models/post_item.dart';
+import 'package:you_too_art/features/notifications/models/notification_item.dart';
 
 /// Provider for the current logged-in user's profile.
 final currentUserProfileProvider = StreamProvider<UserModel?>((ref) async* {
@@ -227,6 +228,41 @@ class HomeFeedNotifier extends AsyncNotifier<List<PostItem>> {
 
     final current = state.value ?? [];
     state = AsyncValue.data([newPost, ...current]);
+
+    // Dispatch realtime in-app notifications to tagged users
+    if (taggedUsers.isNotEmpty) {
+      try {
+        final allUsers = await ref.read(allRegisteredUsersProvider.future);
+        final notifRepo = ref.read(notificationRepositoryProvider);
+        for (final tag in taggedUsers) {
+          final matchedUser = allUsers.where((u) {
+            final name = u.name.isNotEmpty
+                ? u.name
+                : '${u.firstName} ${u.lastName}'.trim();
+            return name.toLowerCase() == tag.toLowerCase() ||
+                u.id == tag ||
+                u.email.toLowerCase() == tag.toLowerCase();
+          }).firstOrNull;
+
+          if (matchedUser != null && matchedUser.id != resolvedAuthorId) {
+            await notifRepo.sendNotification(
+              recipientId: matchedUser.id,
+              actorId: resolvedAuthorId,
+              type: NotificationType.comment,
+              primarySubject: resolvedAuthorName,
+              actionText: 'tagged you in a',
+              targetObject: 'post',
+              avatarUrl: resolvedAuthorAvatar,
+              entityType: 'post',
+              entityId: postUuid,
+            );
+          }
+        }
+      } catch (e) {
+        if (kDebugMode) debugPrint('Failed to send tag notifications: $e');
+      }
+    }
+
     return true;
   }
 

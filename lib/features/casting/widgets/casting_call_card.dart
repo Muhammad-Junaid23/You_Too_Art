@@ -8,6 +8,7 @@ class CastingCallCard extends StatelessWidget {
   final CastingCallModel call;
   final bool isMyCall;
   final bool isProductionHouse;
+  final bool canApply;
   final VoidCallback onTap;
   final VoidCallback onApply;
   final VoidCallback? onViewApplications;
@@ -19,6 +20,7 @@ class CastingCallCard extends StatelessWidget {
     required this.call,
     this.isMyCall = false,
     this.isProductionHouse = false,
+    this.canApply = true,
     required this.onTap,
     required this.onApply,
     this.onViewApplications,
@@ -377,7 +379,7 @@ class CastingCallCard extends StatelessWidget {
                         ],
                       ),
                     )
-                  else if (!isProductionHouse)
+                  else if (!isProductionHouse && canApply)
                     SizedBox(
                       height: 34,
                       child: ElevatedButton(

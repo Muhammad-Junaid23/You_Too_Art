@@ -8,6 +8,7 @@ import 'package:you_too_art/features/casting/models/casting_call_model.dart';
 import 'package:you_too_art/features/casting/presentation/apply_casting_screen.dart';
 import 'package:you_too_art/features/casting/presentation/casting_applications_screen.dart';
 import 'package:you_too_art/features/casting/providers/casting_provider.dart';
+import 'package:you_too_art/features/casting/utils/casting_role_matcher.dart';
 
 /// Casting Call details screen matching Figma Image 1 (middle screen).
 class CastingDetailScreen extends ConsumerWidget {
@@ -49,6 +50,12 @@ class CastingDetailScreen extends ConsumerWidget {
     final activeCall = rawCall.copyWith(
       isApplied: isApplied,
       appliedAt: appliedAt,
+    );
+
+    final canRoleApply = CastingRoleMatcher.canUserApply(
+      userRolesString: roleLower,
+      call: activeCall,
+      isProductionHouse: isProductionHouse,
     );
 
     return Scaffold(
@@ -433,6 +440,34 @@ class CastingDetailScreen extends ConsumerWidget {
                                     ],
                                   ),
                                 )
+                              : !canRoleApply
+                                  ? Container(
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFF5F6F8),
+                                        borderRadius: BorderRadius.circular(26),
+                                      ),
+                                      alignment: Alignment.center,
+                                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          const Icon(Icons.info_outline_rounded,
+                                              color: Color(0xFF757575), size: 18),
+                                          const SizedBox(width: 8),
+                                          Flexible(
+                                            child: Text(
+                                              'Only ${CastingRoleMatcher.targetRoleName(activeCall)} profiles can apply',
+                                              style: const TextStyle(
+                                                fontSize: 13.5,
+                                                fontWeight: FontWeight.w600,
+                                                color: Color(0xFF757575),
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    )
                               : ElevatedButton(
                               onPressed: () {
                                 Navigator.push(

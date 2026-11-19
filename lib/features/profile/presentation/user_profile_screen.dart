@@ -1164,12 +1164,8 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
         ? currentUser.location!
         : ((effective?.location.isNotEmpty ?? false)
             ? effective!.location
-            : (talent.location ?? ''));
-
-    final isSeedLocation = rawLocation == 'Islamabad, Pakistan' ||
-        rawLocation == 'Lahore, Pakistan' ||
-        rawLocation == 'Karachi, Pakistan';
-    final locationText = (!isSeedLocation && rawLocation.trim().isNotEmpty) ? rawLocation.trim() : '';
+            : (talent.location ?? (talent.aboutInfo['Location'] ?? '')));
+    final locationText = rawLocation.trim();
 
     final rawWebsite = (effective?.website.isNotEmpty ?? false)
         ? effective!.website
@@ -1177,37 +1173,27 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
             talent.aboutInfo['Personal Website'] ??
             talent.aboutInfo['Official Website'] ??
             '');
-    final isSeedWebsite = rawWebsite.contains('sara-cinematography') ||
-        rawWebsite.contains('bilaltariqmusic') ||
-        rawWebsite.contains('youtooart.test') ||
-        rawWebsite.contains('example.com');
-    final website = !isSeedWebsite ? rawWebsite.trim() : '';
+    final website = rawWebsite.trim();
 
     final rawEstablished = (isOwnProfile && currentUser != null && currentUser.establishedYear != null)
         ? '${currentUser.establishedYear}'
-        : '';
-    final establishedYear = (rawEstablished.isNotEmpty && rawEstablished != '2019') ? rawEstablished : '';
+        : (talent.aboutInfo['Established'] ?? talent.aboutInfo['Established Year'] ?? '');
+    final establishedYear = rawEstablished.trim();
 
     final rawInc = (isOwnProfile && currentUser != null && currentUser.incorporationNumber != null && currentUser.incorporationNumber!.isNotEmpty)
         ? currentUser.incorporationNumber!
-        : '';
-    final incNumber = (rawInc.isNotEmpty && rawInc != 'PK-REG-84920') ? rawInc : '';
+        : (talent.aboutInfo['Incorporation'] ?? talent.aboutInfo['Incorporation Number'] ?? '');
+    final incNumber = rawInc.trim();
 
     final rawAddress = (isOwnProfile && currentUser != null && currentUser.address != null && currentUser.address!.isNotEmpty)
         ? currentUser.address!
-        : '';
-    final officeAddress = (rawAddress.isNotEmpty && !rawAddress.contains('Blue Area')) ? rawAddress : '';
+        : (talent.aboutInfo['Address'] ?? talent.aboutInfo['Studio / Office Address'] ?? '');
+    final officeAddress = rawAddress.trim();
 
     final rawExp = (effective?.experience.isNotEmpty ?? false)
         ? effective!.experience
         : (talent.aboutInfo['Experience'] ?? '');
-    final isSeedExp = rawExp == '5+ Years' ||
-        rawExp == '7+ Years' ||
-        rawExp == '8+ Years' ||
-        rawExp == '6+ Years' ||
-        rawExp == '4+ Years' ||
-        rawExp.contains('Experience');
-    final experienceText = (!isSeedExp && rawExp.isNotEmpty) ? rawExp : '';
+    final experienceText = rawExp.trim();
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
 import 'package:you_too_art/features/casting/models/casting_call_model.dart';
 import 'package:you_too_art/features/casting/providers/casting_provider.dart';
+import 'package:you_too_art/features/casting/utils/casting_role_matcher.dart';
 import 'package:you_too_art/features/home/providers/home_feed_provider.dart';
 
 /// Application form screen matching Figma Image 1 (right screen).
@@ -61,6 +62,23 @@ class _ApplyCastingScreenState extends ConsumerState<ApplyCastingScreen> {
         const SnackBar(
           backgroundColor: Colors.red,
           content: Text('Production Houses cannot apply for casting roles.'),
+        ),
+      );
+      return;
+    }
+
+    final canRoleApply = CastingRoleMatcher.canUserApply(
+      userRolesString: roleLower,
+      call: widget.call,
+      isProductionHouse: false,
+    );
+    if (!canRoleApply) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.red,
+          content: Text(
+            'Only ${CastingRoleMatcher.targetRoleName(widget.call)} profiles can apply to this casting call.',
+          ),
         ),
       );
       return;
