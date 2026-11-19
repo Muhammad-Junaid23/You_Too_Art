@@ -278,7 +278,11 @@ class AccountSheets {
     );
   }
 
-  static void showVerifyAccount(BuildContext context) {
+  static void showVerifyAccount(
+    BuildContext context, {
+    String? email,
+    bool isEmailVerified = true,
+  }) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -298,29 +302,39 @@ class AccountSheets {
                 width: 64,
                 height: 64,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE8F8F3),
+                  color: isEmailVerified
+                      ? const Color(0xFFE8F8F3)
+                      : const Color(0xFFFFF7ED),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: const Icon(
-                  Icons.verified_rounded,
-                  color: Color(0xFF00C48C),
+                child: Icon(
+                  isEmailVerified
+                      ? Icons.verified_rounded
+                      : Icons.mark_email_unread_outlined,
+                  color: isEmailVerified
+                      ? const Color(0xFF00C48C)
+                      : const Color(0xFFF59E0B),
                   size: 36,
                 ),
               ),
               const SizedBox(height: 16),
-              const Text(
-                'Account Verified',
-                style: TextStyle(
+              Text(
+                isEmailVerified
+                    ? 'Account & Email Verified'
+                    : 'Email Verification Pending',
+                style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w700,
                   color: Color(0xFF1A1A2E),
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
-                'Your artist identity and credentials are fully verified. You enjoy priority visibility across talent listings and casting calls.',
+              Text(
+                isEmailVerified
+                    ? 'Your email ${email != null && email.isNotEmpty ? '($email)' : ''} was successfully verified via OTP security code. Your artist identity and credentials are fully verified.'
+                    : 'Your email ${email != null && email.isNotEmpty ? '($email)' : ''} has not been confirmed yet. Please verify your email to unlock all casting and messaging features.',
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 14,
                   color: Color(0xFF616161),
                   height: 1.5,

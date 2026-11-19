@@ -10,6 +10,7 @@ import 'package:you_too_art/features/casting/presentation/casting_detail_screen.
 import 'package:you_too_art/features/casting/presentation/create_casting_call_screen.dart';
 import 'package:you_too_art/features/casting/providers/casting_provider.dart';
 import 'package:you_too_art/features/casting/widgets/casting_call_card.dart';
+import 'package:you_too_art/features/casting/utils/casting_role_matcher.dart';
 
 /// Main Casting Calls screen with full-stack sync, search, filters,
 /// and reactive multi-persona workflows matching Figma Images 1 & 2.
@@ -332,6 +333,7 @@ class _CastingScreenState extends ConsumerState<CastingScreen> {
                 appliedCalls: appliedCalls,
                 myCalls: myCalls,
                 userPersonaId: userPersona.id,
+                userRolesString: roleLower,
                 isProductionHouse: isProductionHouse,
                 canCreateCasting: canCreateCasting,
               ),
@@ -398,6 +400,7 @@ class _CastingScreenState extends ConsumerState<CastingScreen> {
     required List<CastingCallModel> appliedCalls,
     required List<CastingCallModel> myCalls,
     required String userPersonaId,
+    required String userRolesString,
     required bool isProductionHouse,
     required bool canCreateCasting,
   }) {
@@ -418,12 +421,22 @@ class _CastingScreenState extends ConsumerState<CastingScreen> {
           final call = filteredCalls[idx];
           final isMyCall = call.authorId == userPersonaId ||
               AppPersistenceService.instance.isSamePersona(call.authorId, userPersonaId);
+          final canRoleApply = CastingRoleMatcher.canUserApply(
+            userRolesString: userRolesString,
+            call: call,
+            isProductionHouse: isProductionHouse,
+          );
           return CastingCallCard(
             call: call,
             isMyCall: isMyCall,
             isProductionHouse: isProductionHouse,
+            canApply: canRoleApply,
             onTap: () => _openDetail(call),
-            onApply: () => _openApply(call, isProductionHouse: isProductionHouse),
+            onApply: () => _openApply(
+              call,
+              isProductionHouse: isProductionHouse,
+              userRolesString: userRolesString,
+            ),
             onViewApplications: isMyCall ? () => _openApplications(call) : null,
           );
         },
@@ -444,8 +457,13 @@ class _CastingScreenState extends ConsumerState<CastingScreen> {
           return CastingCallCard(
             call: call,
             isProductionHouse: isProductionHouse,
+            canApply: false, // Already applied
             onTap: () => _openDetail(call),
-            onApply: () => _openApply(call, isProductionHouse: isProductionHouse),
+            onApply: () => _openApply(
+              call,
+              isProductionHouse: isProductionHouse,
+              userRolesString: userRolesString,
+            ),
           );
         },
       );
@@ -514,8 +532,13 @@ class _CastingScreenState extends ConsumerState<CastingScreen> {
                 call: call,
                 isMyCall: true,
                 isProductionHouse: isProductionHouse,
+                canApply: false,
                 onTap: () => _openDetail(call),
-                onApply: () => _openApply(call, isProductionHouse: isProductionHouse),
+                onApply: () => _openApply(
+                  call,
+                  isProductionHouse: isProductionHouse,
+                  userRolesString: userRolesString,
+                ),
                 onViewApplications: () => _openApplications(call),
                 onEdit: () => _openEditCall(call),
                 onDelete: () {
@@ -558,11 +581,32 @@ class _CastingScreenState extends ConsumerState<CastingScreen> {
     );
   }
 
-  Future<void> _openApply(CastingCallModel call, {required bool isProductionHouse}) async {
+  Future<void> _openApply(
+    CastingCallModel call, {
+    required bool isProductionHouse,
+    required String userRolesString,
+  }) async {
     if (isProductionHouse) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Production Houses cannot apply for casting roles.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    final canRoleApply = CastingRoleMatcher.canUserApply(
+      userRolesString: userRolesString,
+      call: call,
+      isProductionHouse: false,
+    );
+    if (!canRoleApply) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Only ${CastingRoleMatcher.targetRoleName(call)} profiles can apply to this call.',
+          ),
           behavior: SnackBarBehavior.floating,
         ),
       );

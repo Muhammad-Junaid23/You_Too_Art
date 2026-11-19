@@ -225,6 +225,13 @@ class TalentModel {
         ? role
         : (isProd ? 'Production House' : 'Actor | Model | Director');
 
+    final website = (json['website'] as String? ?? '').trim();
+    final exp = (json['experience'] as String? ?? '').trim();
+    final address = (json['address'] as String? ?? '').trim();
+    final inc = (json['incorporation_number'] as String? ?? '').trim();
+    final est = json['established_year'] != null ? '${json['established_year']}' : '';
+    final loc = (json['location'] as String? ?? '').trim();
+
     return TalentModel(
       id: json['id'] as String? ?? '',
       name: name,
@@ -235,7 +242,19 @@ class TalentModel {
       isProductionHouse: isProd,
       email: json['email'] as String?,
       bio: json['bio'] as String?,
-      location: json['location'] as String?,
+      location: loc.isNotEmpty ? loc : null,
+      aboutInfo: {
+        'Category': isProd ? 'Production House' : 'Performing Arts',
+        if (json['email'] != null) 'Email': json['email'] as String,
+        if (loc.isNotEmpty) 'Location': loc,
+        if (address.isNotEmpty) 'Address': address,
+        if (est.isNotEmpty) 'Established': est,
+        if (inc.isNotEmpty) 'Incorporation': inc,
+        if (website.isNotEmpty) 'Website': website,
+        if (website.isNotEmpty)
+          (isProd ? 'Official Website' : 'Personal Website'): website,
+        if (exp.isNotEmpty) 'Experience': exp,
+      },
     );
   }
 
