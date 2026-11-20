@@ -81,7 +81,9 @@ class TalentModel {
 
     final mergedAbout = Map<String, String>.from(aboutInfo ?? {});
     if (persona.website.isNotEmpty) {
+      mergedAbout['Website'] = persona.website;
       mergedAbout['Personal Website'] = persona.website;
+      mergedAbout['Official Website'] = persona.website;
     }
     if (persona.experience.isNotEmpty) {
       mergedAbout['Experience'] = persona.experience;
@@ -90,8 +92,10 @@ class TalentModel {
       mergedAbout['Location'] = persona.location;
     }
     if (persona.email.isNotEmpty) mergedAbout['Email'] = persona.email;
-    if (persona.role.isNotEmpty && !mergedAbout.containsKey('Category')) {
-      mergedAbout['Category'] = persona.role;
+    if (!mergedAbout.containsKey('Category')) {
+      mergedAbout['Category'] = persona.isProductionHouse
+          ? 'Production House'
+          : (persona.role.isNotEmpty ? persona.role : 'Performing Arts');
     }
     if (persona.bio.isNotEmpty && !mergedAbout.containsKey('Bio')) {
       mergedAbout['Bio'] = persona.bio;
@@ -178,25 +182,31 @@ class TalentModel {
       connectsCount: isProd ? '0' : '0',
       followersCount: '0',
       email: user.email,
-      bio: user.bio ?? (isProd
-          ? 'Official Production House profile on You Too Art.'
-          : 'Passionate artist and creator on You Too Art.'),
-      location: user.location ?? (user.address ?? 'Los Angeles, CA'),
+      bio: user.bio,
+      location: user.location ?? user.address,
       aboutInfo: {
-        'Category': isProd ? 'Production House' : 'Performing Arts',
+        'Category': isProd ? 'Production House' : (rolesStr.isNotEmpty ? rolesStr : 'Performing Arts'),
         if (user.email.isNotEmpty) 'Email': user.email,
         if (user.location != null && user.location!.isNotEmpty)
           'Location': user.location!,
-        if (user.address != null && user.address!.isNotEmpty)
+        if (user.address != null && user.address!.isNotEmpty) ...{
           'Address': user.address!,
-        if (user.establishedYear != null)
+          'Studio / Office Address': user.address!,
+        },
+        if (user.establishedYear != null) ...{
           'Established': '${user.establishedYear}',
+          'Established Year': '${user.establishedYear}',
+        },
         if (user.incorporationNumber != null &&
-            user.incorporationNumber!.isNotEmpty)
+            user.incorporationNumber!.isNotEmpty) ...{
           'Incorporation': user.incorporationNumber!,
-        if (effectiveWebsite.isNotEmpty) 'Website': effectiveWebsite,
-        if (effectiveWebsite.isNotEmpty)
-          (isProd ? 'Official Website' : 'Personal Website'): effectiveWebsite,
+          'Incorporation Number': user.incorporationNumber!,
+        },
+        if (effectiveWebsite.isNotEmpty) ...{
+          'Website': effectiveWebsite,
+          'Official Website': effectiveWebsite,
+          'Personal Website': effectiveWebsite,
+        },
         if (effectiveExp.isNotEmpty) 'Experience': effectiveExp,
       },
     );
@@ -244,15 +254,26 @@ class TalentModel {
       bio: json['bio'] as String?,
       location: loc.isNotEmpty ? loc : null,
       aboutInfo: {
-        'Category': isProd ? 'Production House' : 'Performing Arts',
+        'Category': isProd ? 'Production House' : (rolesStr.isNotEmpty ? rolesStr : 'Performing Arts'),
         if (json['email'] != null) 'Email': json['email'] as String,
         if (loc.isNotEmpty) 'Location': loc,
-        if (address.isNotEmpty) 'Address': address,
-        if (est.isNotEmpty) 'Established': est,
-        if (inc.isNotEmpty) 'Incorporation': inc,
-        if (website.isNotEmpty) 'Website': website,
-        if (website.isNotEmpty)
-          (isProd ? 'Official Website' : 'Personal Website'): website,
+        if (address.isNotEmpty) ...{
+          'Address': address,
+          'Studio / Office Address': address,
+        },
+        if (est.isNotEmpty) ...{
+          'Established': est,
+          'Established Year': est,
+        },
+        if (inc.isNotEmpty) ...{
+          'Incorporation': inc,
+          'Incorporation Number': inc,
+        },
+        if (website.isNotEmpty) ...{
+          'Website': website,
+          'Official Website': website,
+          'Personal Website': website,
+        },
         if (exp.isNotEmpty) 'Experience': exp,
       },
     );

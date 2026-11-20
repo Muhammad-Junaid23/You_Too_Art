@@ -122,12 +122,8 @@ class TalentNotifier extends Notifier<TalentState> {
             fetched.id == 'd4444444-4444-4444-4444-444444444444') {
           continue;
         }
-        if (UserPersonaNotifier.hasPersona(fetched.id)) {
-          final p = UserPersonaNotifier.getPersonaById(fetched.id);
-          combined.add(TalentModel.fromPersona(p));
-        } else {
-          combined.add(fetched);
-        }
+        // Always prefer the rich, real database record from Supabase
+        combined.add(fetched);
       }
 
       // Filter out active persona (cannot discover yourself)

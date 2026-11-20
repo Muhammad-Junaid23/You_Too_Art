@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:you_too_art/app/config/routes.dart';
 import 'package:you_too_art/core/models/user_model.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
@@ -204,13 +205,17 @@ class AccountScreen extends ConsumerWidget {
                     context: context,
                     icon: Icons.check_circle_outline_rounded,
                     title: 'Verify Account',
-                    onTap: () => AccountSheets.showVerifyAccount(
-                      context,
-                      email: currentUser?.email.isNotEmpty == true
-                          ? currentUser!.email
-                          : activePersona.email,
-                      isEmailVerified: true,
-                    ),
+                    onTap: () {
+                      final clientUser = Supabase.instance.client.auth.currentUser;
+                      final isEmailConfirmed = clientUser?.emailConfirmedAt != null;
+                      AccountSheets.showVerifyAccount(
+                        context,
+                        email: currentUser?.email.isNotEmpty == true
+                            ? currentUser!.email
+                            : (clientUser?.email ?? activePersona.email),
+                        isEmailVerified: isEmailConfirmed,
+                      );
+                    },
                   ),
                   _buildOptionTile(
                     context: context,

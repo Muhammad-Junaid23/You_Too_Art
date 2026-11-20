@@ -281,7 +281,7 @@ class AccountSheets {
   static void showVerifyAccount(
     BuildContext context, {
     String? email,
-    bool isEmailVerified = true,
+    bool isEmailVerified = false,
   }) {
     showModalBottomSheet(
       context: context,
@@ -303,24 +303,24 @@ class AccountSheets {
                 height: 64,
                 decoration: BoxDecoration(
                   color: isEmailVerified
-                      ? const Color(0xFFE8F8F3)
+                      ? const Color(0xFFE8F1FC)
                       : const Color(0xFFFFF7ED),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Icon(
                   isEmailVerified
-                      ? Icons.verified_rounded
+                      ? Icons.verified_user_outlined
                       : Icons.mark_email_unread_outlined,
                   color: isEmailVerified
-                      ? const Color(0xFF00C48C)
+                      ? const Color(0xFF3899F3)
                       : const Color(0xFFF59E0B),
-                  size: 36,
+                  size: 34,
                 ),
               ),
               const SizedBox(height: 16),
               Text(
                 isEmailVerified
-                    ? 'Account & Email Verified'
+                    ? 'Account Verification Status'
                     : 'Email Verification Pending',
                 style: const TextStyle(
                   fontSize: 20,
@@ -328,37 +328,144 @@ class AccountSheets {
                   color: Color(0xFF1A1A2E),
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          isEmailVerified ? Icons.check_circle : Icons.pending_outlined,
+                          size: 18,
+                          color: isEmailVerified ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            isEmailVerified
+                                ? 'Authentication: Signed in via OTP Code'
+                                : 'Email: Confirmation Pending',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF1E293B),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (email != null && email.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Padding(
+                          padding: const EdgeInsets.only(left: 26),
+                          child: Text(
+                            email,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF64748B),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 10),
+                    const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: const [
+                        Icon(
+                          Icons.workspace_premium_outlined,
+                          size: 18,
+                          color: Color(0xFF64748B),
+                        ),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Artist Profile Badge: Standard (Unverified)',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF1E293B),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
               Text(
                 isEmailVerified
-                    ? 'Your email ${email != null && email.isNotEmpty ? '($email)' : ''} was successfully verified via OTP security code. Your artist identity and credentials are fully verified.'
-                    : 'Your email ${email != null && email.isNotEmpty ? '($email)' : ''} has not been confirmed yet. Please verify your email to unlock all casting and messaging features.',
+                    ? 'Entering the 6-digit code authenticated your account session. To receive the official verified badge on your profile, your credentials and portfolio must be vetted by our editorial team.'
+                    : 'Please check your email inbox and confirm your email address to unlock full features.',
                 textAlign: TextAlign.center,
                 style: const TextStyle(
-                  fontSize: 14,
-                  color: Color(0xFF616161),
+                  fontSize: 13.5,
+                  color: Color(0xFF64748B),
                   height: 1.5,
                 ),
               ),
               const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF3899F3),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+              Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: 48,
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF64748B),
+                          side: const BorderSide(color: Color(0xFFCBD5E1)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text('Close'),
+                      ),
                     ),
-                    elevation: 0,
                   ),
-                  child: const Text(
-                    'Done',
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: SizedBox(
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Verification badge request submitted for editorial review!'),
+                              backgroundColor: Color(0xFF1E293B),
+                            ),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF3899F3),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: const FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            'Request Badge',
+                            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
             ],
           ),

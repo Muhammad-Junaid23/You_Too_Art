@@ -111,17 +111,45 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     _bioController.text = user.bio?.isNotEmpty == true ? user.bio! : persona.bio;
     _emailController.text =
         user.email.isNotEmpty ? user.email : persona.email;
-    _websiteController.text = (user.website != null && user.website!.isNotEmpty)
+    final initialWeb = (user.website != null && user.website!.isNotEmpty)
         ? user.website!
         : (metaWebsite.isNotEmpty
             ? metaWebsite
             : persona.website);
-    _experienceController.text =
-        (user.experience != null && user.experience!.isNotEmpty)
-            ? user.experience!
-            : (metaExp.isNotEmpty
-                ? metaExp
-                : persona.experience);
+    final initialExp = (user.experience != null && user.experience!.isNotEmpty)
+        ? user.experience!
+        : (metaExp.isNotEmpty
+            ? metaExp
+            : persona.experience);
+
+    bool isWebLike(String s) {
+      final l = s.toLowerCase().trim();
+      return l.startsWith('http://') ||
+          l.startsWith('https://') ||
+          l.startsWith('www.') ||
+          l.contains('.com') ||
+          l.contains('.org') ||
+          l.contains('.net') ||
+          l.contains('.pk') ||
+          l.contains('.io') ||
+          l.contains('.co');
+    }
+
+    bool isExpLike(String s) {
+      final l = s.toLowerCase().trim();
+      return l.contains('year') ||
+          l.contains('yr') ||
+          l.contains('exp') ||
+          RegExp(r'^\d+\+?\s*(years?|yrs?)?', caseSensitive: false).hasMatch(l);
+    }
+
+    if (isWebLike(initialExp) && (isExpLike(initialWeb) || !isWebLike(initialWeb))) {
+      _websiteController.text = initialExp;
+      _experienceController.text = initialWeb;
+    } else {
+      _websiteController.text = initialWeb;
+      _experienceController.text = initialExp;
+    }
     _incorporationController.text = user.incorporationNumber ?? '';
     _establishedYearController.text =
         user.establishedYear != null ? '${user.establishedYear}' : '';
@@ -218,16 +246,43 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
       final nameVal = pick(_nameController.text.trim(), dbUser?.name, persona.name);
       final bioVal = pick(_bioController.text.trim(), dbUser?.bio, persona.bio);
-      final websiteVal = _websiteController.text.trim().isNotEmpty
+      final rawWeb = _websiteController.text.trim().isNotEmpty
           ? _websiteController.text.trim()
           : (dbUser?.website?.isNotEmpty == true
               ? dbUser!.website!
               : (metaWebsite.isNotEmpty ? metaWebsite : persona.website));
-      final expVal = _experienceController.text.trim().isNotEmpty
+      final rawExp = _experienceController.text.trim().isNotEmpty
           ? _experienceController.text.trim()
           : (dbUser?.experience?.isNotEmpty == true
               ? dbUser!.experience!
               : (metaExp.isNotEmpty ? metaExp : persona.experience));
+
+      String websiteVal = rawWeb;
+      String expVal = rawExp;
+      bool isWeb(String s) {
+        final l = s.toLowerCase().trim();
+        return l.startsWith('http://') ||
+            l.startsWith('https://') ||
+            l.startsWith('www.') ||
+            l.contains('.com') ||
+            l.contains('.org') ||
+            l.contains('.net') ||
+            l.contains('.pk') ||
+            l.contains('.io') ||
+            l.contains('.co');
+      }
+      bool isExp(String s) {
+        final l = s.toLowerCase().trim();
+        return l.contains('year') ||
+            l.contains('yr') ||
+            l.contains('exp') ||
+            RegExp(r'^\d+\+?\s*(years?|yrs?)?', caseSensitive: false).hasMatch(l);
+      }
+      if (isWeb(expVal) && (isExp(websiteVal) || !isWeb(websiteVal))) {
+        final temp = websiteVal;
+        websiteVal = expVal;
+        expVal = temp;
+      }
 
       final updates = <String, dynamic>{
         if (bioVal.isNotEmpty) 'bio': bioVal,
