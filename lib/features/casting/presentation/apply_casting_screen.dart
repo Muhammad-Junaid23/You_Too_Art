@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
 import 'package:you_too_art/features/casting/models/casting_call_model.dart';
 import 'package:you_too_art/features/casting/providers/casting_provider.dart';
@@ -21,11 +22,9 @@ class ApplyCastingScreen extends ConsumerStatefulWidget {
 
 class _ApplyCastingScreenState extends ConsumerState<ApplyCastingScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _phoneController = TextEditingController(text: '+92 332 02522110');
-  final _emailController = TextEditingController(text: 'muhammadali@gmail.com');
-  final _noteController = TextEditingController(
-    text: 'Shoot will be of 30 days at the Centaurus Mall Islamabad.',
-  );
+  final _phoneController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _noteController = TextEditingController();
   bool _isSubmitting = false;
 
   @override
@@ -33,8 +32,15 @@ class _ApplyCastingScreenState extends ConsumerState<ApplyCastingScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final user = ref.read(userPersonaProvider);
-      if (user.email.isNotEmpty && user.email != 'muhammadali@gmail.com') {
-        _emailController.text = user.email;
+      final currentUser = ref.read(currentUserProfileProvider).value;
+      final clientEmail = Supabase.instance.client.auth.currentUser?.email;
+      final effectiveEmail = currentUser?.email.isNotEmpty == true
+          ? currentUser!.email
+          : (clientEmail?.isNotEmpty == true
+              ? clientEmail!
+              : user.email);
+      if (effectiveEmail.isNotEmpty && _emailController.text.isEmpty) {
+        _emailController.text = effectiveEmail;
       }
     });
   }
@@ -179,7 +185,7 @@ class _ApplyCastingScreenState extends ConsumerState<ApplyCastingScreen> {
                       TextFormField(
                         controller: _phoneController,
                         keyboardType: TextInputType.phone,
-                        decoration: _inputDecoration('Contact Number'),
+                        decoration: _inputDecoration('e.g. +92 300 1234567'),
                         validator: (val) {
                           if (val == null || val.trim().isEmpty) {
                             return 'Please enter your contact number';
@@ -195,7 +201,7 @@ class _ApplyCastingScreenState extends ConsumerState<ApplyCastingScreen> {
                       TextFormField(
                         controller: _emailController,
                         keyboardType: TextInputType.emailAddress,
-                        decoration: _inputDecoration('Contact Email'),
+                        decoration: _inputDecoration('e.g. your.email@example.com'),
                         validator: (val) {
                           if (val == null || val.trim().isEmpty) {
                             return 'Please enter your contact email';
@@ -214,7 +220,9 @@ class _ApplyCastingScreenState extends ConsumerState<ApplyCastingScreen> {
                       TextFormField(
                         controller: _noteController,
                         maxLines: 4,
-                        decoration: _inputDecoration('Write your note'),
+                        decoration: _inputDecoration(
+                          'Add a pitch note, relevant past projects, or why you are a great fit...',
+                        ),
                         validator: (val) {
                           if (val == null || val.trim().isEmpty) {
                             return 'Please enter a note for the makers';

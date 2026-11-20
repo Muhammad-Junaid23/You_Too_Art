@@ -29,7 +29,80 @@ class CastingRoleMatcher {
       return true;
     }
 
-    // 1. Actor / Actress / Performing Talent
+    // Normalize user role tokens into a set for exact token matching
+    final rolesSet = userRoles
+        .split(RegExp(r'[,|/•]+'))
+        .map((s) => s.trim().replaceAll(' ', '_'))
+        .where((s) => s.isNotEmpty)
+        .toSet();
+
+    bool hasAnyUserRole(List<String> keys) {
+      for (final k in keys) {
+        final normalized = k.toLowerCase().replaceAll(' ', '_');
+        if (rolesSet.contains(normalized) || userRoles.contains(k.toLowerCase())) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    // 1. Cinematographer / Camera (Director of Photography / DP)
+    // NOTE: Must check BEFORE Director so "Director of Photography" is never treated as Film Director.
+    final isCameraCall = target.contains('cinematograph') ||
+        target.contains('director of photography') ||
+        target.contains('dop') ||
+        target.contains('camera') ||
+        target.contains('photograph');
+    if (isCameraCall) {
+      return hasAnyUserRole([
+        'cinematographer',
+        'director_of_photography',
+        'camera_operator',
+        'photographer',
+        'dop',
+      ]);
+    }
+
+    // 2. Art Director / Production Designer
+    // NOTE: Must check BEFORE Director so "Art Director" is never treated as Film Director.
+    final isArtCall = target.contains('art director') ||
+        target.contains('production design') ||
+        target.contains('set design');
+    if (isArtCall) {
+      return hasAnyUserRole([
+        'art_director',
+        'production_designer',
+        'set_designer',
+      ]);
+    }
+
+    // 3. Stunt Director / Stunt Performer
+    final isStuntCall = target.contains('stunt');
+    if (isStuntCall) {
+      return hasAnyUserRole([
+        'stunt_director',
+        'stunt_performer',
+        'stunt',
+      ]);
+    }
+
+    // 4. Film / Theatre Director (excluding Art, Stunt, and Photography)
+    final isDirectorCall = target.contains('director') &&
+        !target.contains('art director') &&
+        !target.contains('stunt') &&
+        !target.contains('photography') &&
+        !target.contains('dop');
+    if (isDirectorCall) {
+      // Must not match if user only has art_director or stunt_director
+      final hasRealDirector = rolesSet.contains('director') ||
+          rolesSet.contains('assistant_director') ||
+          (userRoles.contains('director') &&
+              !userRoles.contains('art_director') &&
+              !userRoles.contains('stunt_director'));
+      if (hasRealDirector) return true;
+    }
+
+    // 5. Actor / Actress / Performing Talent
     final isActingCall = crewReq.contains('actor') ||
         crewReq.contains('actress') ||
         pos.contains('actor') ||
@@ -43,128 +116,75 @@ class CastingRoleMatcher {
         target.contains('model') ||
         target.contains('standup comedian');
     if (isActingCall) {
-      if (userRoles.contains('actor') ||
-          userRoles.contains('actress') ||
-          userRoles.contains('anchor') ||
-          userRoles.contains('comedian') ||
-          userRoles.contains('dubbing')) {
-        return true;
-      }
+      return hasAnyUserRole([
+        'actor',
+        'actress',
+        'anchor',
+        'comedian',
+        'dubbing',
+        'model',
+        'voice_over_artist',
+      ]);
     }
 
-    // 2. Director (excluding Art Director and Stunt Director)
-    final isDirectorCall = (crewReq.contains('director') &&
-            !crewReq.contains('art') &&
-            !crewReq.contains('stunt')) ||
-        (pos.contains('director') &&
-            !pos.contains('art') &&
-            !pos.contains('stunt') &&
-            !pos.contains('photography'));
-    if (isDirectorCall) {
-      if (userRoles.contains('director') &&
-          !userRoles.contains('art_director') &&
-          !userRoles.contains('stunt_director')) {
-        return true;
-      }
-    }
-
-    // 3. Writer / Screenwriter
+    // 6. Writer / Screenwriter
     final isWriterCall = target.contains('writer') ||
         target.contains('screenwriter') ||
         target.contains('script');
-    if (isWriterCall && userRoles.contains('writer')) {
-      return true;
+    if (isWriterCall) {
+      return hasAnyUserRole(['writer', 'screenwriter', 'scriptwriter']);
     }
 
-    // 4. Producer
+    // 7. Producer / Line Producer / Executive Producer
     final isProducerCall = target.contains('producer') || target.contains('line producer');
-    if (isProducerCall && userRoles.contains('producer')) {
-      return true;
+    if (isProducerCall) {
+      return hasAnyUserRole(['producer', 'line_producer', 'executive_producer']);
     }
 
-    // 5. Cinematographer / Camera
-    final isCameraCall = target.contains('cinematograph') ||
-        target.contains('director of photography') ||
-        target.contains('dop') ||
-        target.contains('camera') ||
-        target.contains('photograph');
-    if (isCameraCall &&
-        (userRoles.contains('cinematographer') ||
-            userRoles.contains('photographer'))) {
-      return true;
+    // 8. Editor
+    final isEditorCall = target.contains('editor') || target.contains('editing') || target.contains('colorist');
+    if (isEditorCall) {
+      return hasAnyUserRole(['editor', 'colorist']);
     }
 
-    // 6. Editor
-    final isEditorCall = target.contains('editor') || target.contains('editing');
-    if (isEditorCall && userRoles.contains('editor')) {
-      return true;
-    }
-
-    // 7. Sound / Audio / Music
+    // 9. Sound / Audio / Music
     final isSoundCall = target.contains('sound') ||
         target.contains('audio') ||
         target.contains('sound mixing') ||
-        target.contains('sound designer');
-    if (isSoundCall &&
-        (userRoles.contains('sound') ||
-            userRoles.contains('musician') ||
-            userRoles.contains('singer'))) {
-      return true;
+        target.contains('sound designer') ||
+        target.contains('music');
+    if (isSoundCall) {
+      return hasAnyUserRole(['sound', 'musician', 'sound_engineer', 'composer']);
     }
 
-    // 8. Singer
+    // 10. Singer / Vocalist
     final isSingerCall = target.contains('singer') || target.contains('vocal');
-    if (isSingerCall &&
-        (userRoles.contains('singer') || userRoles.contains('musician'))) {
-      return true;
+    if (isSingerCall) {
+      return hasAnyUserRole(['singer', 'vocalist', 'musician']);
     }
 
-    // 9. Dancer / Choreographer
+    // 11. Dancer / Choreographer
     final isDanceCall = target.contains('dance') || target.contains('choreograph');
-    if (isDanceCall &&
-        (userRoles.contains('dancer') || userRoles.contains('choreographer'))) {
-      return true;
+    if (isDanceCall) {
+      return hasAnyUserRole(['dancer', 'choreographer']);
     }
 
-    // 10. VFX / Animator
-    final isVfxCall = target.contains('vfx') || target.contains('visual effects');
-    if (isVfxCall && userRoles.contains('vfx')) {
-      return true;
+    // 12. VFX / Animator
+    final isVfxCall = target.contains('vfx') || target.contains('visual effects') || target.contains('animat');
+    if (isVfxCall) {
+      return hasAnyUserRole(['vfx', 'animator', 'vfx_artist']);
     }
 
-    // 11. Art Director / Set Design
-    final isArtCall = target.contains('art director') || target.contains('production design');
-    if (isArtCall && userRoles.contains('art_director')) {
-      return true;
-    }
-
-    // 12. Costume Designer / Wardrobe
+    // 13. Costume Designer / Wardrobe / Stylist
     final isCostumeCall = target.contains('costume') || target.contains('wardrobe') || target.contains('stylist');
-    if (isCostumeCall && userRoles.contains('costume')) {
-      return true;
+    if (isCostumeCall) {
+      return hasAnyUserRole(['costume', 'costume_designer', 'stylist', 'wardrobe']);
     }
 
-    // 13. Makeup Artist
+    // 14. Makeup Artist
     final isMakeupCall = target.contains('makeup');
-    if (isMakeupCall && userRoles.contains('makeup')) {
-      return true;
-    }
-
-    // 14. Stunt Director
-    final isStuntCall = target.contains('stunt');
-    if (isStuntCall && userRoles.contains('stunt')) {
-      return true;
-    }
-
-    // Fallback: check each role token against target
-    final userTokens = userRoles
-        .split(RegExp(r'[,|/_ ]+'))
-        .map((t) => t.trim().toLowerCase())
-        .where((t) => t.length > 2);
-    for (final token in userTokens) {
-      if (crewReq.contains(token) || pos.contains(token)) {
-        return true;
-      }
+    if (isMakeupCall) {
+      return hasAnyUserRole(['makeup', 'makeup_artist']);
     }
 
     return false;

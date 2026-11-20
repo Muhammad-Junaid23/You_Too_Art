@@ -24,6 +24,12 @@ import 'package:you_too_art/features/profile/widgets/edit_work_media_modal.dart'
 import 'package:you_too_art/features/talent/models/talent_model.dart';
 import 'package:you_too_art/features/talent/providers/talent_provider.dart';
 
+final otherUserProfileProvider =
+    FutureProvider.family<UserModel?, String>((ref, userId) async {
+  if (userId.isEmpty) return null;
+  return ref.watch(userRepositoryProvider).getById(userId);
+});
+
 class UserProfileScreen extends ConsumerStatefulWidget {
   final TalentModel initialTalent;
 
@@ -291,6 +297,11 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
       activePersona.id,
     );
 
+    final otherUserAsync = isOwnProfile
+        ? null
+        : ref.watch(otherUserProfileProvider(widget.initialTalent.id));
+    final otherUser = otherUserAsync?.value;
+
     final isActor = UserPersonaNotifier.isActorId(widget.initialTalent.id);
     final targetPersona = isOwnProfile
         ? activePersona
@@ -337,28 +348,43 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                 postsCount: dynamicPostsCount,
                 workPortfolio: portfolio.photos.map((p) => p.mediaUrl).toList(),
               )
-            : (targetPersona != null
-                ? TalentModel.fromPersona(
-                    targetPersona,
+            : (otherUser != null
+                ? TalentModel.fromUser(
+                    otherUser,
+                    connectionStatus: _currentStatus ?? widget.initialTalent.connectionStatus,
+                    isFollowing: _isFollowing ?? widget.initialTalent.isFollowing,
+                  ).copyWith(
                     connectsCount: dynamicConnectsCount,
                     postsCount: dynamicPostsCount,
                     workPortfolio: portfolio.photos.map((p) => p.mediaUrl).toList(),
                   )
-                : (fromState ??
-                    TalentDirectory.findById(widget.initialTalent.id) ??
-                    widget.initialTalent).copyWith(
-                      connectsCount: dynamicConnectsCount,
-                    )));
+                : (targetPersona != null
+                    ? TalentModel.fromPersona(
+                        targetPersona,
+                        connectsCount: dynamicConnectsCount,
+                        postsCount: dynamicPostsCount,
+                        workPortfolio: portfolio.photos.map((p) => p.mediaUrl).toList(),
+                      )
+                    : (fromState ??
+                        TalentDirectory.findById(widget.initialTalent.id) ??
+                        widget.initialTalent).copyWith(
+                          connectsCount: dynamicConnectsCount,
+                        ))));
 
     final isProd = (isOwnProfile && currentUser != null)
         ? (currentUser.role.toLowerCase().contains('production') ||
             currentUser.role.toLowerCase().contains('studio') ||
             (currentUser.incorporationNumber != null &&
                 currentUser.incorporationNumber!.isNotEmpty))
-        : (baseTalent.isProductionHouse ||
-            baseTalent.roles.toLowerCase().contains('production') ||
-            baseTalent.roles.toLowerCase().contains('studio') ||
-            (targetPersona?.isProductionHouse ?? false));
+        : (otherUser != null
+            ? (otherUser.role.toLowerCase().contains('production') ||
+                otherUser.role.toLowerCase().contains('studio') ||
+                (otherUser.incorporationNumber != null &&
+                    otherUser.incorporationNumber!.isNotEmpty))
+            : (baseTalent.isProductionHouse ||
+                baseTalent.roles.toLowerCase().contains('production') ||
+                baseTalent.roles.toLowerCase().contains('studio') ||
+                (targetPersona?.isProductionHouse ?? false)));
 
     final effectiveStatus = _currentStatus ?? baseTalent.connectionStatus;
     final effectiveFollowing = _isFollowing ?? baseTalent.isFollowing;
@@ -724,6 +750,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                 activePersona,
                 isOwnProfile,
                 currentUser: currentUser,
+                targetUser: otherUser,
               ),
             ),
           ] else if (_selectedTabIndex == 2 && !isProd) ...[
@@ -1135,15 +1162,18 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
     UserPersona activePersona,
     bool isOwnProfile, {
     UserModel? currentUser,
+    UserModel? targetUser,
   }) {
     final effective = isOwnProfile ? activePersona : targetPersona;
     final rawBio = (isOwnProfile && currentUser != null && currentUser.bio != null && currentUser.bio!.isNotEmpty)
         ? currentUser.bio!
-        : ((effective?.bio.isNotEmpty ?? false)
-            ? effective!.bio
-            : (talent.bio?.isNotEmpty ?? false
-                ? talent.bio!
-                : ''));
+        : ((!isOwnProfile && targetUser != null && targetUser.bio != null && targetUser.bio!.isNotEmpty)
+            ? targetUser.bio!
+            : ((effective?.bio.isNotEmpty ?? false)
+                ? effective!.bio
+                : (talent.bio?.isNotEmpty ?? false
+                    ? talent.bio!
+                    : '')));
 
     final isSeedBio = rawBio.contains('Leading digital film studio') ||
         rawBio.contains('Award-winning independent filmmaker') ||
@@ -1152,7 +1182,9 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
         rawBio.contains('Passionate performing artist and creator') ||
         rawBio.contains('Cinematographer and camera operator') ||
         rawBio.contains('Vocalist, playback singer') ||
-        rawBio.contains('Professional performing artist');
+        rawBio.contains('Professional performing artist') ||
+        rawBio.contains('Official Production House profile on You Too Art') ||
+        rawBio.contains('Passionate artist and creator on You Too Art');
 
     final bioText = (!isSeedBio && rawBio.trim().isNotEmpty)
         ? rawBio.trim()
@@ -1162,38 +1194,83 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
 
     final rawLocation = (isOwnProfile && currentUser != null && currentUser.location != null && currentUser.location!.isNotEmpty)
         ? currentUser.location!
-        : ((effective?.location.isNotEmpty ?? false)
-            ? effective!.location
-            : (talent.location ?? (talent.aboutInfo['Location'] ?? '')));
+        : ((!isOwnProfile && targetUser != null && targetUser.location != null && targetUser.location!.isNotEmpty)
+            ? targetUser.location!
+            : ((effective?.location.isNotEmpty ?? false)
+                ? effective!.location
+                : (talent.location ?? (talent.aboutInfo['Location'] ?? ''))));
     final locationText = rawLocation.trim();
 
-    final rawWebsite = (effective?.website.isNotEmpty ?? false)
-        ? effective!.website
-        : (talent.aboutInfo['Website'] ??
-            talent.aboutInfo['Personal Website'] ??
-            talent.aboutInfo['Official Website'] ??
-            '');
-    final website = rawWebsite.trim();
+    final rawWebsite = (isOwnProfile && currentUser != null && currentUser.website != null && currentUser.website!.isNotEmpty)
+        ? currentUser.website!
+        : ((!isOwnProfile && targetUser != null && targetUser.website != null && targetUser.website!.isNotEmpty)
+            ? targetUser.website!
+            : ((effective?.website.isNotEmpty ?? false)
+                ? effective!.website
+                : (talent.aboutInfo['Website'] ??
+                    talent.aboutInfo['Personal Website'] ??
+                    talent.aboutInfo['Official Website'] ??
+                    '')));
 
     final rawEstablished = (isOwnProfile && currentUser != null && currentUser.establishedYear != null)
         ? '${currentUser.establishedYear}'
-        : (talent.aboutInfo['Established'] ?? talent.aboutInfo['Established Year'] ?? '');
+        : ((!isOwnProfile && targetUser != null && targetUser.establishedYear != null)
+            ? '${targetUser.establishedYear}'
+            : (talent.aboutInfo['Established'] ?? talent.aboutInfo['Established Year'] ?? ''));
     final establishedYear = rawEstablished.trim();
 
     final rawInc = (isOwnProfile && currentUser != null && currentUser.incorporationNumber != null && currentUser.incorporationNumber!.isNotEmpty)
         ? currentUser.incorporationNumber!
-        : (talent.aboutInfo['Incorporation'] ?? talent.aboutInfo['Incorporation Number'] ?? '');
+        : ((!isOwnProfile && targetUser != null && targetUser.incorporationNumber != null && targetUser.incorporationNumber!.isNotEmpty)
+            ? targetUser.incorporationNumber!
+            : (talent.aboutInfo['Incorporation'] ?? talent.aboutInfo['Incorporation Number'] ?? ''));
     final incNumber = rawInc.trim();
 
     final rawAddress = (isOwnProfile && currentUser != null && currentUser.address != null && currentUser.address!.isNotEmpty)
         ? currentUser.address!
-        : (talent.aboutInfo['Address'] ?? talent.aboutInfo['Studio / Office Address'] ?? '');
+        : ((!isOwnProfile && targetUser != null && targetUser.address != null && targetUser.address!.isNotEmpty)
+            ? targetUser.address!
+            : (talent.aboutInfo['Address'] ?? talent.aboutInfo['Studio / Office Address'] ?? ''));
     final officeAddress = rawAddress.trim();
 
-    final rawExp = (effective?.experience.isNotEmpty ?? false)
-        ? effective!.experience
-        : (talent.aboutInfo['Experience'] ?? '');
-    final experienceText = rawExp.trim();
+    final rawExp = (isOwnProfile && currentUser != null && currentUser.experience != null && currentUser.experience!.isNotEmpty)
+        ? currentUser.experience!
+        : ((!isOwnProfile && targetUser != null && targetUser.experience != null && targetUser.experience!.isNotEmpty)
+            ? targetUser.experience!
+            : ((effective?.experience.isNotEmpty ?? false)
+                ? effective!.experience
+                : (talent.aboutInfo['Experience'] ?? '')));
+
+    // Automatic sanity swap in case website was saved in experience or vice versa
+    String cleanExp = rawExp.trim();
+    String cleanWeb = rawWebsite.trim();
+
+    bool isWebLike(String s) {
+      final l = s.toLowerCase();
+      return l.startsWith('http://') ||
+          l.startsWith('https://') ||
+          l.startsWith('www.') ||
+          l.contains('.com') ||
+          l.contains('.org') ||
+          l.contains('.net') ||
+          l.contains('.pk') ||
+          l.contains('.io') ||
+          l.contains('.co');
+    }
+
+    bool isExpLike(String s) {
+      final l = s.toLowerCase();
+      return l.contains('year') ||
+          l.contains('yr') ||
+          l.contains('exp') ||
+          RegExp(r'^\d+\+?\s*(years?|yrs?)?', caseSensitive: false).hasMatch(l);
+    }
+
+    if (isWebLike(cleanExp) && (isExpLike(cleanWeb) || !isWebLike(cleanWeb))) {
+      final temp = cleanExp;
+      cleanExp = cleanWeb;
+      cleanWeb = temp;
+    }
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
@@ -1243,18 +1320,20 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
             // Individual artist specific fields
             _buildAboutSection(
               label: 'Category',
-              value: (targetPersona != null && targetPersona.role.isNotEmpty)
-                  ? targetPersona.role
-                  : ((currentUser != null && currentUser.id == talent.id && currentUser.role.isNotEmpty && currentUser.role != 'unset')
-                      ? currentUser.role.split('_').map((w) => w.isEmpty ? '' : '${w[0].toUpperCase()}${w.substring(1).toLowerCase()}').join(' ')
-                      : (talent.roles.isNotEmpty ? talent.roles : 'Creative Artist')),
+              value: (!isOwnProfile && targetUser != null && targetUser.role.isNotEmpty && targetUser.role != 'unset')
+                  ? targetUser.role.split('_').map((w) => w.isEmpty ? '' : '${w[0].toUpperCase()}${w.substring(1).toLowerCase()}').join(' ')
+                  : ((targetPersona != null && targetPersona.role.isNotEmpty)
+                      ? targetPersona.role
+                      : ((currentUser != null && currentUser.id == talent.id && currentUser.role.isNotEmpty && currentUser.role != 'unset')
+                          ? currentUser.role.split('_').map((w) => w.isEmpty ? '' : '${w[0].toUpperCase()}${w.substring(1).toLowerCase()}').join(' ')
+                          : (talent.roles.isNotEmpty ? talent.roles : 'Creative Artist'))),
               isBold: true,
             ),
             const SizedBox(height: 24),
-            if (experienceText.isNotEmpty) ...[
+            if (cleanExp.isNotEmpty) ...[
               _buildAboutSection(
                 label: 'Experience',
-                value: experienceText,
+                value: cleanExp,
                 isBold: true,
               ),
               const SizedBox(height: 24),
@@ -1272,10 +1351,10 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
           ],
 
           // Website (only if real website present, no fake default)
-          if (website.isNotEmpty && website != 'www.youtooart.com') ...[
+          if (cleanWeb.isNotEmpty && cleanWeb != 'www.youtooart.com') ...[
             _buildAboutSection(
               label: isProd ? 'Official Website' : 'Personal Website',
-              value: website,
+              value: cleanWeb,
               isBold: true,
             ),
             const SizedBox(height: 24),
