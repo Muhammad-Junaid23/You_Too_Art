@@ -55,8 +55,11 @@ class _CastingScreenState extends ConsumerState<CastingScreen> {
         (currentUser?.incorporationNumber != null &&
             currentUser!.incorporationNumber!.isNotEmpty);
 
+    final isFilmDirector = roleLower.contains('director') &&
+        !roleLower.contains('art director') &&
+        !roleLower.contains('stunt');
     final canCreateCasting = isProductionHouse ||
-        roleLower.contains('director') ||
+        isFilmDirector ||
         roleLower.contains('producer');
 
     // Calculate feed calls with search and filter applied,
@@ -421,10 +424,11 @@ class _CastingScreenState extends ConsumerState<CastingScreen> {
           final call = filteredCalls[idx];
           final isMyCall = call.authorId == userPersonaId ||
               AppPersistenceService.instance.isSamePersona(call.authorId, userPersonaId);
-          final canRoleApply = CastingRoleMatcher.canUserApply(
+          final canRoleApply = !isMyCall && CastingRoleMatcher.canUserApply(
             userRolesString: userRolesString,
             call: call,
             isProductionHouse: isProductionHouse,
+            currentUserId: userPersonaId,
           );
           return CastingCallCard(
             call: call,
@@ -596,10 +600,24 @@ class _CastingScreenState extends ConsumerState<CastingScreen> {
       return;
     }
 
+    final userPersona = ref.read(userPersonaProvider);
+    final isMyCall = call.authorId == userPersona.id ||
+        AppPersistenceService.instance.isSamePersona(call.authorId, userPersona.id);
+    if (isMyCall) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You cannot apply to your own casting call.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     final canRoleApply = CastingRoleMatcher.canUserApply(
       userRolesString: userRolesString,
       call: call,
       isProductionHouse: false,
+      currentUserId: userPersona.id,
     );
     if (!canRoleApply) {
       ScaffoldMessenger.of(context).showSnackBar(

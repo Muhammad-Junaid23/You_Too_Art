@@ -7,6 +7,7 @@ import 'package:you_too_art/core/providers/user_persona_provider.dart';
 import 'package:you_too_art/core/repositories/chat_repository.dart';
 import 'package:you_too_art/core/repositories/connection_repository.dart';
 import 'package:you_too_art/core/services/app_persistence_service.dart';
+import 'package:you_too_art/core/utils/role_formatter.dart';
 import 'package:you_too_art/features/chats/models/chat_message_model.dart';
 import 'package:you_too_art/features/chats/models/conversation_model.dart';
 import 'package:you_too_art/features/talent/models/talent_model.dart';
@@ -241,10 +242,15 @@ class ChatListNotifier extends Notifier<ChatListState> {
               .where((p) => p.id == peerId || _isActorMatch(p.id, peerId))
               .firstOrNull;
           if (personaMatch != null) {
+            final rolesStr = personaMatch.isProductionHouse
+                ? 'Production House'
+                : (RoleFormatter.format(personaMatch.role).isNotEmpty
+                    ? RoleFormatter.format(personaMatch.role)
+                    : 'Creative Artist');
             talent = TalentModel(
               id: personaMatch.id,
               name: personaMatch.name,
-              roles: personaMatch.role,
+              roles: rolesStr,
               avatarUrl: personaMatch.avatarUrl,
               isProductionHouse: personaMatch.isProductionHouse,
               connectionStatus: ConnectionStatus.connected,

@@ -1,6 +1,7 @@
 import 'package:you_too_art/core/models/user_model.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
 import 'package:you_too_art/core/services/app_persistence_service.dart';
+import 'package:you_too_art/core/utils/role_formatter.dart';
 import 'package:you_too_art/features/home/models/post_item.dart';
 
 enum ConnectionStatus {
@@ -17,6 +18,7 @@ class TalentModel {
   final String roles;
   final ConnectionStatus connectionStatus;
   final bool isFollowing;
+  final bool isVerified;
   final bool _isProductionHouse;
   bool get isProductionHouse =>
       _isProductionHouse ||
@@ -43,6 +45,7 @@ class TalentModel {
     required this.roles,
     this.connectionStatus = ConnectionStatus.none,
     this.isFollowing = false,
+    this.isVerified = false,
     bool? isProductionHouse,
     this.connectsCount = '0',
     this.postsCount = '0',
@@ -101,13 +104,20 @@ class TalentModel {
       mergedAbout['Bio'] = persona.bio;
     }
 
+    final rolesStr = persona.isProductionHouse
+        ? 'Production House'
+        : (RoleFormatter.format(persona.role).isNotEmpty
+            ? RoleFormatter.format(persona.role)
+            : 'Creative Artist');
+
     return TalentModel(
       id: persona.id,
       name: persona.name,
       avatarUrl: persona.avatarUrl,
-      roles: persona.role,
+      roles: rolesStr,
       connectionStatus: connectionStatus,
       isFollowing: isFollowing,
+      isVerified: false,
       isProductionHouse: persona.isProductionHouse,
       connectsCount: connectsCount,
       postsCount: calculatedPosts,
@@ -134,34 +144,10 @@ class TalentModel {
         (user.incorporationNumber != null &&
             user.incorporationNumber!.isNotEmpty);
 
-    String rolesStr = isProd ? 'Production House' : 'Actor | Model | Director';
-    if (user.role.isNotEmpty && user.role.toLowerCase() != 'unset') {
-      if (user.role.contains(',') || user.role.contains('•') || user.role.contains('|')) {
-        rolesStr = user.role
-            .split(RegExp(r'[,•|]'))
-            .map((w) => w.trim())
-            .where((w) => w.isNotEmpty)
-            .map((w) => w
-                .split('_')
-                .map((p) => p.isEmpty
-                    ? ''
-                    : '${p[0].toUpperCase()}${p.substring(1).toLowerCase()}')
-                .join(' '))
-            .join(' • ');
-      } else {
-        rolesStr = user.role
-            .split('_')
-            .map((w) => w.isEmpty
-                ? ''
-                : '${w[0].toUpperCase()}${w.substring(1).toLowerCase()}')
-            .join(' ');
-      }
-    }
-    if (user.bio != null &&
-        user.bio!.trim().isNotEmpty &&
-        rolesStr == 'Actor | Model | Director') {
-      rolesStr = user.bio!.trim();
-    }
+    final rolesFormatted = RoleFormatter.format(user.role);
+    final rolesStr = isProd
+        ? 'Production House'
+        : (rolesFormatted.isNotEmpty ? rolesFormatted : 'Creative Artist');
 
     final localPersona = AppPersistenceService.instance.getPersona(user.id);
     final effectiveWebsite = (user.website != null && user.website!.isNotEmpty)
@@ -178,6 +164,7 @@ class TalentModel {
       roles: rolesStr,
       connectionStatus: connectionStatus,
       isFollowing: isFollowing,
+      isVerified: user.isVerified,
       isProductionHouse: isProd,
       connectsCount: isProd ? '0' : '0',
       followersCount: '0',
@@ -231,9 +218,10 @@ class TalentModel {
         name.toLowerCase().contains('production') ||
         json['incorporation_number'] != null;
 
-    final rolesStr = (role.isNotEmpty && role.toLowerCase() != 'unset')
-        ? role
-        : (isProd ? 'Production House' : 'Actor | Model | Director');
+    final rolesFormatted = RoleFormatter.format(role);
+    final rolesStr = isProd
+        ? 'Production House'
+        : (rolesFormatted.isNotEmpty ? rolesFormatted : 'Creative Artist');
 
     final website = (json['website'] as String? ?? '').trim();
     final exp = (json['experience'] as String? ?? '').trim();
@@ -249,6 +237,7 @@ class TalentModel {
       roles: rolesStr,
       connectionStatus: connectionStatus,
       isFollowing: isFollowing,
+      isVerified: json['is_verified'] == true || json['isVerified'] == true,
       isProductionHouse: isProd,
       email: json['email'] as String?,
       bio: json['bio'] as String?,
@@ -286,6 +275,7 @@ class TalentModel {
     String? roles,
     ConnectionStatus? connectionStatus,
     bool? isFollowing,
+    bool? isVerified,
     bool? isProductionHouse,
     String? connectsCount,
     String? postsCount,
@@ -304,6 +294,7 @@ class TalentModel {
       roles: roles ?? this.roles,
       connectionStatus: connectionStatus ?? this.connectionStatus,
       isFollowing: isFollowing ?? this.isFollowing,
+      isVerified: isVerified ?? this.isVerified,
       isProductionHouse: isProductionHouse ?? this.isProductionHouse,
       connectsCount: connectsCount ?? this.connectsCount,
       postsCount: postsCount ?? this.postsCount,

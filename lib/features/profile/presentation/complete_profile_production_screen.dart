@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:you_too_art/app/config/routes.dart';
 import 'package:you_too_art/app/constants/app_colors.dart';
 import 'package:you_too_art/core/providers/geo_providers.dart';
+import 'package:you_too_art/core/utils/role_formatter.dart';
 import 'package:you_too_art/features/auth/providers/auth_provider.dart';
 import 'package:you_too_art/features/profile/providers/complete_profile_production_provider.dart';
 import 'package:you_too_art/features/profile/widgets/profile_avatar_picker.dart';
@@ -78,7 +79,7 @@ class _CompleteProfileProductionScreenState
         ? const AsyncValue.data(<Map<String, dynamic>>[])
         : ref.watch(citiesProvider(profile.country!));
 
-    final roleLabel = _titleCase(auth.role ?? 'Production House');
+    final roleLabel = RoleFormatter.format(auth.role ?? 'Production House');
 
     return Scaffold(
       backgroundColor: colors.surface,
@@ -337,18 +338,6 @@ class _CompleteProfileProductionScreenState
         ),
       ),
     );
-  }
-
-  String _titleCase(String s) {
-    if (s.isEmpty) return s;
-    return s
-        .split(RegExp(r'[_ ]+'))
-        .map(
-          (w) => w.isEmpty
-              ? ''
-              : w[0].toUpperCase() + w.substring(1).toLowerCase(),
-        )
-        .join(' ');
   }
 }
 

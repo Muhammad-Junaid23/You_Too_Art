@@ -282,6 +282,10 @@ class AccountSheets {
     BuildContext context, {
     String? email,
     bool isEmailVerified = false,
+    bool isArtistVerified = false,
+    Future<bool> Function()? onSendVerificationEmail,
+    Future<bool> Function()? onCheckVerification,
+    VoidCallback? onToggleVerification,
   }) {
     showModalBottomSheet(
       context: context,
@@ -290,186 +294,13 @@ class AccountSheets {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (ctx) => SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildHandle(),
-              const SizedBox(height: 20),
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  color: isEmailVerified
-                      ? const Color(0xFFE8F1FC)
-                      : const Color(0xFFFFF7ED),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Icon(
-                  isEmailVerified
-                      ? Icons.verified_user_outlined
-                      : Icons.mark_email_unread_outlined,
-                  color: isEmailVerified
-                      ? const Color(0xFF3899F3)
-                      : const Color(0xFFF59E0B),
-                  size: 34,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                isEmailVerified
-                    ? 'Account Verification Status'
-                    : 'Email Verification Pending',
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF1A1A2E),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          isEmailVerified ? Icons.check_circle : Icons.pending_outlined,
-                          size: 18,
-                          color: isEmailVerified ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            isEmailVerified
-                                ? 'Authentication: Signed in via OTP Code'
-                                : 'Email: Confirmation Pending',
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF1E293B),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (email != null && email.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Padding(
-                          padding: const EdgeInsets.only(left: 26),
-                          child: Text(
-                            email,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF64748B),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 10),
-                    const Divider(height: 1, color: Color(0xFFE2E8F0)),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: const [
-                        Icon(
-                          Icons.workspace_premium_outlined,
-                          size: 18,
-                          color: Color(0xFF64748B),
-                        ),
-                        SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Artist Profile Badge: Standard (Unverified)',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF1E293B),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 14),
-              Text(
-                isEmailVerified
-                    ? 'Entering the 6-digit code authenticated your account session. To receive the official verified badge on your profile, your credentials and portfolio must be vetted by our editorial team.'
-                    : 'Please check your email inbox and confirm your email address to unlock full features.',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 13.5,
-                  color: Color(0xFF64748B),
-                  height: 1.5,
-                ),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: SizedBox(
-                      height: 48,
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.pop(ctx),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFF64748B),
-                          side: const BorderSide(color: Color(0xFFCBD5E1)),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: const Text('Close'),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: SizedBox(
-                      height: 48,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.pop(ctx);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Verification badge request submitted for editorial review!'),
-                              backgroundColor: Color(0xFF1E293B),
-                            ),
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF3899F3),
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          elevation: 0,
-                        ),
-                        child: const FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Text(
-                            'Request Badge',
-                            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
+      builder: (ctx) => _VerifyAccountSheetContent(
+        email: email,
+        initialEmailVerified: isEmailVerified,
+        initialArtistVerified: isArtistVerified,
+        onSendVerificationEmail: onSendVerificationEmail,
+        onCheckVerification: onCheckVerification,
+        onToggleVerification: onToggleVerification,
       ),
     );
   }
@@ -558,6 +389,150 @@ class AccountSheets {
                         ),
                         child: const Text(
                           'Yes, Logout',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  static void showDeleteAccountModal(
+    BuildContext context, {
+    required Future<void> Function() onDelete,
+  }) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(
+                        Icons.delete_outline_rounded,
+                        color: Color(0xFFDC2626),
+                        size: 24,
+                      ),
+                      SizedBox(width: 8),
+                      Text(
+                        'Delete Account?',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF1A1A2E),
+                        ),
+                      ),
+                    ],
+                  ),
+                  _buildCloseButton(ctx),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF2F2),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFFCA5A5)),
+                ),
+                child: const Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.warning_amber_rounded,
+                      color: Color(0xFFDC2626),
+                      size: 20,
+                    ),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'This action is permanent and cannot be undone.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF991B1B),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'Are you sure you want to delete your account?\n\n'
+                'All your profile data, portfolio, media posts, casting calls, applications, and connections will be permanently wiped.',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF616161),
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFEEEEEE),
+                          foregroundColor: const Color(0xFF424242),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                        ),
+                        child: const Text(
+                          'Cancel',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: SizedBox(
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          Navigator.pop(ctx);
+                          await onDelete();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFFFEBEE),
+                          foregroundColor: const Color(0xFFDC2626),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                        ),
+                        child: const Text(
+                          'Delete Account',
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w700,
@@ -734,6 +709,397 @@ class _LegalSection extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _VerifyAccountSheetContent extends StatefulWidget {
+  final String? email;
+  final bool initialEmailVerified;
+  final bool initialArtistVerified;
+  final Future<bool> Function()? onSendVerificationEmail;
+  final Future<bool> Function()? onCheckVerification;
+  final VoidCallback? onToggleVerification;
+
+  const _VerifyAccountSheetContent({
+    this.email,
+    required this.initialEmailVerified,
+    required this.initialArtistVerified,
+    this.onSendVerificationEmail,
+    this.onCheckVerification,
+    this.onToggleVerification,
+  });
+
+  @override
+  State<_VerifyAccountSheetContent> createState() =>
+      _VerifyAccountSheetContentState();
+}
+
+class _VerifyAccountSheetContentState extends State<_VerifyAccountSheetContent> {
+  late bool _emailVerified;
+  late bool _artistVerified;
+  bool _emailSent = false;
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _emailVerified = widget.initialEmailVerified;
+    _artistVerified = widget.initialArtistVerified;
+  }
+
+  Future<void> _handleSendEmail() async {
+    setState(() => _isLoading = true);
+    final ok = await widget.onSendVerificationEmail?.call() ?? false;
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+        if (ok) _emailSent = true;
+      });
+    }
+  }
+
+  Future<void> _handleCheckStatus() async {
+    setState(() => _isLoading = true);
+    final confirmed = await widget.onCheckVerification?.call() ?? false;
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+        if (confirmed) {
+          _emailVerified = true;
+          _artistVerified = true;
+        }
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AccountSheets._buildHandle(),
+            const SizedBox(height: 20),
+
+            // Top Status Icon
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: _artistVerified
+                    ? const Color(0xFFE8F1FC)
+                    : (_emailSent
+                        ? const Color(0xFFFFF7ED)
+                        : const Color(0xFFE8F1FC)),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Icon(
+                _artistVerified
+                    ? Icons.verified
+                    : (_emailSent
+                        ? Icons.mark_email_unread_outlined
+                        : Icons.verified_user_outlined),
+                color: _artistVerified
+                    ? const Color(0xFF3899F3)
+                    : (_emailSent
+                        ? const Color(0xFFF59E0B)
+                        : const Color(0xFF3899F3)),
+                size: 34,
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Header Title
+            Text(
+              _artistVerified
+                  ? 'Official Verified Artist'
+                  : (_emailSent
+                      ? 'Verification Link Sent'
+                      : 'Verify Your Artist Profile'),
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1A1A2E),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Status Card
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        _emailVerified
+                            ? Icons.check_circle
+                            : (_emailSent
+                                ? Icons.mail_outline_rounded
+                                : Icons.pending_outlined),
+                        size: 18,
+                        color: _emailVerified
+                            ? const Color(0xFF10B981)
+                            : (_emailSent
+                                ? const Color(0xFF3899F3)
+                                : const Color(0xFFF59E0B)),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _emailVerified
+                              ? 'Email Status: Confirmed'
+                              : (_emailSent
+                                  ? 'Email Status: Link Sent (Awaiting Click)'
+                                  : 'Email Status: Unverified'),
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: _emailVerified
+                                ? const Color(0xFF10B981)
+                                : const Color(0xFF1E293B),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (widget.email != null && widget.email!.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 26),
+                        child: Text(
+                          widget.email!,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF64748B),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 10),
+                  const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Icon(
+                        _artistVerified
+                            ? Icons.verified
+                            : Icons.workspace_premium_outlined,
+                        size: 18,
+                        color: _artistVerified
+                            ? const Color(0xFF3899F3)
+                            : const Color(0xFF64748B),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _artistVerified
+                              ? 'Artist Profile Badge: Official Verified'
+                              : 'Artist Profile Badge: Standard (Unverified)',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: _artistVerified
+                                ? const Color(0xFF10B981)
+                                : const Color(0xFF1E293B),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            // Description
+            Text(
+              _artistVerified
+                  ? 'Your profile is officially verified with the blue checkmark badge. Your credentials, portfolio, and identity are recognized across the platform.'
+                  : (_emailSent
+                      ? 'We sent a verification email with your 6-digit code and confirmation link (valid for 1 hour / 3600s).\n\nCheck your email inbox, click the "Confirm Email" link, then tap "Check Status" below to activate your badge.'
+                      : 'To claim the official blue checkmark badge, we will send an email with a secure "Confirm Email" link (valid for 1 hour). Clicking the link will verify your email and activate your badge.'),
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 13.5,
+                color: Color(0xFF64748B),
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Action Buttons
+            if (_artistVerified) ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: 48,
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF64748B),
+                          side: const BorderSide(color: Color(0xFFCBD5E1)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text('Close'),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: SizedBox(
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          widget.onToggleVerification?.call();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFFFEBEE),
+                          foregroundColor: const Color(0xFFDC2626),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'Remove Badge',
+                          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ] else if (_emailSent) ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: 48,
+                      child: OutlinedButton(
+                        onPressed: _isLoading ? null : _handleSendEmail,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF3899F3),
+                          side: const BorderSide(color: Color(0xFF3899F3)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text('Resend Link'),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: SizedBox(
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: _isLoading ? null : _handleCheckStatus,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF10B981),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: _isLoading
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                'Check Status',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ] else ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: 48,
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF64748B),
+                          side: const BorderSide(color: Color(0xFFCBD5E1)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text('Close'),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: SizedBox(
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: _isLoading ? null : _handleSendEmail,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF3899F3),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: _isLoading
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  'Send Verification Email',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

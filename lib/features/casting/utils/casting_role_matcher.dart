@@ -1,3 +1,4 @@
+import 'package:you_too_art/core/services/app_persistence_service.dart';
 import 'package:you_too_art/features/casting/models/casting_call_model.dart';
 
 /// Utility to match a user's registered artist categories with a casting call's required role.
@@ -7,9 +8,18 @@ class CastingRoleMatcher {
     required String userRolesString,
     required CastingCallModel call,
     required bool isProductionHouse,
+    String? currentUserId,
   }) {
     // Production Houses can never apply to casting calls
     if (isProductionHouse) return false;
+
+    // Authors cannot apply to their own casting calls
+    if (currentUserId != null &&
+        call.authorId.isNotEmpty &&
+        (call.authorId == currentUserId ||
+            AppPersistenceService.instance.isSamePersona(call.authorId, currentUserId))) {
+      return false;
+    }
 
     final userRoles = userRolesString.toLowerCase();
     if (userRoles.isEmpty) return false;

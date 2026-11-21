@@ -15,6 +15,7 @@ enum ConnectionRequestNotificationStatus {
   pending,
   accepted,
   rejected,
+  cancelled,
 }
 
 @immutable

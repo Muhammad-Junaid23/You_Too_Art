@@ -401,20 +401,12 @@ class ChatRepository {
       conversationId: conversationId,
       userId: userId,
     );
-
-    if (_isSupabaseTableAvailable != false && isValidUuid(conversationId)) {
-      try {
-        await _messages.delete().eq('conversation_id', conversationId);
-        await _conversations
-            .update({'last_message': ''})
-            .eq('id', conversationId);
-      } catch (e) {
-        if (kDebugMode) debugPrint('ChatRepository.clearConversationMessages error: $e');
-      }
-    }
+    // Note: Do NOT delete messages in Supabase because "Clear Chat" is a per-user
+    // ("Clear for me") action and must never delete messages for the other participant.
   }
 
-  /// Delete a conversation for [userId] and wipe it from local and cloud storage.
+  /// Delete a conversation for [userId] (soft delete for this user).
+  /// Only hard-deletes from cloud database if BOTH participants have deleted it.
   Future<void> deleteConversation({
     required String conversationId,
     required String userId,
@@ -426,8 +418,22 @@ class ChatRepository {
 
     if (_isSupabaseTableAvailable != false && isValidUuid(conversationId)) {
       try {
-        await _messages.delete().eq('conversation_id', conversationId);
-        await _conversations.delete().eq('id', conversationId);
+        final conv = _LocalChatStore.instance.getConversation(conversationId);
+        if (conv != null) {
+          final pa = conv['participant_a']?.toString() ?? '';
+          final pb = conv['participant_b']?.toString() ?? '';
+          if (pa.isNotEmpty && pb.isNotEmpty) {
+            final paDeleted =
+                _LocalChatStore.instance.isDeletedForUser(conversationId, pa);
+            final pbDeleted =
+                _LocalChatStore.instance.isDeletedForUser(conversationId, pb);
+            // Only remove from cloud database if BOTH users have deleted it
+            if (paDeleted && pbDeleted) {
+              await _messages.delete().eq('conversation_id', conversationId);
+              await _conversations.delete().eq('id', conversationId);
+            }
+          }
+        }
       } catch (e) {
         if (kDebugMode) debugPrint('ChatRepository.deleteConversation Supabase error: $e');
       }
@@ -736,12 +742,28 @@ class _LocalChatStore {
       } catch (_) {}
     }
 
-    _conversations.remove(conversationId);
-    _draftConversations.remove(conversationId);
-    _messages.remove(conversationId);
+    // Only remove completely from local store if both participants have deleted it
+    final conv = _conversations[conversationId] ?? _draftConversations[conversationId];
+    bool bothDeleted = false;
+    if (conv != null) {
+      final pa = conv['participant_a']?.toString() ?? '';
+      final pb = conv['participant_b']?.toString() ?? '';
+      if (pa.isNotEmpty && pb.isNotEmpty) {
+        final paDeleted = isDeletedForUser(conversationId, pa);
+        final pbDeleted = isDeletedForUser(conversationId, pb);
+        if (paDeleted && pbDeleted) {
+          bothDeleted = true;
+        }
+      }
+    }
 
-    _saveConvsToPrefs();
-    _saveMsgsToPrefs();
+    if (bothDeleted) {
+      _conversations.remove(conversationId);
+      _draftConversations.remove(conversationId);
+      _messages.remove(conversationId);
+      _saveConvsToPrefs();
+      _saveMsgsToPrefs();
+    }
     _saveUserDeletedToPrefs();
     _saveUserClearedToPrefs();
     _convController.add(null);

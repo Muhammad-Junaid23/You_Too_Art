@@ -72,6 +72,16 @@ class AuthRepository {
       await _auth.signOut();
     } catch (e) {
       if (kDebugMode) debugPrint('AuthRepository.logout: $e');
+      // If the session is already invalidated, user was deleted (403 Forbidden),
+      // or network is offline, ignore server rejection and allow local sign-out.
+      final str = e.toString().toLowerCase();
+      if (str.contains('403') ||
+          str.contains('401') ||
+          str.contains('forbidden') ||
+          str.contains('not found') ||
+          str.contains('session')) {
+        return;
+      }
       rethrow;
     }
   }
@@ -91,10 +101,30 @@ class AuthRepository {
     try {
       final email = _auth.currentUser?.email;
       if (email == null) throw Exception('No user email found.');
-      await _auth.resend(type: OtpType.signup, email: email);
+      try {
+        await _auth.resend(type: OtpType.signup, email: email);
+      } catch (_) {
+        await _auth.signInWithOtp(email: email);
+      }
     } catch (e) {
       if (kDebugMode) debugPrint('AuthRepository.resendVerificationEmail: $e');
       rethrow;
+    }
+  }
+
+  /// Reload the current user session from Supabase to check fresh confirmation state.
+  Future<User?> reloadUser() async {
+    try {
+      final res = await _auth.refreshSession();
+      return res.user ?? _auth.currentUser;
+    } catch (_) {
+      try {
+        final res = await _auth.getUser();
+        return res.user ?? _auth.currentUser;
+      } catch (e) {
+        if (kDebugMode) debugPrint('AuthRepository.reloadUser: $e');
+        return _auth.currentUser;
+      }
     }
   }
 

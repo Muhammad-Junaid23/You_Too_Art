@@ -6,6 +6,7 @@ import 'package:you_too_art/app/config/routes.dart';
 import 'package:you_too_art/core/models/user_model.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
 import 'package:you_too_art/core/services/app_persistence_service.dart';
+import 'package:you_too_art/core/utils/role_formatter.dart';
 import 'package:you_too_art/features/account/presentation/account_sheets.dart';
 import 'package:you_too_art/features/account/presentation/help_support_screen.dart';
 import 'package:you_too_art/features/account/presentation/transaction_history_screen.dart';
@@ -40,6 +41,10 @@ class AccountScreen extends ConsumerWidget {
         : (!activePersona.name.toLowerCase().contains('wajahat')
             ? activePersona.avatarUrl
             : '');
+
+    final displayRoles =
+        RoleFormatter.format(currentUser?.role ?? activePersona.role);
+    final isVerified = currentUser?.isVerified == true;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -102,23 +107,24 @@ class AccountScreen extends ConsumerWidget {
                                       )
                                     : null,
                               ),
-                              Positioned(
-                                right: -2,
-                                bottom: -2,
-                                child: Container(
-                                  width: 20,
-                                  height: 20,
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFF3899F3),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(
-                                    Icons.check,
-                                    color: Colors.white,
-                                    size: 13,
+                              if (isVerified)
+                                Positioned(
+                                  right: -2,
+                                  bottom: -2,
+                                  child: Container(
+                                    width: 20,
+                                    height: 20,
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFF3899F3),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.check,
+                                      color: Colors.white,
+                                      size: 13,
+                                    ),
                                   ),
                                 ),
-                              ),
                             ],
                           ),
                           const SizedBox(width: 14),
@@ -139,13 +145,21 @@ class AccountScreen extends ConsumerWidget {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                                 const SizedBox(height: 3),
-                                const Text(
-                                  'Account Verified',
+                                Text(
+                                  isVerified
+                                      ? 'Verified Profile'
+                                      : (displayRoles.isNotEmpty
+                                          ? displayRoles
+                                          : 'Creative Artist'),
                                   style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w500,
-                                    color: Color(0xFF00C48C),
+                                    color: isVerified
+                                        ? const Color(0xFF3899F3)
+                                        : const Color(0xFF6B7280),
                                   ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ],
                             ),
@@ -214,6 +228,78 @@ class AccountScreen extends ConsumerWidget {
                             ? currentUser!.email
                             : (clientUser?.email ?? activePersona.email),
                         isEmailVerified: isEmailConfirmed,
+                        isArtistVerified: isVerified,
+                        onSendVerificationEmail: () async {
+                          final ok = await ref
+                              .read(authProvider.notifier)
+                              .sendVerificationEmail();
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  ok
+                                      ? 'Verification email sent! Check your inbox and click Confirm Email.'
+                                      : 'Failed to send verification email. Please try again.',
+                                ),
+                                backgroundColor: ok
+                                    ? const Color(0xFF3899F3)
+                                    : const Color(0xFFEF4444),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
+                          return ok;
+                        },
+                        onCheckVerification: () async {
+                          final confirmed = await ref
+                              .read(authProvider.notifier)
+                              .checkEmailVerification();
+                          ref.invalidate(currentUserProfileProvider);
+                          if (context.mounted) {
+                            if (confirmed) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Congratulations! Your email is confirmed and your verified badge is now active!',
+                                  ),
+                                  backgroundColor: Color(0xFF10B981),
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Email not confirmed yet. Please click the link in your email and tap Check Status again.',
+                                  ),
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
+                          }
+                          return confirmed;
+                        },
+                        onToggleVerification: () async {
+                          final newStatus = !isVerified;
+                          await ref
+                              .read(authProvider.notifier)
+                              .setVerificationStatus(newStatus);
+                          ref.invalidate(currentUserProfileProvider);
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  newStatus
+                                      ? 'Congratulations! Your profile is now verified with the official badge.'
+                                      : 'Verification badge removed.',
+                                ),
+                                backgroundColor: newStatus
+                                    ? const Color(0xFF10B981)
+                                    : const Color(0xFF1E293B),
+                              ),
+                            );
+                          }
+                        },
                       );
                     },
                   ),
@@ -269,6 +355,39 @@ class AccountScreen extends ConsumerWidget {
                       context,
                       onLogout: () {
                         ref.read(authProvider.notifier).logout();
+                      },
+                    ),
+                  ),
+                  _buildOptionTile(
+                    context: context,
+                    icon: Icons.delete_outline_rounded,
+                    title: 'Delete Account',
+                    iconColor: const Color(0xFFDC2626),
+                    titleColor: const Color(0xFFDC2626),
+                    onTap: () => AccountSheets.showDeleteAccountModal(
+                      context,
+                      onDelete: () async {
+                        final success = await ref
+                            .read(authProvider.notifier)
+                            .deleteAccount();
+                        if (context.mounted) {
+                          if (success) {
+                            context.go(AppRoutes.login);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Your account has been deleted.'),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Failed to delete account. Please try again.'),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
+                        }
                       },
                     ),
                   ),

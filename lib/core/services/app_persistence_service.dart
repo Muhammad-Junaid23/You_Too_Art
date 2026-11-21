@@ -260,6 +260,8 @@ class AppPersistenceService {
     notifyListeners();
   }
 
+  String get activePersonaId => _activePersonaId;
+
   void setActivePersonaId(String id) {
     _activePersonaId = id;
     _flush();
@@ -268,6 +270,22 @@ class AppPersistenceService {
   void clearActiveSession() {
     _activePersonaId = '';
     _prefs.remove('active_user_persona_id');
+    notifyListeners();
+  }
+
+  void deletePersona(String id) {
+    _personas.remove(id);
+    _portfolios.remove(id);
+    _followersCounts.remove(id);
+    _followingSets.remove(id);
+    _deletedConvsByUser.remove(id);
+    _prefs.remove('persona_profile_$id');
+    _prefs.remove('portfolio_$id');
+    if (_activePersonaId == id) {
+      _activePersonaId = '';
+      _prefs.remove('active_user_persona_id');
+    }
+    _flush();
     notifyListeners();
   }
 
@@ -989,6 +1007,13 @@ class AppPersistenceService {
           currentPersona = updatedWithRow;
           _personas[user.id] = updatedWithRow;
           _prefs.setString('persona_profile_${user.id}', jsonEncode(updatedWithRow.toJson()));
+
+          // If email is confirmed via email link or OTP, automatically ensure is_verified is true
+          if (user.emailConfirmedAt != null && row['is_verified'] != true) {
+            try {
+              await client.from('users').update({'is_verified': true}).eq('id', user.id);
+            } catch (_) {}
+          }
         } else {
           // Only if user row DOES NOT exist in users table yet, create an initial record.
           final names = currentPersona.name.trim().split(' ');

@@ -88,11 +88,14 @@ class UserRepository {
       final data = await _db.update(updates).eq('id', uid).select().single();
       return UserModel.fromJson(data);
     } catch (e) {
-      if (updates.containsKey('website') || updates.containsKey('experience')) {
+      if (updates.containsKey('website') ||
+          updates.containsKey('experience') ||
+          updates.containsKey('is_verified')) {
         try {
           final fallbackUpdates = Map<String, dynamic>.from(updates)
             ..remove('website')
-            ..remove('experience');
+            ..remove('experience')
+            ..remove('is_verified');
           final data =
               await _db.update(fallbackUpdates).eq('id', uid).select().single();
           return UserModel.fromJson(data);
@@ -121,6 +124,46 @@ class UserRepository {
     } catch (e) {
       if (kDebugMode) debugPrint('UserRepository.getAllUsers: $e');
       return [];
+    }
+  }
+
+  /// Delete a user profile and their data from Supabase.
+  Future<bool> deleteUser(String uid) async {
+    final cleanUid = uid.trim();
+    if (cleanUid.isEmpty || !isValidUuid(cleanUid)) return false;
+    try {
+      // 1. Try invoking delete_user_account RPC function (deletes auth.users and cascades everywhere)
+      try {
+        await _client.rpc('delete_user_account');
+        return true;
+      } catch (rpcErr) {
+        if (kDebugMode) debugPrint('delete_user_account RPC failed/not found: $rpcErr');
+      }
+
+      // 2. Clean up child records to prevent foreign key errors
+      try {
+        await _client.from('connections').delete().or('user_id.eq.$cleanUid,connected_user_id.eq.$cleanUid');
+      } catch (_) {}
+      try {
+        await _client.from('notifications').delete().or('recipient_id.eq.$cleanUid,actor_id.eq.$cleanUid');
+      } catch (_) {}
+      try {
+        await _client.from('posts').delete().eq('author_id', cleanUid);
+      } catch (_) {}
+      try {
+        await _client.from('casting_applications').delete().eq('applicant_id', cleanUid);
+      } catch (_) {}
+      try {
+        await _client.from('portfolio_items').delete().eq('user_id', cleanUid);
+      } catch (_) {}
+
+      // 3. Delete directly from public.users table
+      await _db.delete().eq('id', cleanUid);
+
+      return true;
+    } catch (e) {
+      if (kDebugMode) debugPrint('UserRepository.deleteUser: $e');
+      return false;
     }
   }
 }

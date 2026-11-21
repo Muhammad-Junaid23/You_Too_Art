@@ -417,6 +417,124 @@ class AuthNotifier extends Notifier<AppAuthState> {
     }
   }
 
+  /// Permanently delete the user account and associated data.
+  Future<bool> deleteAccount() async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      final currentAuthUser = _authRepo.currentUser;
+      final currentUid = currentAuthUser?.id;
+
+      if (currentUid != null) {
+        // Delete user row from database
+        await _userRepo.deleteUser(currentUid);
+      }
+
+      // Clear local personas and persistence
+      final activePersonaId =
+          AppPersistenceService.instance.activePersonaId;
+      if (activePersonaId.isNotEmpty) {
+        AppPersistenceService.instance.deletePersona(activePersonaId);
+      }
+
+      final prefs = ref.read(sharedPreferencesProvider);
+      await prefs.remove('is_test_role_logged_in');
+      AppPersistenceService.instance.clearActiveSession();
+
+      // Logout / sign out of Supabase Auth
+      try {
+        await _authRepo.logout();
+      } catch (e) {
+        if (kDebugMode) debugPrint('deleteAccount: logout ignored error: $e');
+      }
+
+      state = state.copyWith(isLoggedIn: false, isLoading: false, role: null);
+      _invalidateUserScopedProviders();
+      return true;
+    } catch (e) {
+      if (kDebugMode) debugPrint('AuthNotifier.deleteAccount: $e');
+      state = state.copyWith(isLoading: false, errorMessage: friendlyError(e));
+      return false;
+    }
+  }
+
+  /// Toggle or update artist verification badge status
+  Future<bool> setVerificationStatus(bool isVerified) async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      final currentAuthUser = _authRepo.currentUser;
+      final currentUid = currentAuthUser?.id;
+
+      if (currentUid != null) {
+        // 1. Update cloud auth metadata (persists securely across devices)
+        try {
+          await supabase.Supabase.instance.client.auth.updateUser(
+            supabase.UserAttributes(data: {'is_verified': isVerified}),
+          );
+        } catch (e) {
+          if (kDebugMode) debugPrint('auth.updateUser is_verified failed: $e');
+        }
+
+        // 2. Update public.users database row
+        try {
+          await _userRepo.updateProfile(
+            uid: currentUid,
+            updates: {'is_verified': isVerified},
+          );
+        } catch (e) {
+          if (kDebugMode) debugPrint('userRepo.updateProfile is_verified failed: $e');
+        }
+
+        // 3. Update local persona if matched
+        final currentPersona = ref.read(userPersonaProvider);
+        if (currentPersona.id.isNotEmpty) {
+          AppPersistenceService.instance.savePersona(currentPersona);
+        }
+      }
+
+      state = state.copyWith(isLoading: false);
+      _invalidateUserScopedProviders();
+      return true;
+    } catch (e) {
+      if (kDebugMode) debugPrint('AuthNotifier.setVerificationStatus: $e');
+      state = state.copyWith(isLoading: false, errorMessage: friendlyError(e));
+      return false;
+    }
+  }
+
+  /// Send verification email with confirmation link and OTP to the active user.
+  Future<bool> sendVerificationEmail() async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      await _authRepo.resendVerificationEmail();
+      state = state.copyWith(isLoading: false);
+      return true;
+    } catch (e) {
+      if (kDebugMode) debugPrint('AuthNotifier.sendVerificationEmail: $e');
+      state = state.copyWith(isLoading: false, errorMessage: friendlyError(e));
+      return false;
+    }
+  }
+
+  /// Check if the user confirmed their email via the link and activate their verified badge.
+  Future<bool> checkEmailVerification() async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      final user = await _authRepo.reloadUser();
+      final isEmailConfirmed = user?.emailConfirmedAt != null;
+      if (isEmailConfirmed) {
+        // Automatically activate verified badge
+        await setVerificationStatus(true);
+      }
+      state = state.copyWith(isLoading: false);
+      _invalidateUserScopedProviders();
+      return isEmailConfirmed;
+    } catch (e) {
+      if (kDebugMode) debugPrint('AuthNotifier.checkEmailVerification: $e');
+      state = state.copyWith(isLoading: false, errorMessage: friendlyError(e));
+      return false;
+    }
+  }
+
   /// Send a password reset email.
   Future<bool> sendPasswordReset(String email) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
