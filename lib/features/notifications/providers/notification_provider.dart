@@ -73,24 +73,30 @@ class NotificationNotifier extends Notifier<NotificationState> {
   }
 
   /// Accept connection request from notification tile
-  Future<void> acceptConnection(NotificationItem item) async {
+  Future<bool> acceptConnection(NotificationItem item) async {
     final myId = _currentEffectiveId();
     final senderId = item.senderId ?? item.actorId;
 
     if (senderId != null && senderId.isNotEmpty) {
-      await _connectionRepo.acceptConnection(
+      final success = await _connectionRepo.acceptConnection(
         userId: myId,
         senderUserId: senderId,
       );
+      if (!success) {
+        await _notifRepo.deleteNotification(item.id);
+        return false;
+      }
       // Immediately refresh all screens: chats, talent, and network
       ref.read(chatListProvider.notifier).refreshConnections();
       ref.read(talentListProvider.notifier).fetchTalents();
       ref.read(networkProvider.notifier).refresh();
+      return true;
     } else {
       await _notifRepo.updateRequestStatus(
         item.id,
         ConnectionRequestNotificationStatus.accepted,
       );
+      return true;
     }
   }
 

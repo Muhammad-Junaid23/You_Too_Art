@@ -131,13 +131,24 @@ class NotificationRepository {
     StreamSubscription<void>? localSub;
     final normUserId = _normalizeUserId(userId);
 
-    void emitMerged(List<NotificationItem> incoming) {
+    void emitMerged(List<NotificationItem> incoming, {bool isAuthoritativeRemote = false}) {
       if (controller.isClosed) return;
-      final currentList = _userNotifications[normUserId] ?? [];
 
-      // Merge remote incoming rows and local optimistic list.
-      // Remote incoming rows appear first so their authoritative IDs win.
-      final combined = <NotificationItem>[...incoming, ...currentList];
+      List<NotificationItem> combined;
+      if (isAuthoritativeRemote) {
+        final currentLocal = _userNotifications[normUserId] ?? [];
+        // When receiving an authoritative snapshot from Supabase Realtime,
+        // any item with a valid server UUID that is not present in incoming was deleted.
+        // We only retain unpersisted optimistic local items (e.g. temporary IDs like 'notif-..').
+        final localOptimistic = currentLocal.where((it) {
+          if (isValidUuid(it.id)) return false;
+          return !incoming.any((r) => r.id == it.id);
+        }).toList();
+        combined = [...incoming, ...localOptimistic];
+      } else {
+        final currentList = _userNotifications[normUserId] ?? [];
+        combined = <NotificationItem>[...incoming, ...currentList];
+      }
       final deduped = _deduplicateNotifications(combined);
 
       // Strictly isolate notifications:
@@ -188,7 +199,7 @@ class NotificationRepository {
                     _isSupabaseTableAvailable = true;
                     final remoteList =
                         rows.map((r) => NotificationItem.fromRow(r)).toList();
-                    emitMerged(remoteList);
+                    emitMerged(remoteList, isAuthoritativeRemote: true);
                     _saveToPrefs();
                   },
                   onError: (e) {
@@ -296,6 +307,48 @@ class NotificationRepository {
     return notif;
   }
 
+  /// Permanently removes a connection request notification when cancelled or withdrawn.
+  Future<void> removeConnectionRequestNotification({
+    required String recipientId,
+    required String senderUserId,
+  }) async {
+    final normRecipient = _normalizeUserId(recipientId);
+    final normSender = _normalizeUserId(senderUserId);
+
+    // 1. Remove from local in-memory store
+    for (final entry in _userNotifications.entries) {
+      entry.value.removeWhere((it) {
+        if (it.type != NotificationType.connectionRequest) return false;
+        final itRecipient = _normalizeUserId(it.recipientId ?? '');
+        final itSender = _normalizeUserId(it.senderId ?? it.actorId ?? '');
+        return (itRecipient == normRecipient && itSender == normSender) ||
+            (itRecipient == normSender && itSender == normRecipient);
+      });
+    }
+
+    _saveToPrefs();
+    _updateController.add(null);
+
+    // 2. Delete from Supabase notifications table
+    if (_isSupabaseTableAvailable != false &&
+        isValidUuid(recipientId) &&
+        isValidUuid(senderUserId)) {
+      try {
+        await _db
+            .delete()
+            .or(
+              'and(recipient_id.eq.$recipientId,actor_id.eq.$senderUserId),'
+              'and(recipient_id.eq.$senderUserId,actor_id.eq.$recipientId)',
+            )
+            .eq('type', 'connection_request');
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('Notice deleting notification from Supabase: $e');
+        }
+      }
+    }
+  }
+
   /// Synchronizes connection request status across all notifications
   /// whenever a connection is accepted or rejected anywhere in the app
   /// (Talent page, UserProfile page, Network screen, or Notification Center).
@@ -304,6 +357,14 @@ class NotificationRepository {
     required String senderUserId,
     required ConnectionRequestNotificationStatus status,
   }) async {
+    if (status == ConnectionRequestNotificationStatus.cancelled) {
+      await removeConnectionRequestNotification(
+        recipientId: recipientId,
+        senderUserId: senderUserId,
+      );
+      return;
+    }
+
     final normRecipient = _normalizeUserId(recipientId);
     final normSender = _normalizeUserId(senderUserId);
 
@@ -336,13 +397,16 @@ class NotificationRepository {
         isValidUuid(recipientId) &&
         isValidUuid(senderUserId)) {
       try {
+        final dbStatus = status.name;
         await _db
             .update({
-              'request_status': status.name,
+              'request_status': dbStatus,
               'is_read': true,
             })
-            .eq('recipient_id', recipientId)
-            .eq('actor_id', senderUserId)
+            .or(
+              'and(recipient_id.eq.$recipientId,actor_id.eq.$senderUserId),'
+              'and(recipient_id.eq.$senderUserId,actor_id.eq.$recipientId)',
+            )
             .eq('type', 'connection_request');
       } catch (e) {
         if (kDebugMode) {
@@ -396,6 +460,11 @@ class NotificationRepository {
     String id,
     ConnectionRequestNotificationStatus status,
   ) async {
+    if (status == ConnectionRequestNotificationStatus.cancelled) {
+      await deleteNotification(id);
+      return;
+    }
+
     for (final entry in _userNotifications.entries) {
       final list = entry.value;
       for (var i = 0; i < list.length; i++) {
@@ -414,11 +483,16 @@ class NotificationRepository {
 
     if (_isSupabaseTableAvailable != false && isValidUuid(id)) {
       try {
+        final dbStatus = status.name;
         await _db.update({
-          'request_status': status.name,
+          'request_status': dbStatus,
           'is_read': true,
         }).eq('id', id);
-      } catch (_) {}
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('Notice updating notification status in Supabase: $e');
+        }
+      }
     }
   }
 

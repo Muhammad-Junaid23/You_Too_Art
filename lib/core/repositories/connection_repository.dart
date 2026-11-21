@@ -239,7 +239,7 @@ class ConnectionRepository {
 
     // 1. Update local cache
     final local = await _loadLocalStore();
-    bool found = false;
+    bool foundPending = false;
     for (var item in local) {
       final u1 = item['user_id'] as String? ?? '';
       final u2 = item['connected_user_id'] as String? ?? '';
@@ -247,37 +247,49 @@ class ConnectionRepository {
       final isReverse = _isUserMatch(u1, effectiveUserId) && _isUserMatch(u2, effectiveSenderId);
 
       if (isDirect || isReverse) {
-        item['status'] = 'accepted';
-        item['created_at'] = DateTime.now().toUtc().toIso8601String();
-        found = true;
+        if (item['status'] == 'pending') {
+          item['status'] = 'accepted';
+          item['created_at'] = DateTime.now().toUtc().toIso8601String();
+          foundPending = true;
+        } else if (item['status'] == 'accepted') {
+          return true;
+        }
       }
     }
-    if (!found) {
-      local.add({
-        'id': 'conn-${DateTime.now().millisecondsSinceEpoch}',
-        'user_id': effectiveSenderId,
-        'connected_user_id': effectiveUserId,
-        'status': 'accepted',
-        'created_at': DateTime.now().toUtc().toIso8601String(),
-      });
+    if (foundPending) {
+      await _saveLocalStore(local);
     }
-    await _saveLocalStore(local);
 
     // 2. Sync to Supabase if table is available and both IDs are valid UUIDs
+    bool updatedInSupabase = false;
     if (_isSupabaseTableAvailable != false &&
         isValidUuid(effectiveUserId) &&
         isValidUuid(effectiveSenderId)) {
       try {
-        await _db
+        final res = await _db
             .update({'status': 'accepted'})
             .or(
               'and(user_id.eq.$effectiveSenderId,connected_user_id.eq.$effectiveUserId),'
               'and(user_id.eq.$effectiveUserId,connected_user_id.eq.$effectiveSenderId)',
-            );
+            )
+            .select();
         _isSupabaseTableAvailable = true;
+        if (res.isNotEmpty) {
+          updatedInSupabase = true;
+        }
       } catch (e) {
         _recordSupabaseError(e);
       }
+    }
+
+    if (!foundPending && !updatedInSupabase) {
+      // The pending connection was withdrawn / cancelled by the sender. Remove notification!
+      await NotificationRepository.instance?.removeConnectionRequestNotification(
+        recipientId: effectiveUserId,
+        senderUserId: senderUserId,
+      );
+      notifyChanges();
+      return false;
     }
 
     // 3. Synchronize notifications so the incoming connection request card
@@ -399,11 +411,14 @@ class ConnectionRepository {
       }
     }
 
-    // 3. Reset notification status so UI reflects removed connection
-    await NotificationRepository.instance?.syncConnectionStatus(
+    // 3. Reset and delete notification so UI reflects removed / cancelled connection
+    await NotificationRepository.instance?.removeConnectionRequestNotification(
+      recipientId: effectiveConnectedId,
+      senderUserId: effectiveUserId,
+    );
+    await NotificationRepository.instance?.removeConnectionRequestNotification(
       recipientId: effectiveUserId,
-      senderUserId: connectedUserId,
-      status: ConnectionRequestNotificationStatus.none,
+      senderUserId: effectiveConnectedId,
     );
 
     notifyChanges();

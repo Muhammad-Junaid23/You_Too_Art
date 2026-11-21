@@ -6,6 +6,7 @@ import 'package:you_too_art/core/models/user_model.dart';
 import 'package:you_too_art/core/providers/geo_providers.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
 import 'package:you_too_art/core/services/app_persistence_service.dart';
+import 'package:you_too_art/core/utils/role_formatter.dart';
 import 'package:you_too_art/features/auth/providers/auth_provider.dart';
 import 'package:you_too_art/features/home/providers/home_feed_provider.dart';
 import 'package:you_too_art/features/network/providers/network_provider.dart';
@@ -106,8 +107,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     final metaExp = meta['experience'] as String? ?? '';
 
     _nameController.text = fullName;
-    _roleController.text =
-        (user.role.isNotEmpty && user.role != 'unset') ? user.role : persona.role;
+    final rawRole = (user.role.isNotEmpty && user.role != 'unset') ? user.role : persona.role;
+    _roleController.text = _isProd ? 'Production House' : RoleFormatter.format(rawRole);
     _bioController.text = user.bio?.isNotEmpty == true ? user.bio! : persona.bio;
     _emailController.text =
         user.email.isNotEmpty ? user.email : persona.email;
@@ -317,7 +318,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               : '';
         }
         final roleVal = pick(_roleController.text.trim(), dbUser?.role == 'unset' ? '' : dbUser?.role, persona.role);
-        if (roleVal.isNotEmpty) updates['role'] = roleVal;
+        if (roleVal.isNotEmpty) updates['role'] = RoleFormatter.format(roleVal);
       }
 
       // 1. Sync to Supabase PostgREST (public.users table)

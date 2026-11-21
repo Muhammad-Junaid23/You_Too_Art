@@ -10,6 +10,7 @@ import 'package:you_too_art/core/providers/supabase_providers.dart'
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
 import 'package:you_too_art/core/repositories/connection_repository.dart';
 import 'package:you_too_art/core/services/app_persistence_service.dart';
+import 'package:you_too_art/core/utils/role_formatter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:you_too_art/features/account/presentation/edit_profile_screen.dart';
@@ -411,9 +412,18 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
     final displayName = (isOwnProfile && currentUser != null && currentUser.name.isNotEmpty)
         ? currentUser.name
         : (targetPersona?.name ?? talent.name);
-    final displayRoles = (isOwnProfile && currentUser != null && currentUser.role.isNotEmpty && currentUser.role != 'unset')
-        ? (isProd ? 'Production House' : currentUser.role)
-        : (targetPersona?.role ?? talent.roles);
+    final rawDisplayRole = (isOwnProfile && currentUser != null && currentUser.role.isNotEmpty && currentUser.role != 'unset')
+        ? currentUser.role
+        : (!isOwnProfile && otherUser != null && otherUser.role.isNotEmpty && otherUser.role != 'unset')
+            ? otherUser.role
+            : ((targetPersona != null && targetPersona.role.isNotEmpty)
+                ? targetPersona.role
+                : talent.roles);
+    final displayRoles = isProd
+        ? 'Production House'
+        : (RoleFormatter.format(rawDisplayRole).isNotEmpty
+            ? RoleFormatter.format(rawDisplayRole)
+            : 'Creative Artist');
     final displayAvatar = (isOwnProfile && currentUser != null && currentUser.profileImagePath != null && currentUser.profileImagePath!.isNotEmpty)
         ? currentUser.profileImagePath!
         : (targetPersona?.avatarUrl ?? talent.avatarUrl);
@@ -522,23 +532,24 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                                         size: 46, color: Colors.grey)
                                     : null,
                               ),
-                              Positioned(
-                                right: 0,
-                                bottom: 0,
-                                child: Container(
-                                  width: 22,
-                                  height: 22,
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFF3899F3),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(
-                                    Icons.check,
-                                    color: Colors.white,
-                                    size: 14,
+                              if (talent.isVerified)
+                                Positioned(
+                                  right: 0,
+                                  bottom: 0,
+                                  child: Container(
+                                    width: 22,
+                                    height: 22,
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFF3899F3),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.check,
+                                      color: Colors.white,
+                                      size: 14,
+                                    ),
                                   ),
                                 ),
-                              ),
                             ],
                           ),
                   ),
@@ -1320,13 +1331,19 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
             // Individual artist specific fields
             _buildAboutSection(
               label: 'Category',
-              value: (!isOwnProfile && targetUser != null && targetUser.role.isNotEmpty && targetUser.role != 'unset')
-                  ? targetUser.role.split('_').map((w) => w.isEmpty ? '' : '${w[0].toUpperCase()}${w.substring(1).toLowerCase()}').join(' ')
-                  : ((targetPersona != null && targetPersona.role.isNotEmpty)
-                      ? targetPersona.role
-                      : ((currentUser != null && currentUser.id == talent.id && currentUser.role.isNotEmpty && currentUser.role != 'unset')
-                          ? currentUser.role.split('_').map((w) => w.isEmpty ? '' : '${w[0].toUpperCase()}${w.substring(1).toLowerCase()}').join(' ')
-                          : (talent.roles.isNotEmpty ? talent.roles : 'Creative Artist'))),
+              value: isProd
+                  ? 'Production House'
+                  : (() {
+                      final raw = (!isOwnProfile && targetUser != null && targetUser.role.isNotEmpty && targetUser.role != 'unset')
+                          ? targetUser.role
+                          : ((targetPersona != null && targetPersona.role.isNotEmpty)
+                              ? targetPersona.role
+                              : ((currentUser != null && currentUser.id == talent.id && currentUser.role.isNotEmpty && currentUser.role != 'unset')
+                                  ? currentUser.role
+                                  : (talent.roles.isNotEmpty ? talent.roles : 'Creative Artist')));
+                      final formatted = RoleFormatter.format(raw);
+                      return formatted.isNotEmpty ? formatted : 'Creative Artist';
+                    })(),
               isBold: true,
             ),
             const SizedBox(height: 24),

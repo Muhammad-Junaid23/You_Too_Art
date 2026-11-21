@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
 import 'package:you_too_art/features/casting/models/casting_call_model.dart';
@@ -107,8 +108,11 @@ class _CreateCastingCallScreenState
           roleLower.contains('studio') ||
           (currentUser?.incorporationNumber != null &&
               currentUser!.incorporationNumber!.isNotEmpty);
+      final isFilmDirector = roleLower.contains('director') &&
+          !roleLower.contains('art director') &&
+          !roleLower.contains('stunt');
       final canCreateCasting = isProductionHouse ||
-          roleLower.contains('director') ||
+          isFilmDirector ||
           roleLower.contains('producer');
 
       if (widget.callToEdit == null && !canCreateCasting) {
@@ -363,6 +367,14 @@ class _CreateCastingCallScreenState
                         controller: _emailController,
                         keyboardType: TextInputType.emailAddress,
                         decoration: _inputDecoration('Enter Contact Email'),
+                        validator: (val) {
+                          final trimmed = val?.trim() ?? '';
+                          if (trimmed.isNotEmpty &&
+                              !RegExp(r'^[\w\.\-]+@[\w\.\-]+\.[a-zA-Z]{2,}$').hasMatch(trimmed)) {
+                            return 'Please enter a valid email address';
+                          }
+                          return null;
+                        },
                       ),
                       const SizedBox(height: 18),
 
@@ -372,7 +384,27 @@ class _CreateCastingCallScreenState
                       TextFormField(
                         controller: _phoneController,
                         keyboardType: TextInputType.phone,
-                        decoration: _inputDecoration('Enter Contact Number'),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(RegExp(r'[\d\s+\-()]')),
+                          LengthLimitingTextInputFormatter(18),
+                        ],
+                        decoration: _inputDecoration('Enter Contact Number (e.g. +92 300 1234567)'),
+                        validator: (val) {
+                          final trimmed = val?.trim() ?? '';
+                          if (trimmed.isNotEmpty) {
+                            final digitsOnly = trimmed.replaceAll(RegExp(r'\D'), '');
+                            if (digitsOnly.length < 7) {
+                              return 'Contact number must be at least 7 digits';
+                            }
+                            if (digitsOnly.length > 15) {
+                              return 'Contact number cannot exceed 15 digits';
+                            }
+                            if (!RegExp(r'^\+?[\d\s\-()]{7,18}$').hasMatch(trimmed)) {
+                              return 'Please enter a valid phone number';
+                            }
+                          }
+                          return null;
+                        },
                       ),
                       const SizedBox(height: 18),
 

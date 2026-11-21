@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
+import 'package:you_too_art/core/services/app_persistence_service.dart';
 import 'package:you_too_art/features/casting/models/casting_call_model.dart';
 import 'package:you_too_art/features/casting/providers/casting_provider.dart';
 import 'package:you_too_art/features/casting/utils/casting_role_matcher.dart';
@@ -73,10 +75,24 @@ class _ApplyCastingScreenState extends ConsumerState<ApplyCastingScreen> {
       return;
     }
 
+    final isMyCall = widget.call.authorId == userPersona.id ||
+        (currentUser?.id != null && widget.call.authorId == currentUser!.id) ||
+        AppPersistenceService.instance.isSamePersona(widget.call.authorId, userPersona.id);
+    if (isMyCall) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: Colors.red,
+          content: Text('You cannot apply to your own casting call.'),
+        ),
+      );
+      return;
+    }
+
     final canRoleApply = CastingRoleMatcher.canUserApply(
       userRolesString: roleLower,
       call: widget.call,
       isProductionHouse: false,
+      currentUserId: userPersona.id,
     );
     if (!canRoleApply) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -185,10 +201,25 @@ class _ApplyCastingScreenState extends ConsumerState<ApplyCastingScreen> {
                       TextFormField(
                         controller: _phoneController,
                         keyboardType: TextInputType.phone,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(RegExp(r'[\d\s+\-()]')),
+                          LengthLimitingTextInputFormatter(18),
+                        ],
                         decoration: _inputDecoration('e.g. +92 300 1234567'),
                         validator: (val) {
-                          if (val == null || val.trim().isEmpty) {
+                          final trimmed = val?.trim() ?? '';
+                          if (trimmed.isEmpty) {
                             return 'Please enter your contact number';
+                          }
+                          final digitsOnly = trimmed.replaceAll(RegExp(r'\D'), '');
+                          if (digitsOnly.length < 7) {
+                            return 'Contact number must be at least 7 digits';
+                          }
+                          if (digitsOnly.length > 15) {
+                            return 'Contact number cannot exceed 15 digits';
+                          }
+                          if (!RegExp(r'^\+?[\d\s\-()]{7,18}$').hasMatch(trimmed)) {
+                            return 'Please enter a valid phone number';
                           }
                           return null;
                         },
@@ -203,10 +234,11 @@ class _ApplyCastingScreenState extends ConsumerState<ApplyCastingScreen> {
                         keyboardType: TextInputType.emailAddress,
                         decoration: _inputDecoration('e.g. your.email@example.com'),
                         validator: (val) {
-                          if (val == null || val.trim().isEmpty) {
+                          final trimmed = val?.trim() ?? '';
+                          if (trimmed.isEmpty) {
                             return 'Please enter your contact email';
                           }
-                          if (!val.contains('@')) {
+                          if (!RegExp(r'^[\w\.\-]+@[\w\.\-]+\.[a-zA-Z]{2,}$').hasMatch(trimmed)) {
                             return 'Please enter a valid email address';
                           }
                           return null;

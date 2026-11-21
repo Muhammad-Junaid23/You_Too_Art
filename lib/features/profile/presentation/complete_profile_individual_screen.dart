@@ -6,6 +6,7 @@ import 'package:you_too_art/app/constants/app_colors.dart';
 import 'package:you_too_art/core/providers/geo_providers.dart';
 import 'package:you_too_art/core/providers/supabase_providers.dart';
 import 'package:you_too_art/core/services/app_persistence_service.dart';
+import 'package:you_too_art/core/utils/role_formatter.dart';
 import 'package:you_too_art/features/auth/providers/auth_provider.dart';
 import 'package:you_too_art/features/profile/providers/complete_profile_provider.dart';
 import 'package:you_too_art/features/profile/providers/user_portfolio_provider.dart';
@@ -135,8 +136,8 @@ class _CompleteProfileIndividualScreenState
         ? const AsyncValue.data(<Map<String, dynamic>>[])
         : ref.watch(citiesProvider(profile.country!));
 
-    // Role label — "actor" → "Actor"
-    final roleLabel = _titleCase(auth.role ?? 'Actor');
+    // Role label — formatted consistently as "Actor • Director"
+    final roleLabel = RoleFormatter.format(auth.role ?? 'Actor');
 
     return Scaffold(
       backgroundColor: colors.surface,
@@ -488,25 +489,6 @@ class _CompleteProfileIndividualScreenState
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('Could not save: $e')));
     }
-  }
-
-  String _titleCase(String s) {
-    if (s.isEmpty) return s;
-    if (s.contains(',')) {
-      return s
-          .split(',')
-          .map((r) => _titleCase(r.trim()))
-          .where((r) => r.isNotEmpty)
-          .join(' • ');
-    }
-    return s
-        .split(RegExp(r'[_ ]+'))
-        .map(
-          (w) => w.isEmpty
-              ? ''
-              : w[0].toUpperCase() + w.substring(1).toLowerCase(),
-        )
-        .join(' ');
   }
 }
 

@@ -127,19 +127,32 @@ class NotificationsScreen extends ConsumerWidget {
                     return _NotificationTile(
                       item: item,
                       onTap: () => _handleItemTap(context, ref, item),
-                      onAccept: () {
-                        ref
+                      onAccept: () async {
+                        final success = await ref
                             .read(notificationProvider.notifier)
                             .acceptConnection(item);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              'You accepted connection request from ${item.primarySubject}',
+                        if (!context.mounted) return;
+                        if (!success) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'This connection request is no longer available or was cancelled.',
+                              ),
+                              duration: Duration(seconds: 2),
+                              behavior: SnackBarBehavior.floating,
                             ),
-                            duration: const Duration(seconds: 2),
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
+                          );
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'You accepted connection request from ${item.primarySubject}',
+                              ),
+                              duration: const Duration(seconds: 2),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
                       },
                       onReject: () {
                         ref
@@ -469,6 +482,37 @@ class _NotificationTile extends StatelessWidget {
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
                           ),
+                        ),
+                      )
+                    else if (item.requestStatus ==
+                        ConnectionRequestNotificationStatus.cancelled)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF3F4F6),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.cancel_outlined,
+                              size: 14,
+                              color: Color(0xFF6B7280),
+                            ),
+                            SizedBox(width: 4),
+                            Text(
+                              'Request cancelled',
+                              style: TextStyle(
+                                color: Color(0xFF6B7280),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                   ],

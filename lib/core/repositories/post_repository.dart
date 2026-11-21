@@ -169,6 +169,34 @@ class PostRepository {
     }
   }
 
+  /// Fetch likers for a post joined with user info.
+  Future<List<Map<String, dynamic>>> fetchLikesWithUsers(String postId) async {
+    try {
+      final data = await _likes
+          .select('''
+            id,
+            post_id,
+            user_id,
+            created_at,
+            user:users(id, name, first_name, last_name, profile_image_path, role)
+          ''')
+          .eq('post_id', postId)
+          .order('created_at', ascending: false);
+      return List<Map<String, dynamic>>.from(data);
+    } catch (e) {
+      if (kDebugMode) debugPrint('PostRepository.fetchLikesWithUsers: $e');
+      try {
+        final fallback = await _likes
+            .select('id, post_id, user_id, created_at')
+            .eq('post_id', postId)
+            .order('created_at', ascending: false);
+        return List<Map<String, dynamic>>.from(fallback);
+      } catch (_) {
+        return [];
+      }
+    }
+  }
+
   void _notifyPostAuthorOnLike({
     required String postId,
     required String likingUserId,

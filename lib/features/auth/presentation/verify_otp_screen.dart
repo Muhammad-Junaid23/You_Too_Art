@@ -22,10 +22,10 @@ class _VerifyOtpScreenState extends ConsumerState<VerifyOtpScreen> {
   static const int _otpLength = 6;
 
   final _controller = TextEditingController();
-  final _focusNode = FocusNode();
 
   int _resendCountdown = 30;
   Timer? _timer;
+  bool _isVerifying = false;
 
   @override
   void initState() {
@@ -52,6 +52,7 @@ class _VerifyOtpScreenState extends ConsumerState<VerifyOtpScreen> {
   Future<void> _onResend() async {
     if (_resendCountdown > 0) return;
     _startTimer();
+    _controller.clear();
     final ok = await ref
         .read(authProvider.notifier)
         .sendEmailOtp(email: widget.email);
@@ -76,11 +77,11 @@ class _VerifyOtpScreenState extends ConsumerState<VerifyOtpScreen> {
   void dispose() {
     _timer?.cancel();
     _controller.dispose();
-    _focusNode.dispose();
     super.dispose();
   }
 
   Future<void> _onVerify() async {
+    if (_isVerifying) return;
     final code = _controller.text.trim();
     if (code.length != _otpLength) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -88,6 +89,8 @@ class _VerifyOtpScreenState extends ConsumerState<VerifyOtpScreen> {
       );
       return;
     }
+
+    setState(() => _isVerifying = true);
 
     // 1. Verify — no state flip yet.
     final user = await ref
@@ -100,9 +103,11 @@ class _VerifyOtpScreenState extends ConsumerState<VerifyOtpScreen> {
           ref.read(authProvider).errorMessage ?? 'Invalid or expired code.';
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
       _controller.clear();
-      _focusNode.requestFocus();
+      setState(() => _isVerifying = false);
       return;
     }
+
+    setState(() => _isVerifying = false);
 
     // 2. Decide route based on profile state.
     final String next;
@@ -179,9 +184,8 @@ class _VerifyOtpScreenState extends ConsumerState<VerifyOtpScreen> {
 
                     _OtpBoxes(
                       controller: _controller,
-                      focusNode: _focusNode,
                       length: _otpLength,
-                      enabled: !isLoading,
+                      isVerifying: _isVerifying,
                       onCompleted: _onVerify,
                     ),
 
@@ -282,94 +286,223 @@ class _VerifyOtpScreenState extends ConsumerState<VerifyOtpScreen> {
   }
 }
 
-/// Six visual boxes backed by a single hidden TextField.
-class _OtpBoxes extends StatelessWidget {
+/// Six individual visual input boxes with full keyboard typing, backspace, and paste support.
+class _OtpBoxes extends StatefulWidget {
   final TextEditingController controller;
-  final FocusNode focusNode;
   final int length;
-  final bool enabled;
+  final bool isVerifying;
   final VoidCallback onCompleted;
 
   const _OtpBoxes({
     required this.controller,
-    required this.focusNode,
     required this.length,
-    required this.enabled,
+    this.isVerifying = false,
     required this.onCompleted,
   });
+
+  @override
+  State<_OtpBoxes> createState() => _OtpBoxesState();
+}
+
+class _OtpBoxesState extends State<_OtpBoxes> {
+  late final List<TextEditingController> _boxControllers;
+  late final List<FocusNode> _focusNodes;
+
+  @override
+  void initState() {
+    super.initState();
+    _boxControllers = List.generate(widget.length, (i) {
+      final char = i < widget.controller.text.length
+          ? widget.controller.text[i]
+          : '';
+      return TextEditingController(text: char);
+    });
+
+    _focusNodes = List.generate(widget.length, (i) {
+      final fn = FocusNode();
+      fn.onKeyEvent = (node, event) {
+        if (event is KeyDownEvent &&
+            event.logicalKey == LogicalKeyboardKey.backspace) {
+          if (_boxControllers[i].text.isEmpty && i > 0) {
+            _boxControllers[i - 1].clear();
+            _focusNodes[i - 1].requestFocus();
+            _syncToParent();
+            return KeyEventResult.handled;
+          }
+        }
+        return KeyEventResult.ignored;
+      };
+      return fn;
+    });
+
+    widget.controller.addListener(_onParentControllerChanged);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _focusNodes.isNotEmpty) {
+        _focusNodes[0].requestFocus();
+      }
+    });
+  }
+
+  void _onParentControllerChanged() {
+    final currentFull = _boxControllers.map((c) => c.text).join();
+    if (widget.controller.text != currentFull) {
+      final text = widget.controller.text;
+      for (var i = 0; i < widget.length; i++) {
+        final char = i < text.length ? text[i] : '';
+        if (_boxControllers[i].text != char) {
+          _boxControllers[i].text = char;
+        }
+      }
+      if (text.isEmpty && mounted && _focusNodes.isNotEmpty) {
+        _focusNodes[0].requestFocus();
+      }
+    }
+  }
+
+  void _syncToParent() {
+    final code = _boxControllers.map((c) => c.text).join();
+    if (widget.controller.text != code) {
+      widget.controller.text = code;
+    }
+    if (code.length == widget.length) {
+      widget.onCompleted();
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onParentControllerChanged);
+    for (final c in _boxControllers) {
+      c.dispose();
+    }
+    for (final fn in _focusNodes) {
+      fn.dispose();
+    }
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final colors = AppColors.of(context);
     final text = Theme.of(context).textTheme;
+    final isNarrow = MediaQuery.sizeOf(context).width < 340;
 
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        Opacity(
-          opacity: 0,
-          child: TextField(
-            controller: controller,
-            focusNode: focusNode,
-            enabled: enabled,
-            keyboardType: TextInputType.number,
-            maxLength: length,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            decoration: const InputDecoration(
-              counterText: '',
-              border: InputBorder.none,
-              contentPadding: EdgeInsets.zero,
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: List.generate(widget.length, (i) {
+        return Expanded(
+          child: Container(
+            height: isNarrow ? 46 : 52,
+            margin: EdgeInsets.symmetric(horizontal: isNarrow ? 1.5 : 3),
+            decoration: BoxDecoration(
+              color: colors.surface,
+              borderRadius: BorderRadius.circular(8),
             ),
-            onChanged: (text) {
-              if (text.length == length) {
-                onCompleted();
-              }
-            },
-            onSubmitted: (_) => onCompleted(),
-          ),
-        ),
-        GestureDetector(
-          onTap: () => focusNode.requestFocus(),
-          child: ValueListenableBuilder<TextEditingValue>(
-            valueListenable: controller,
-            builder: (context, value, _) {
-              final code = value.text;
-              final isNarrow = MediaQuery.sizeOf(context).width < 340;
-              return Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: List.generate(length, (i) {
-                  final filled = i < code.length;
-                  return Expanded(
-                    child: Container(
-                      height: isNarrow ? 46 : 52,
-                      margin: EdgeInsets.symmetric(horizontal: isNarrow ? 1.5 : 3),
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: colors.surface,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: filled ? colors.primary : colors.border,
-                          width: 1,
-                        ),
+            child: ValueListenableBuilder<TextEditingValue>(
+              valueListenable: _boxControllers[i],
+              builder: (context, value, _) {
+                final isFilled = value.text.isNotEmpty;
+                return ListenableBuilder(
+                  listenable: _focusNodes[i],
+                  builder: (context, _) {
+                    final isFocused = _focusNodes[i].hasFocus;
+                    return TextField(
+                      controller: _boxControllers[i],
+                      focusNode: _focusNodes[i],
+                      readOnly: widget.isVerifying,
+                      textAlign: TextAlign.center,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(widget.length),
+                      ],
+                      style: text.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: colors.textPrimary,
+                        fontSize: 18,
                       ),
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text(
-                          filled ? code[i] : '',
-                          style: text.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: colors.textPrimary,
+                      cursorColor: colors.primary,
+                      enableInteractiveSelection: true,
+                      decoration: InputDecoration(
+                        counterText: '',
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(
+                          vertical: isNarrow ? 10 : 12,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(
+                            color: isFocused
+                                ? colors.primary
+                                : (isFilled ? colors.primary : colors.border),
+                            width: isFocused ? 1.5 : 1,
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(
+                            color: isFocused
+                                ? colors.primary
+                                : (isFilled ? colors.primary : colors.border),
+                            width: isFocused ? 1.5 : 1,
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(
+                            color: colors.primary,
+                            width: 1.5,
                           ),
                         ),
                       ),
-                    ),
-                  );
-                }),
-              );
-            },
+                      onTap: () {
+                        _boxControllers[i].selection = TextSelection(
+                          baseOffset: 0,
+                          extentOffset: _boxControllers[i].text.length,
+                        );
+                      },
+                      onChanged: (val) {
+                        final digits = val.replaceAll(RegExp(r'[^0-9]'), '');
+                        if (digits.length > 1) {
+                          // Pasted multiple digits into this box
+                          for (var k = 0; k < widget.length; k++) {
+                            final char = k < digits.length ? digits[k] : '';
+                            _boxControllers[k].text = char;
+                          }
+                          final nextFocus = digits.length < widget.length
+                              ? digits.length
+                              : widget.length - 1;
+                          _focusNodes[nextFocus].requestFocus();
+                          _syncToParent();
+                          return;
+                        }
+
+                        if (digits.isNotEmpty) {
+                          _boxControllers[i].text = digits;
+                          _syncToParent();
+                          if (i < widget.length - 1) {
+                            _focusNodes[i + 1].requestFocus();
+                          }
+                        } else {
+                          _boxControllers[i].clear();
+                          _syncToParent();
+                        }
+                      },
+                      onSubmitted: (_) {
+                        _syncToParent();
+                        if (i < widget.length - 1) {
+                          _focusNodes[i + 1].requestFocus();
+                        }
+                      },
+                    );
+                  },
+                );
+              },
+            ),
           ),
-        ),
-      ],
+        );
+      }),
     );
   }
 }

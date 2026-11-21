@@ -52,10 +52,11 @@ class CastingDetailScreen extends ConsumerWidget {
       appliedAt: appliedAt,
     );
 
-    final canRoleApply = CastingRoleMatcher.canUserApply(
+    final canRoleApply = !isMyCall && CastingRoleMatcher.canUserApply(
       userRolesString: roleLower,
       call: activeCall,
       isProductionHouse: isProductionHouse,
+      currentUserId: userPersona.id,
     );
 
     return Scaffold(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:you_too_art/core/utils/role_formatter.dart';
 import 'package:you_too_art/core/widgets/app_avatar.dart';
 import 'package:you_too_art/features/auth/providers/auth_provider.dart';
 
@@ -60,7 +61,7 @@ class _TagPeopleSheetState extends ConsumerState<TagPeopleSheet> {
                   ? '${u.firstName} ${u.lastName}'.trim()
                   : u.email.split('@').first);
           final roleStr = u.role.isNotEmpty && u.role != 'unset'
-              ? u.role.replaceAll('_', ' ').toUpperCase()
+              ? RoleFormatter.format(u.role).toUpperCase()
               : 'CREATIVE ARTIST';
           return {
             'id': u.id,

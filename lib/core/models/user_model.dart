@@ -10,6 +10,7 @@ class UserModel {
   final String role;
   final String? location;
   final bool isAdmin;
+  final bool isVerified;
   final String? incorporationNumber;
   final int? establishedYear;
   final String? address;
@@ -28,6 +29,7 @@ class UserModel {
     this.role = 'unset',
     this.location,
     this.isAdmin = false,
+    this.isVerified = false,
     this.incorporationNumber,
     this.establishedYear,
     this.address,
@@ -51,6 +53,7 @@ class UserModel {
       role: parseString(json['role'], defaultValue: 'unset'),
       location: json['location'] as String?,
       isAdmin: parseBool(json['is_admin'] ?? json['isAdmin']),
+      isVerified: parseBool(json['is_verified'] ?? json['isVerified'] ?? json['raw_user_meta_data']?['is_verified']),
       incorporationNumber: json['incorporation_number'] as String?,
       establishedYear: json['established_year'] as int?,
       address: json['address'] as String?,
@@ -73,6 +76,7 @@ class UserModel {
       'role': role,
       'location': location,
       'is_admin': isAdmin,
+      'is_verified': isVerified,
       'incorporation_number': incorporationNumber,
       'established_year': establishedYear,
       'address': address,
@@ -93,6 +97,7 @@ class UserModel {
     String? role,
     String? location,
     bool? isAdmin,
+    bool? isVerified,
     String? incorporationNumber,
     int? establishedYear,
     String? address,
@@ -111,6 +116,7 @@ class UserModel {
       role: role ?? this.role,
       location: location ?? this.location,
       isAdmin: isAdmin ?? this.isAdmin,
+      isVerified: isVerified ?? this.isVerified,
       incorporationNumber: incorporationNumber ?? this.incorporationNumber,
       establishedYear: establishedYear ?? this.establishedYear,
       address: address ?? this.address,
