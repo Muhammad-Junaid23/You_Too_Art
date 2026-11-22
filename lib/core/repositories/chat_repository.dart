@@ -164,6 +164,34 @@ class ChatRepository {
 
         // Listen to Supabase Realtime only if table is available and uid is valid UUID
         if (_isSupabaseTableAvailable != false && isValidUuid(uid)) {
+          // Perform an immediate initial REST fetch so chats display instantly on startup
+          Future.microtask(() async {
+            try {
+              final rows = await _conversations
+                  .select()
+                  .or('participant_a.eq.$uid,participant_b.eq.$uid')
+                  .order('last_message_at', ascending: false);
+              final idsToPreload = <String>[];
+              for (final row in rows) {
+                final id = row['id'].toString();
+                if (row['participant_a'] == uid) {
+                  cacheA[id] = row;
+                } else {
+                  cacheB[id] = row;
+                }
+                _LocalChatStore.instance.registerConversation(row);
+                idsToPreload.add(id);
+              }
+              emitMerged();
+              if (idsToPreload.isNotEmpty) {
+                await _preloadMessagesFor(idsToPreload);
+                emitMerged();
+              }
+            } catch (e) {
+              _recordSupabaseError(e);
+            }
+          });
+
           try {
             subA = _conversations
                 .stream(primaryKey: ['id'])
@@ -173,8 +201,12 @@ class ChatRepository {
                     _isSupabaseTableAvailable = true;
                     cacheA.clear();
                     for (final row in rows) {
-                      cacheA[row['id'].toString()] = row;
+                      final id = row['id'].toString();
+                      cacheA[id] = row;
+                      _LocalChatStore.instance.registerConversation(row);
                     }
+                    _preloadMessagesFor(
+                        rows.map((r) => r['id'].toString()).toList());
                     emitMerged();
                   },
                   onError: (e) {
@@ -192,8 +224,12 @@ class ChatRepository {
                     _isSupabaseTableAvailable = true;
                     cacheB.clear();
                     for (final row in rows) {
-                      cacheB[row['id'].toString()] = row;
+                      final id = row['id'].toString();
+                      cacheB[id] = row;
+                      _LocalChatStore.instance.registerConversation(row);
                     }
+                    _preloadMessagesFor(
+                        rows.map((r) => r['id'].toString()).toList());
                     emitMerged();
                   },
                   onError: (e) {
@@ -215,6 +251,29 @@ class ChatRepository {
     );
 
     return controller.stream;
+  }
+
+  Future<void> _preloadMessagesFor(List<String> convIds) async {
+    final validIds = convIds.where(isValidUuid).toList();
+    if (validIds.isEmpty || _isSupabaseTableAvailable == false) return;
+    try {
+      final rows = await _messages
+          .select()
+          .inFilter('conversation_id', validIds)
+          .order('created_at');
+      final grouped = <String, List<Map<String, dynamic>>>{};
+      for (final r in rows) {
+        final cid = r['conversation_id']?.toString() ?? '';
+        if (cid.isNotEmpty) {
+          grouped.putIfAbsent(cid, () => []).add(r);
+        }
+      }
+      for (final entry in grouped.entries) {
+        _LocalChatStore.instance.setSupabaseMessages(entry.key, entry.value);
+      }
+    } catch (e) {
+      _recordSupabaseError(e);
+    }
   }
 
   /// Real-time stream of messages in a given [conversationId] for [userId].
@@ -579,10 +638,11 @@ class _LocalChatStore {
         }
       }
 
-      // Strictly purge any conversations that have zero messages
+      // Strictly purge any draft conversations that have zero messages and no last_message
       _conversations.removeWhere((id, conv) {
         final msgs = _messages[id];
-        return msgs == null || msgs.isEmpty;
+        final lastMsg = (conv['last_message'] as String?)?.trim() ?? '';
+        return (msgs == null || msgs.isEmpty) && lastMsg.isEmpty;
       });
       await prefs.setString(_localConvsKey, jsonEncode(_conversations));
 
@@ -800,8 +860,9 @@ class _LocalChatStore {
       if (isDeletedForUser(entry.key, uid)) continue;
       final c = entry.value;
       final msgs = getMessages(entry.key, userId: uid);
+      final lastMsg = (c['last_message'] as String?)?.trim() ?? '';
       // Only list active conversations with messages
-      if (msgs.isEmpty) continue;
+      if (msgs.isEmpty && lastMsg.isEmpty) continue;
 
       final pa = c['participant_a'] as String? ?? '';
       final pb = c['participant_b'] as String? ?? '';
