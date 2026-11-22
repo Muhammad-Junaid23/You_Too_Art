@@ -27,9 +27,9 @@ class _NewChatModalState extends ConsumerState<NewChatModal> {
   @override
   Widget build(BuildContext context) {
     final chatState = ref.watch(chatListProvider);
-    final connectedTalents = chatState.connectedTalents;
+    final availableTalents = chatState.uncontactedConnectedTalents;
 
-    final filtered = connectedTalents.where((t) {
+    final filtered = availableTalents.where((t) {
       if (_query.trim().isEmpty) return true;
       final q = _query.trim().toLowerCase();
       return t.name.toLowerCase().contains(q) ||
@@ -125,19 +125,21 @@ class _NewChatModalState extends ConsumerState<NewChatModal> {
 
           // Body
           Expanded(
-            child: connectedTalents.isEmpty
+            child: chatState.connectedTalents.isEmpty
                 ? _buildEmptyNoConnections(context)
-                : filtered.isEmpty
-                    ? const Center(
-                        child: Text(
-                          'No connected artists found matching your search.',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Color(0xFF6B7280),
-                          ),
-                        ),
-                      )
-                    : ListView.separated(
+                : availableTalents.isEmpty
+                    ? _buildAllChattingEmpty(context)
+                    : filtered.isEmpty
+                        ? const Center(
+                            child: Text(
+                              'No connected artists found matching your search.',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Color(0xFF6B7280),
+                              ),
+                            ),
+                          )
+                        : ListView.separated(
                         padding: const EdgeInsets.symmetric(vertical: 8),
                         itemCount: filtered.length,
                         separatorBuilder: (_, index) => const Divider(
@@ -263,6 +265,51 @@ class _NewChatModalState extends ConsumerState<NewChatModal> {
               child: const Text(
                 'Explore Artists',
                 style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAllChattingEmpty(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: const BoxDecoration(
+                color: Color(0xFFF3F4F6),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.chat_bubble_outline_rounded,
+                size: 30,
+                color: Color(0xFF9CA3AF),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'No New Connections to Message',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: Colors.black,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'You already have active chats with all your connected artists. Check your chat list to continue your conversations!',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13.5,
+                color: Color(0xFF6B7280),
+                height: 1.4,
               ),
             ),
           ],

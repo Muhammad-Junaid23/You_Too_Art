@@ -7,7 +7,6 @@ import 'package:you_too_art/core/providers/user_persona_provider.dart';
 import 'package:you_too_art/core/repositories/chat_repository.dart';
 import 'package:you_too_art/core/repositories/connection_repository.dart';
 import 'package:you_too_art/core/services/app_persistence_service.dart';
-import 'package:you_too_art/core/utils/role_formatter.dart';
 import 'package:you_too_art/features/chats/models/chat_message_model.dart';
 import 'package:you_too_art/features/chats/models/conversation_model.dart';
 import 'package:you_too_art/features/talent/models/talent_model.dart';
@@ -38,6 +37,25 @@ class ChatListState {
     return activeConvs.where((c) {
       return c.peerName.toLowerCase().contains(query) ||
           c.lastMessage.toLowerCase().contains(query);
+    }).toList();
+  }
+
+  /// Connected talents who do NOT already have an active conversation with the current user.
+  List<TalentModel> get uncontactedConnectedTalents {
+    final activeConvs = conversations
+        .where((c) => c.lastMessage.trim().isNotEmpty)
+        .toList();
+    return connectedTalents.where((t) {
+      final alreadyChatting = activeConvs.any((c) {
+        if (c.peerId == t.id || c.peerTalent?.id == t.id) return true;
+        if (UserPersonaNotifier.isSamePersona(c.peerId, t.id)) return true;
+        if (c.peerTalent?.id != null &&
+            UserPersonaNotifier.isSamePersona(c.peerTalent!.id, t.id)) {
+          return true;
+        }
+        return false;
+      });
+      return !alreadyChatting;
     }).toList();
   }
 
@@ -173,24 +191,39 @@ class ChatListNotifier extends Notifier<ChatListState> {
           // Compute dynamic unread count and read status for active persona
           final convId = row['id'] as String? ?? '';
           final msgs = _chatRepo.getMessages(convId, userId: activeUserId);
-          if (msgs.isEmpty) {
-            // Never display empty or draft conversations without messages in the chat list
+          final rowLastMsg = (row['last_message'] as String? ?? '').trim();
+          if (msgs.isEmpty && rowLastMsg.isEmpty) {
+            // Only skip truly empty draft conversations that have no messages
             continue;
           }
-          final lastMsg = msgs.last;
+
+          final lastMsg = msgs.isNotEmpty ? msgs.last : null;
+          final lastMsgText = lastMsg != null
+              ? (lastMsg['text'] as String? ?? '')
+              : rowLastMsg;
+          final lastMsgTime = lastMsg != null
+              ? (lastMsg['created_at'] as String? ?? '')
+              : (row['last_message_at'] as String? ?? '');
 
           final unreadCount = _chatRepo.getUnreadCount(
             conversationId: convId,
             userId: activeUserId,
           );
-          final isMine =
-              _isActorMatch(lastMsg['sender_id']?.toString() ?? '', activeUserId);
-          final isRead = (lastMsg['read_at'] != null &&
-              lastMsg['read_at'].toString().isNotEmpty);
+          final isMine = lastMsg != null
+              ? _isActorMatch(lastMsg['sender_id']?.toString() ?? '', activeUserId)
+              : false;
+          final isRead = lastMsg != null
+              ? (lastMsg['read_at'] != null &&
+                  lastMsg['read_at'].toString().isNotEmpty)
+              : true;
+
+          final effectiveRow = Map<String, dynamic>.from(row);
+          if (lastMsgText.isNotEmpty) effectiveRow['last_message'] = lastMsgText;
+          if (lastMsgTime.isNotEmpty) effectiveRow['last_message_at'] = lastMsgTime;
 
           models.add(
             ConversationModel.fromRow(
-              row: row,
+              row: effectiveRow,
               currentUserId: activeUserId,
               peerTalent: peerTalent,
               unreadCount: unreadCount,
@@ -224,6 +257,7 @@ class ChatListNotifier extends Notifier<ChatListState> {
       final acceptedRows =
           await _connectionRepo.fetchAcceptedConnections(activeUserId);
       final connectedList = <TalentModel>[];
+      final missingPeerIds = <String>{};
 
       for (final row in acceptedRows) {
         final partA = row['user_id'] as String? ?? '';
@@ -236,32 +270,96 @@ class ChatListNotifier extends Notifier<ChatListState> {
           continue;
         }
 
-        TalentModel? talent = TalentDirectory.findById(peerId);
-        if (talent == null) {
-          final personaMatch = UserPersonaNotifier.allPersonas
-              .where((p) => p.id == peerId || _isActorMatch(p.id, peerId))
-              .firstOrNull;
-          if (personaMatch != null) {
-            final rolesStr = personaMatch.isProductionHouse
-                ? 'Production House'
-                : (RoleFormatter.format(personaMatch.role).isNotEmpty
-                    ? RoleFormatter.format(personaMatch.role)
-                    : 'Creative Artist');
-            talent = TalentModel(
-              id: personaMatch.id,
-              name: personaMatch.name,
-              roles: rolesStr,
-              avatarUrl: personaMatch.avatarUrl,
-              isProductionHouse: personaMatch.isProductionHouse,
-              connectionStatus: ConnectionStatus.connected,
-            );
+        TalentModel? talent;
+        if (UserPersonaNotifier.hasPersona(peerId)) {
+          final p = UserPersonaNotifier.getPersonaById(peerId);
+          talent = TalentModel.fromPersona(p);
+        } else if (UserPersonaNotifier.isActorId(peerId)) {
+          final p = UserPersonaNotifier.getActorPersona();
+          talent = TalentModel.fromPersona(p);
+        } else {
+          final direct = TalentDirectory.findById(peerId);
+          if (direct != null && direct.name != 'Artist' && direct.name != 'Creative Artist') {
+            talent = direct;
           }
         }
 
-        if (talent != null) {
+        if (talent == null || talent.name == 'Artist' || talent.name == 'Creative Artist') {
+          try {
+            final fromTalentList = ref.read(talentListProvider).findById(peerId);
+            if (fromTalentList != null && fromTalentList.name != 'Artist') {
+              talent = fromTalentList;
+            }
+          } catch (_) {}
+        }
+
+        if (talent == null || talent.name == 'Artist' || talent.name == 'Creative Artist') {
+          if (ConnectionRepository.isValidUuid(peerId)) {
+            missingPeerIds.add(peerId);
+          } else {
+            final fallback = talent ??
+                TalentModel(
+                  id: peerId,
+                  name: 'Creative Artist',
+                  roles: 'Artist',
+                  connectionStatus: ConnectionStatus.connected,
+                );
+            if (!connectedList.any((t) => t.id == fallback.id || _isActorMatch(t.id, fallback.id))) {
+              connectedList.add(fallback);
+            }
+          }
+        } else {
           final resolved = talent;
           if (!connectedList.any((t) => t.id == resolved.id || _isActorMatch(t.id, resolved.id))) {
             connectedList.add(resolved.copyWith(connectionStatus: ConnectionStatus.connected));
+          }
+        }
+      }
+
+      // Batch resolve any remaining peer profiles from Supabase users table
+      if (missingPeerIds.isNotEmpty) {
+        try {
+          final client = ref.read(supabaseClientProvider);
+          final rows = await client
+              .from('users')
+              .select()
+              .inFilter('id', missingPeerIds.toList());
+          for (final uRow in rows) {
+            final u = UserModel.fromJson(uRow);
+            final persona = UserPersona(
+              id: u.id,
+              name: u.name.isNotEmpty
+                  ? u.name
+                  : (u.firstName.isNotEmpty
+                      ? '${u.firstName} ${u.lastName}'.trim()
+                      : 'Artist'),
+              email: u.email,
+              role: u.role != 'unset' ? u.role : 'Artist',
+              avatarUrl: u.profileImagePath ?? '',
+              bio: u.bio ?? '',
+              location: u.location ?? '',
+            );
+            AppPersistenceService.instance.savePersona(persona);
+            final t = TalentModel.fromPersona(persona).copyWith(
+              connectionStatus: ConnectionStatus.connected,
+            );
+            if (!connectedList.any((existing) => existing.id == t.id || _isActorMatch(existing.id, t.id))) {
+              connectedList.add(t);
+            }
+            missingPeerIds.remove(u.id);
+          }
+        } catch (_) {}
+
+        // Fallback for any peer IDs not found in users table
+        for (final remainingId in missingPeerIds) {
+          final fallback = TalentModel(
+            id: remainingId,
+            name: 'Connected Artist',
+            roles: 'Artist',
+            connectionStatus: ConnectionStatus.connected,
+          );
+          if (!connectedList.any((existing) => existing.id == fallback.id || _isActorMatch(existing.id, fallback.id))) {
+            connectedList.add(fallback);
           }
         }
       }
