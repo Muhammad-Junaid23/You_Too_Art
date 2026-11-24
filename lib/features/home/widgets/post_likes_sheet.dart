@@ -35,69 +35,6 @@ class _PostLikesSheetState extends ConsumerState<PostLikesSheet> {
   bool _isLoading = true;
   List<Map<String, dynamic>> _likers = [];
 
-  static const List<Map<String, String>> _sampleLikers = [
-    {
-      'name': 'Alexander Cole',
-      'subtitle': 'Connection',
-      'avatar': 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
-    },
-    {
-      'name': 'Yasir Hafeez',
-      'subtitle': 'Connection',
-      'avatar': 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150',
-    },
-    {
-      'name': 'Qasim Muneer',
-      'subtitle': 'Actor',
-      'avatar': 'https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=150',
-    },
-    {
-      'name': 'Shabir Jan',
-      'subtitle': 'Veteran Actor',
-      'avatar': 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150',
-    },
-    {
-      'name': 'Kashif Saeed',
-      'subtitle': 'Director',
-      'avatar': 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150',
-    },
-    {
-      'name': 'Muhammad Saeed',
-      'subtitle': 'Producer',
-      'avatar': 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150',
-    },
-    {
-      'name': 'Usman Nazer',
-      'subtitle': 'Cinematographer',
-      'avatar': 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150',
-    },
-    {
-      'name': 'Irfan Naeem',
-      'subtitle': 'Model',
-      'avatar': 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=150',
-    },
-    {
-      'name': 'Touseef Ahmed',
-      'subtitle': 'Writer',
-      'avatar': 'https://images.unsplash.com/photo-1463453091185-61582044d556?w=150',
-    },
-    {
-      'name': 'Abdurrehman',
-      'subtitle': 'Editor',
-      'avatar': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
-    },
-    {
-      'name': 'Salman Khan Yousafzai',
-      'subtitle': 'Actor',
-      'avatar': 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-    },
-    {
-      'name': 'Tariq Iqbal',
-      'subtitle': 'Voice Artist',
-      'avatar': 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=150',
-    },
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -105,9 +42,6 @@ class _PostLikesSheetState extends ConsumerState<PostLikesSheet> {
   }
 
   Future<void> _loadLikers() async {
-    final isSamplePost = widget.post.id.startsWith('00000000-') ||
-        widget.post.id.startsWith('sample-');
-
     try {
       final repo = ref.read(postRepositoryProvider);
       final raw = await repo.fetchLikesWithUsers(widget.post.id);
@@ -115,107 +49,113 @@ class _PostLikesSheetState extends ConsumerState<PostLikesSheet> {
       final currentUid = ref.read(currentUidProvider) ??
           ref.read(supabaseClientProvider).auth.currentUser?.id;
 
-      if (raw.isNotEmpty) {
-        final loaded = raw.map((item) {
-          final userId = item['user_id']?.toString() ?? '';
-          final user = item['user'] as Map<String, dynamic>?;
-
-          String likerName = 'User';
-          String? likerAvatar;
-          String likerSubtitle = 'Artist';
-
-          if (user != null) {
-            final fName = user['first_name'] as String? ?? '';
-            final lName = user['last_name'] as String? ?? '';
-            final full = '$fName $lName'.trim();
-            likerName = full.isNotEmpty
-                ? full
-                : (user['name'] as String? ?? 'User');
-            likerAvatar = user['profile_image_path'] as String?;
-            final rawRole = user['role'] as String? ?? '';
-            if (rawRole.isNotEmpty) {
-              likerSubtitle = RoleFormatter.format(rawRole);
-            }
+      // If any liker lacks joined user details, batch fetch from users table
+      final missingUserIds = raw
+          .where((item) => item['user'] == null && item['user_id'] != null)
+          .map((item) => item['user_id'].toString())
+          .toSet()
+          .toList();
+      final Map<String, Map<String, dynamic>> fetchedUsers = {};
+      if (missingUserIds.isNotEmpty) {
+        try {
+          final usersData = await ref
+              .read(supabaseClientProvider)
+              .from('users')
+              .select('id, name, first_name, last_name, profile_image_path, role')
+              .filter('id', 'in', missingUserIds);
+          for (final u in (usersData as List)) {
+            final map = Map<String, dynamic>.from(u as Map);
+            final uid = map['id']?.toString() ?? '';
+            if (uid.isNotEmpty) fetchedUsers[uid] = map;
           }
-
-          // Fallback to TalentDirectory or Personas if name is still 'User'
-          if (likerName == 'User' && userId.isNotEmpty) {
-            final talent = TalentDirectory.findById(userId);
-            if (talent != null) {
-              likerName = talent.name;
-              likerAvatar ??= talent.avatarUrl;
-              likerSubtitle = RoleFormatter.format(talent.roles);
-            } else {
-              final persona = UserPersonaNotifier.allPersonas
-                  .where((p) => p.id == userId)
-                  .firstOrNull;
-              if (persona != null) {
-                likerName = persona.name;
-                likerAvatar ??= persona.avatarUrl;
-                likerSubtitle = RoleFormatter.format(persona.role);
-              }
-            }
-          }
-
-          if (currentUid != null && userId == currentUid) {
-            likerSubtitle = 'You';
-          }
-
-          return {
-            'id': userId,
-            'name': likerName,
-            'subtitle': likerSubtitle,
-            'avatar': likerAvatar ?? '',
-          };
-        }).toList();
-
-        // If the post is currently liked by the active user, ensure they are in the list
-        if (widget.post.isLiked && currentUid != null) {
-          final exists = loaded.any((l) => l['id'] == currentUid);
-          if (!exists) {
-            final activeTalent = TalentDirectory.findById(currentUid);
-            final activePersona = UserPersonaNotifier.allPersonas
-                .where((p) => p.id == currentUid)
-                .firstOrNull;
-            final myName =
-                activeTalent?.name ?? activePersona?.name ?? 'You';
-            final myAvatar =
-                activeTalent?.avatarUrl ?? activePersona?.avatarUrl ?? '';
-            loaded.insert(0, {
-              'id': currentUid,
-              'name': myName,
-              'subtitle': 'You',
-              'avatar': myAvatar,
-            });
-          }
-        }
-
-        if (mounted) {
-          setState(() {
-            _likers = loaded;
-            _isLoading = false;
-          });
-          return;
+        } catch (e) {
+          if (kDebugMode) debugPrint('Error batch-fetching liker profiles: $e');
         }
       }
-    } catch (e) {
-      if (kDebugMode) debugPrint('Error loading post likers: $e');
-    }
 
-    // Fallback: If sample post with no DB rows, slice sample likers to post.likeCount
-    if (isSamplePost && widget.post.likeCount > 0) {
-      final sampleCount = widget.post.likeCount.clamp(0, _sampleLikers.length);
-      final sliced = _sampleLikers
-          .take(sampleCount)
-          .map((l) => Map<String, dynamic>.from(l))
-          .toList();
+      final loaded = raw.map((item) {
+        final userId = item['user_id']?.toString() ?? '';
+        final user = (item['user'] as Map<String, dynamic>?) ?? fetchedUsers[userId];
+
+        String likerName = 'User';
+        String? likerAvatar;
+        String likerSubtitle = 'Artist';
+
+        if (user != null) {
+          final fName = user['first_name'] as String? ?? '';
+          final lName = user['last_name'] as String? ?? '';
+          final full = '$fName $lName'.trim();
+          likerName = full.isNotEmpty
+              ? full
+              : (user['name'] as String? ?? 'User');
+          likerAvatar = user['profile_image_path'] as String?;
+          final rawRole = user['role'] as String? ?? '';
+          if (rawRole.isNotEmpty) {
+            likerSubtitle = RoleFormatter.format(rawRole);
+          }
+        }
+
+        // Fallback to TalentDirectory or Personas if name is still 'User'
+        if (likerName == 'User' && userId.isNotEmpty) {
+          final talent = TalentDirectory.findById(userId);
+          if (talent != null) {
+            likerName = talent.name;
+            likerAvatar ??= talent.avatarUrl;
+            likerSubtitle = RoleFormatter.format(talent.roles);
+          } else {
+            final persona = UserPersonaNotifier.allPersonas
+                .where((p) => p.id == userId)
+                .firstOrNull;
+            if (persona != null) {
+              likerName = persona.name;
+              likerAvatar ??= persona.avatarUrl;
+              likerSubtitle = RoleFormatter.format(persona.role);
+            }
+          }
+        }
+
+        if (currentUid != null && userId == currentUid) {
+          likerSubtitle = 'You';
+        }
+
+        return {
+          'id': userId,
+          'name': likerName,
+          'subtitle': likerSubtitle,
+          'avatar': likerAvatar ?? '',
+        };
+      }).toList();
+
+      // If the post is currently liked by the active user, ensure they are in the list
+      if (widget.post.isLiked && currentUid != null) {
+        final exists = loaded.any((l) => l['id'] == currentUid);
+        if (!exists) {
+          final activeTalent = TalentDirectory.findById(currentUid);
+          final activePersona = UserPersonaNotifier.allPersonas
+              .where((p) => p.id == currentUid)
+              .firstOrNull;
+          final myName =
+              activeTalent?.name ?? activePersona?.name ?? 'You';
+          final myAvatar =
+              activeTalent?.avatarUrl ?? activePersona?.avatarUrl ?? '';
+          loaded.insert(0, {
+            'id': currentUid,
+            'name': myName,
+            'subtitle': 'You',
+            'avatar': myAvatar,
+          });
+        }
+      }
+
       if (mounted) {
         setState(() {
-          _likers = sliced;
+          _likers = loaded;
           _isLoading = false;
         });
         return;
       }
+    } catch (e) {
+      if (kDebugMode) debugPrint('Error loading post likers: $e');
     }
 
     if (mounted) {

@@ -5,7 +5,6 @@ import 'package:you_too_art/core/constants/geo_data.dart';
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
 import 'package:you_too_art/core/services/app_persistence_service.dart';
 import 'package:you_too_art/features/auth/providers/auth_provider.dart';
-import 'package:you_too_art/features/profile/providers/user_portfolio_provider.dart';
 
 /// State for the Complete Profile (Individual) form.
 class CompleteProfileState {
@@ -168,14 +167,6 @@ class CompleteProfileNotifier extends Notifier<CompleteProfileState> {
       AppPersistenceService.instance.setActivePersonaId(uid);
       await ref.read(userPersonaProvider.notifier).updateProfile(updatedActor);
 
-      // Ensure local portfolio does not retain dummy Gilgit-Baltistan seed
-      final currentPort = AppPersistenceService.instance.getPortfolio(uid);
-      final hasLegacyDummy = currentPort.videos.any((v) => v.title.contains('Dramatic Monologue') || v.mediaUrl.contains('cloudinary')) ||
-          currentPort.photos.any((p) => p.title.contains('Dramatic Portrait') || p.mediaUrl.contains('cloudinary'));
-      if (hasLegacyDummy) {
-        const emptyPort = UserPortfolioState(videos: [], photos: []);
-        AppPersistenceService.instance.savePortfolio(uid, emptyPort);
-      }
 
       if (user != null) {
         await AppPersistenceService.instance.syncWithSupabaseUser(user);

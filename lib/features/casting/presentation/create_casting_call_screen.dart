@@ -386,7 +386,8 @@ class _CreateCastingCallScreenState
                         keyboardType: TextInputType.phone,
                         inputFormatters: [
                           FilteringTextInputFormatter.allow(RegExp(r'[\d\s+\-()]')),
-                          LengthLimitingTextInputFormatter(18),
+                          LengthLimitingTextInputFormatter(16),
+                          const _MaxDigitsTextInputFormatter(15),
                         ],
                         decoration: _inputDecoration('Enter Contact Number (e.g. +92 300 1234567)'),
                         validator: (val) {
@@ -399,7 +400,7 @@ class _CreateCastingCallScreenState
                             if (digitsOnly.length > 15) {
                               return 'Contact number cannot exceed 15 digits';
                             }
-                            if (!RegExp(r'^\+?[\d\s\-()]{7,18}$').hasMatch(trimmed)) {
+                            if (!RegExp(r'^\+?[\d\s\-()]{7,16}$').hasMatch(trimmed)) {
                               return 'Please enter a valid phone number';
                             }
                           }
@@ -646,5 +647,22 @@ class _CreateCastingCallScreenState
       filled: true,
       fillColor: Colors.white,
     );
+  }
+}
+
+class _MaxDigitsTextInputFormatter extends TextInputFormatter {
+  final int maxDigits;
+  const _MaxDigitsTextInputFormatter(this.maxDigits);
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+    if (digits.length > maxDigits) {
+      return oldValue;
+    }
+    return newValue;
   }
 }

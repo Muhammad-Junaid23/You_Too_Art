@@ -118,6 +118,9 @@ class UserPersonaNotifier extends Notifier<UserPersona> {
   static bool isProductionId(String id) =>
       AppPersistenceService.instance.isProductionId(id);
 
+  static bool isCinematographerId(String id) =>
+      AppPersistenceService.instance.isCinematographerId(id);
+
   static bool isSamePersona(String id1, String id2) =>
       AppPersistenceService.instance.isSamePersona(id1, id2);
 

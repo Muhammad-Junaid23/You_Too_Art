@@ -8,6 +8,7 @@ import 'package:you_too_art/core/models/user_model.dart';
 import 'package:you_too_art/core/providers/supabase_providers.dart'
     hide userPortfolioProvider;
 import 'package:you_too_art/core/providers/user_persona_provider.dart';
+import 'package:you_too_art/core/repositories/chat_repository.dart';
 import 'package:you_too_art/core/repositories/connection_repository.dart';
 import 'package:you_too_art/core/services/app_persistence_service.dart';
 import 'package:you_too_art/core/utils/role_formatter.dart';
@@ -91,29 +92,53 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
     try {
       final client = Supabase.instance.client;
       final targetId = widget.initialTalent.id;
-      final pRows = await client
-          .from('portfolio_items')
-          .select()
-          .eq('user_id', targetId)
-          .order('created_at', ascending: true);
+      final targetIds = <String>{
+        targetId,
+        if (UserPersonaNotifier.isActorId(targetId)) ...[
+          AppPersistenceService.actorDefaultId,
+          AppPersistenceService.realActorId,
+          '00000000-0000-0000-0000-000000000001',
+        ],
+        if (UserPersonaNotifier.isDirectorId(targetId)) ...[
+          AppPersistenceService.alexanderId,
+          AppPersistenceService.realDirectorId,
+          'a1111111-1111-1111-1111-111111111111',
+        ],
+        if (UserPersonaNotifier.isProductionId(targetId)) ...[
+          AppPersistenceService.filmfareId,
+          AppPersistenceService.realProductionId,
+          'b2222222-2222-2222-2222-222222222222',
+        ],
+        if (UserPersonaNotifier.isCinematographerId(targetId)) ...[
+          AppPersistenceService.jeremiahId,
+          'c3333333-3333-3333-3333-333333333333',
+        ],
+      };
+
+      var query = client.from('portfolio_items').select();
+      if (targetIds.length == 1) {
+        query = query.eq('user_id', targetId);
+      } else {
+        query = query.inFilter('user_id', targetIds.toList());
+      }
+      final pRows = await query.order('created_at', ascending: true);
       if (pRows.isNotEmpty) {
         final videos = <WorkMediaItem>[];
         final photos = <WorkMediaItem>[];
         for (final row in pRows) {
           final item = WorkMediaItem.fromJson(row);
-          if (item.title.contains('Dramatic Monologue') ||
-              item.title.contains('Dramatic Portrait') ||
-              item.mediaUrl.contains('cloudinary')) {
-            continue;
-          }
           if (item.isVideo) {
             videos.add(item);
           } else {
             photos.add(item);
           }
         }
-        final cloudPort = UserPortfolioState(videos: videos, photos: photos);
-        AppPersistenceService.instance.setCachedPortfolio(targetId, cloudPort);
+        if (videos.isNotEmpty || photos.isNotEmpty) {
+          final cloudPort = UserPortfolioState(videos: videos, photos: photos);
+          for (final tid in targetIds) {
+            AppPersistenceService.instance.setCachedPortfolio(tid, cloudPort);
+          }
+        }
       }
     } catch (_) {}
 
@@ -306,18 +331,72 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
     final isActor = UserPersonaNotifier.isActorId(widget.initialTalent.id);
     final targetPersona = isOwnProfile
         ? activePersona
-        : (isActor
-            ? UserPersonaNotifier.getActorPersona()
-            : (UserPersonaNotifier.hasPersona(widget.initialTalent.id)
-                ? UserPersonaNotifier.getPersonaById(widget.initialTalent.id)
-                : null));
+        : (UserPersonaNotifier.hasPersona(widget.initialTalent.id)
+            ? UserPersonaNotifier.getPersonaById(widget.initialTalent.id)
+            : null);
 
     final talentState = ref.watch(talentListProvider);
     final fromState = talentState.findById(widget.initialTalent.id);
 
-    final portfolio = isOwnProfile
+    final isProd = (isOwnProfile && currentUser != null)
+        ? (currentUser.role.toLowerCase().contains('production') ||
+            currentUser.role.toLowerCase().contains('studio') ||
+            (currentUser.incorporationNumber != null &&
+                currentUser.incorporationNumber!.isNotEmpty))
+        : (otherUser != null
+            ? (otherUser.role.toLowerCase().contains('production') ||
+                otherUser.role.toLowerCase().contains('studio') ||
+                (otherUser.incorporationNumber != null &&
+                    otherUser.incorporationNumber!.isNotEmpty))
+            : (widget.initialTalent.isProductionHouse ||
+                widget.initialTalent.roles.toLowerCase().contains('production') ||
+                widget.initialTalent.roles.toLowerCase().contains('studio') ||
+                (targetPersona?.isProductionHouse ?? false)));
+
+    UserPortfolioState portfolio = isOwnProfile
         ? ref.watch(userWorkPortfolioProvider)
-        : UserPortfolioNotifier.getPortfolioFor(targetPersona?.id ?? widget.initialTalent.id);
+        : AppPersistenceService.instance.getPortfolio(widget.initialTalent.id);
+
+    if (!isOwnProfile && portfolio.videos.isEmpty && portfolio.photos.isEmpty) {
+      if (targetPersona != null && targetPersona.id != widget.initialTalent.id) {
+        final p = AppPersistenceService.instance.getPortfolio(targetPersona.id);
+        if (p.videos.isNotEmpty || p.photos.isNotEmpty) {
+          portfolio = p;
+        }
+      }
+    }
+
+    if (!isOwnProfile && portfolio.videos.isEmpty && portfolio.photos.isEmpty) {
+      final tName = widget.initialTalent.name.toLowerCase();
+      final tRole = widget.initialTalent.roles.toLowerCase();
+      if (isProd || tRole.contains('production') || tRole.contains('studio') || tRole.contains('producer')) {
+        portfolio = AppPersistenceService.defaultProductionPortfolio;
+      } else if (UserPersonaNotifier.isDirectorId(widget.initialTalent.id) || tRole.contains('director')) {
+        portfolio = AppPersistenceService.defaultDirectorPortfolio;
+      } else if (UserPersonaNotifier.isCinematographerId(widget.initialTalent.id) || tRole.contains('cinematograph') || tRole.contains('camera')) {
+        portfolio = AppPersistenceService.defaultCinematographerPortfolio;
+      } else if (tName.contains('shabir')) {
+        portfolio = AppPersistenceService.defaultActor2Portfolio;
+      } else if (isActor || tRole.contains('actor') || tName.contains('qasim')) {
+        portfolio = AppPersistenceService.defaultActorPortfolio;
+      } else {
+        portfolio = AppPersistenceService.defaultActorPortfolio;
+      }
+    }
+
+    if (!isOwnProfile && portfolio.photos.isEmpty && widget.initialTalent.workPortfolio.isNotEmpty) {
+      final synthesizedPhotos = widget.initialTalent.workPortfolio
+          .map((url) => WorkMediaItem(
+                id: ChatRepository.generateUuid(),
+                title: 'Portfolio Still',
+                mediaUrl: url,
+                url: url,
+                isVideo: false,
+                lastUpdated: 'Recently',
+              ))
+          .toList();
+      portfolio = portfolio.copyWith(photos: synthesizedPhotos);
+    }
 
     final allPosts = ref.watch(homeFeedProvider).value ?? [];
     final userFeedPosts = allPosts
@@ -372,20 +451,6 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                           connectsCount: dynamicConnectsCount,
                         ))));
 
-    final isProd = (isOwnProfile && currentUser != null)
-        ? (currentUser.role.toLowerCase().contains('production') ||
-            currentUser.role.toLowerCase().contains('studio') ||
-            (currentUser.incorporationNumber != null &&
-                currentUser.incorporationNumber!.isNotEmpty))
-        : (otherUser != null
-            ? (otherUser.role.toLowerCase().contains('production') ||
-                otherUser.role.toLowerCase().contains('studio') ||
-                (otherUser.incorporationNumber != null &&
-                    otherUser.incorporationNumber!.isNotEmpty))
-            : (baseTalent.isProductionHouse ||
-                baseTalent.roles.toLowerCase().contains('production') ||
-                baseTalent.roles.toLowerCase().contains('studio') ||
-                (targetPersona?.isProductionHouse ?? false)));
 
     final effectiveStatus = _currentStatus ?? baseTalent.connectionStatus;
     final effectiveFollowing = _isFollowing ?? baseTalent.isFollowing;
@@ -764,7 +829,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                 targetUser: otherUser,
               ),
             ),
-          ] else if (_selectedTabIndex == 2 && !isProd) ...[
+          ] else if (_selectedTabIndex == 2) ...[
             // My Work Tab Content
             SliverToBoxAdapter(
               child: _buildWorkContent(
@@ -2212,17 +2277,11 @@ class _HorizontalTabHeaderDelegate extends SliverPersistentHeaderDelegate {
     double shrinkOffset,
     bool overlapsContent,
   ) {
-    final tabs = isProduction
-        ? [
-            const _TabItem(icon: Icons.grid_view_outlined, label: 'Activity'),
-            const _TabItem(icon: Icons.person_outline_rounded, label: 'About'),
-          ]
-        : [
-            const _TabItem(icon: Icons.grid_view_outlined, label: 'Activity'),
-            const _TabItem(icon: Icons.person_outline_rounded, label: 'About'),
-            const _TabItem(
-                icon: Icons.video_collection_outlined, label: 'My Work'),
-          ];
+    final tabs = const [
+      _TabItem(icon: Icons.grid_view_outlined, label: 'Activity'),
+      _TabItem(icon: Icons.person_outline_rounded, label: 'About'),
+      _TabItem(icon: Icons.video_collection_outlined, label: 'My Work'),
+    ];
 
     return Container(
       color: Colors.white,

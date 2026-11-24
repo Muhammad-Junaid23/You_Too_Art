@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import 'package:you_too_art/app/config/routes.dart';
 import 'package:you_too_art/app/constants/app_colors.dart';
 import 'package:you_too_art/core/widgets/primary_button.dart';
+import 'package:you_too_art/features/account/presentation/account_sheets.dart';
 import 'package:you_too_art/features/auth/providers/auth_provider.dart';
 
 class VerifyOtpScreen extends ConsumerStatefulWidget {
@@ -286,7 +288,10 @@ class _VerifyOtpScreenState extends ConsumerState<VerifyOtpScreen> {
   }
 }
 
-/// Six individual visual input boxes with full keyboard typing, backspace, and paste support.
+/// Six visual input boxes backed by a stable hidden TextField.
+/// The TextField remains permanently mounted and stable (not recreated on keystrokes)
+/// so Android/iOS IME and keyboard typing, pasting, backspacing, and auto-submit
+/// work flawlessly without dropping input or losing focus.
 class _OtpBoxes extends StatefulWidget {
   final TextEditingController controller;
   final int length;
@@ -305,80 +310,21 @@ class _OtpBoxes extends StatefulWidget {
 }
 
 class _OtpBoxesState extends State<_OtpBoxes> {
-  late final List<TextEditingController> _boxControllers;
-  late final List<FocusNode> _focusNodes;
+  final FocusNode _focusNode = FocusNode();
 
   @override
   void initState() {
     super.initState();
-    _boxControllers = List.generate(widget.length, (i) {
-      final char = i < widget.controller.text.length
-          ? widget.controller.text[i]
-          : '';
-      return TextEditingController(text: char);
-    });
-
-    _focusNodes = List.generate(widget.length, (i) {
-      final fn = FocusNode();
-      fn.onKeyEvent = (node, event) {
-        if (event is KeyDownEvent &&
-            event.logicalKey == LogicalKeyboardKey.backspace) {
-          if (_boxControllers[i].text.isEmpty && i > 0) {
-            _boxControllers[i - 1].clear();
-            _focusNodes[i - 1].requestFocus();
-            _syncToParent();
-            return KeyEventResult.handled;
-          }
-        }
-        return KeyEventResult.ignored;
-      };
-      return fn;
-    });
-
-    widget.controller.addListener(_onParentControllerChanged);
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _focusNodes.isNotEmpty) {
-        _focusNodes[0].requestFocus();
+      if (mounted) {
+        _focusNode.requestFocus();
       }
     });
-  }
-
-  void _onParentControllerChanged() {
-    final currentFull = _boxControllers.map((c) => c.text).join();
-    if (widget.controller.text != currentFull) {
-      final text = widget.controller.text;
-      for (var i = 0; i < widget.length; i++) {
-        final char = i < text.length ? text[i] : '';
-        if (_boxControllers[i].text != char) {
-          _boxControllers[i].text = char;
-        }
-      }
-      if (text.isEmpty && mounted && _focusNodes.isNotEmpty) {
-        _focusNodes[0].requestFocus();
-      }
-    }
-  }
-
-  void _syncToParent() {
-    final code = _boxControllers.map((c) => c.text).join();
-    if (widget.controller.text != code) {
-      widget.controller.text = code;
-    }
-    if (code.length == widget.length) {
-      widget.onCompleted();
-    }
   }
 
   @override
   void dispose() {
-    widget.controller.removeListener(_onParentControllerChanged);
-    for (final c in _boxControllers) {
-      c.dispose();
-    }
-    for (final fn in _focusNodes) {
-      fn.dispose();
-    }
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -387,122 +333,116 @@ class _OtpBoxesState extends State<_OtpBoxes> {
     final colors = AppColors.of(context);
     final text = Theme.of(context).textTheme;
     final isNarrow = MediaQuery.sizeOf(context).width < 340;
+    final boxHeight = isNarrow ? 48.0 : 54.0;
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: List.generate(widget.length, (i) {
-        return Expanded(
-          child: Container(
-            height: isNarrow ? 46 : 52,
-            margin: EdgeInsets.symmetric(horizontal: isNarrow ? 1.5 : 3),
-            decoration: BoxDecoration(
-              color: colors.surface,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: ValueListenableBuilder<TextEditingValue>(
-              valueListenable: _boxControllers[i],
-              builder: (context, value, _) {
-                final isFilled = value.text.isNotEmpty;
-                return ListenableBuilder(
-                  listenable: _focusNodes[i],
-                  builder: (context, _) {
-                    final isFocused = _focusNodes[i].hasFocus;
-                    return TextField(
-                      controller: _boxControllers[i],
-                      focusNode: _focusNodes[i],
-                      readOnly: widget.isVerifying,
-                      textAlign: TextAlign.center,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                        LengthLimitingTextInputFormatter(widget.length),
-                      ],
-                      style: text.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: colors.textPrimary,
-                        fontSize: 18,
-                      ),
-                      cursorColor: colors.primary,
-                      enableInteractiveSelection: true,
-                      decoration: InputDecoration(
-                        counterText: '',
-                        isDense: true,
-                        contentPadding: EdgeInsets.symmetric(
-                          vertical: isNarrow ? 10 : 12,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(
-                            color: isFocused
-                                ? colors.primary
-                                : (isFilled ? colors.primary : colors.border),
-                            width: isFocused ? 1.5 : 1,
-                          ),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(
-                            color: isFocused
-                                ? colors.primary
-                                : (isFilled ? colors.primary : colors.border),
-                            width: isFocused ? 1.5 : 1,
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(
-                            color: colors.primary,
-                            width: 1.5,
-                          ),
-                        ),
-                      ),
-                      onTap: () {
-                        _boxControllers[i].selection = TextSelection(
-                          baseOffset: 0,
-                          extentOffset: _boxControllers[i].text.length,
-                        );
-                      },
-                      onChanged: (val) {
-                        final digits = val.replaceAll(RegExp(r'[^0-9]'), '');
-                        if (digits.length > 1) {
-                          // Pasted multiple digits into this box
-                          for (var k = 0; k < widget.length; k++) {
-                            final char = k < digits.length ? digits[k] : '';
-                            _boxControllers[k].text = char;
-                          }
-                          final nextFocus = digits.length < widget.length
-                              ? digits.length
-                              : widget.length - 1;
-                          _focusNodes[nextFocus].requestFocus();
-                          _syncToParent();
-                          return;
-                        }
-
-                        if (digits.isNotEmpty) {
-                          _boxControllers[i].text = digits;
-                          _syncToParent();
-                          if (i < widget.length - 1) {
-                            _focusNodes[i + 1].requestFocus();
-                          }
-                        } else {
-                          _boxControllers[i].clear();
-                          _syncToParent();
-                        }
-                      },
-                      onSubmitted: (_) {
-                        _syncToParent();
-                        if (i < widget.length - 1) {
-                          _focusNodes[i + 1].requestFocus();
-                        }
-                      },
-                    );
-                  },
-                );
+    return SizedBox(
+      height: boxHeight,
+      width: double.infinity,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // 1. Stable, permanent invisible TextField
+          Opacity(
+            opacity: 0.0,
+            child: TextField(
+              controller: widget.controller,
+              focusNode: _focusNode,
+              readOnly: widget.isVerifying,
+              autofocus: true,
+              keyboardType: TextInputType.number,
+              maxLength: widget.length,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(widget.length),
+              ],
+              decoration: const InputDecoration(
+                counterText: '',
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                contentPadding: EdgeInsets.zero,
+              ),
+              onChanged: (val) {
+                if (val.length == widget.length) {
+                  widget.onCompleted();
+                }
+              },
+              onSubmitted: (_) {
+                if (widget.controller.text.length == widget.length) {
+                  widget.onCompleted();
+                }
               },
             ),
           ),
-        );
-      }),
+
+          // 2. Visual Layer: 6 individual boxes that show the digits
+          // Tapping anywhere on the row reliably requests focus on the TextField
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () {
+                _focusNode.requestFocus();
+                widget.controller.selection = TextSelection.collapsed(
+                  offset: widget.controller.text.length,
+                );
+              },
+              child: ValueListenableBuilder<TextEditingValue>(
+                valueListenable: widget.controller,
+                builder: (context, val, _) {
+                  final code = val.text;
+                  return ListenableBuilder(
+                    listenable: _focusNode,
+                    builder: (context, _) {
+                      final hasFocus = _focusNode.hasFocus;
+                      return Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: List.generate(widget.length, (i) {
+                          final isFilled = i < code.length;
+                          final isCurrent = hasFocus &&
+                              (i == code.length ||
+                                  (code.length == widget.length &&
+                                      i == widget.length - 1));
+                          final char = isFilled ? code[i] : '';
+
+                          return Expanded(
+                            child: Container(
+                              height: boxHeight,
+                              margin: EdgeInsets.symmetric(
+                                horizontal: isNarrow ? 2 : 4,
+                              ),
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: colors.surface,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: isCurrent
+                                      ? colors.primary
+                                      : (isFilled
+                                          ? colors.primary
+                                          : colors.border),
+                                  width: isCurrent ? 1.5 : 1.0,
+                                ),
+                              ),
+                              child: Text(
+                                char,
+                                style: text.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: colors.textPrimary,
+                                  fontSize: 20,
+                                ),
+                              ),
+                            ),
+                          );
+                        }),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -521,6 +461,8 @@ class _TermsLine extends StatelessWidget {
           TextSpan(
             text: 'Terms & Conditions',
             style: TextStyle(color: colors.link, fontWeight: FontWeight.w700),
+            recognizer: TapGestureRecognizer()
+              ..onTap = () => AccountSheets.showTermsConditions(context),
           ),
           const TextSpan(text: ' of '),
           TextSpan(
