@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -5,6 +6,7 @@ import 'package:you_too_art/app/config/routes.dart';
 import 'package:you_too_art/app/constants/app_assets.dart';
 import 'package:you_too_art/app/constants/app_colors.dart';
 import 'package:you_too_art/core/widgets/primary_button.dart';
+import 'package:you_too_art/features/account/presentation/account_sheets.dart';
 import 'package:you_too_art/features/auth/providers/auth_provider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -151,7 +153,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           color: colors.link,
                           fontWeight: FontWeight.w700,
                         ),
-                        // TODO: wrap with TapGestureRecognizer once T&C screen exists
+                        recognizer: TapGestureRecognizer()
+                          ..onTap = () => AccountSheets.showTermsConditions(context),
                       ),
                       const TextSpan(text: ' of '),
                       TextSpan(

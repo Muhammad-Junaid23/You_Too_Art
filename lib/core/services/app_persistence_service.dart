@@ -35,9 +35,135 @@ class AppPersistenceService {
   static const UserPortfolioState emptyPortfolio =
       UserPortfolioState(videos: [], photos: []);
 
-  static UserPortfolioState get defaultActorPortfolio => emptyPortfolio;
-  static UserPortfolioState get defaultDirectorPortfolio => emptyPortfolio;
-  static UserPortfolioState get defaultProductionPortfolio => emptyPortfolio;
+  static final UserPortfolioState defaultDirectorPortfolio = UserPortfolioState(
+    videos: [
+      const WorkMediaItem(
+        id: '22222222-0000-0000-0000-000000000001',
+        title: 'Director Narrative Showreel',
+        url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+        mediaUrl:
+            'https://res.cloudinary.com/dsxhrelpu/image/upload/v1793470261/posts/363152eb-78b7-4625-9f6e-e13dc8da45d2/oqlc9tc0nfbcirkrd5bm.jpg',
+        isVideo: true,
+        lastUpdated: 'Recently',
+      ),
+    ],
+    photos: [
+      const WorkMediaItem(
+        id: '22222222-0000-0000-0000-000000000002',
+        title: 'Behind The Scenes - On Set',
+        url:
+            'https://res.cloudinary.com/dsxhrelpu/image/upload/v1793470261/posts/363152eb-78b7-4625-9f6e-e13dc8da45d2/oqlc9tc0nfbcirkrd5bm.jpg',
+        mediaUrl:
+            'https://res.cloudinary.com/dsxhrelpu/image/upload/v1793470261/posts/363152eb-78b7-4625-9f6e-e13dc8da45d2/oqlc9tc0nfbcirkrd5bm.jpg',
+        isVideo: false,
+        lastUpdated: 'Recently',
+      ),
+    ],
+  );
+
+  static final UserPortfolioState defaultProductionPortfolio = UserPortfolioState(
+    videos: [
+      const WorkMediaItem(
+        id: '33333333-0000-0000-0000-000000000001',
+        title: 'Production House Showreel',
+        url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+        mediaUrl:
+            'https://res.cloudinary.com/dsxhrelpu/image/upload/v1793356951/posts/4f668c94-c9df-4db2-b844-b7ad0a981fde/zdfmhy6cauwtc0msvz7u.png',
+        isVideo: true,
+        lastUpdated: 'Recently',
+      ),
+    ],
+    photos: [
+      const WorkMediaItem(
+        id: '33333333-0000-0000-0000-000000000002',
+        title: 'Studio Facilities & Soundstage',
+        url:
+            'https://res.cloudinary.com/dsxhrelpu/image/upload/v1793356951/posts/4f668c94-c9df-4db2-b844-b7ad0a981fde/zdfmhy6cauwtc0msvz7u.png',
+        mediaUrl:
+            'https://res.cloudinary.com/dsxhrelpu/image/upload/v1793356951/posts/4f668c94-c9df-4db2-b844-b7ad0a981fde/zdfmhy6cauwtc0msvz7u.png',
+        isVideo: false,
+        lastUpdated: 'Recently',
+      ),
+    ],
+  );
+
+  static final UserPortfolioState defaultActorPortfolio = UserPortfolioState(
+    videos: [
+      const WorkMediaItem(
+        id: '11111111-0000-0000-0000-000000000001',
+        title: 'Dramatic Monologue - Character Study',
+        url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+        mediaUrl:
+            'https://res.cloudinary.com/dsxhrelpu/image/upload/v1793547862/posts/68f958bd-015f-4d74-ab42-98c224240537/ktn2ebeepmuo7qe8zqem.png',
+        isVideo: true,
+        lastUpdated: 'Recently',
+      ),
+    ],
+    photos: [
+      const WorkMediaItem(
+        id: '11111111-0000-0000-0000-000000000002',
+        title: 'Dramatic Portrait Still',
+        url:
+            'https://res.cloudinary.com/dsxhrelpu/image/upload/v1793547862/posts/68f958bd-015f-4d74-ab42-98c224240537/ktn2ebeepmuo7qe8zqem.png',
+        mediaUrl:
+            'https://res.cloudinary.com/dsxhrelpu/image/upload/v1793547862/posts/68f958bd-015f-4d74-ab42-98c224240537/ktn2ebeepmuo7qe8zqem.png',
+        isVideo: false,
+        lastUpdated: 'Recently',
+      ),
+    ],
+  );
+
+  static final UserPortfolioState defaultActor2Portfolio = UserPortfolioState(
+    videos: [
+      const WorkMediaItem(
+        id: '55555555-0000-0000-0000-000000000001',
+        title: 'Theatrical Performance & Showreel',
+        url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+        mediaUrl:
+            'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800',
+        isVideo: true,
+        lastUpdated: 'Recently',
+      ),
+    ],
+    photos: [
+      const WorkMediaItem(
+        id: '55555555-0000-0000-0000-000000000002',
+        title: 'Character Headshot & Stage Still',
+        url:
+            'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=800',
+        mediaUrl:
+            'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=800',
+        isVideo: false,
+        lastUpdated: 'Recently',
+      ),
+    ],
+  );
+
+  static final UserPortfolioState defaultCinematographerPortfolio = UserPortfolioState(
+    videos: [
+      const WorkMediaItem(
+        id: '44444444-0000-0000-0000-000000000001',
+        title: 'Cinematography & Lighting Showreel',
+        url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+        mediaUrl:
+            'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80',
+        isVideo: true,
+        lastUpdated: 'Recently',
+      ),
+    ],
+    photos: [
+      const WorkMediaItem(
+        id: '44444444-0000-0000-0000-000000000002',
+        title: 'Anamorphic Lens Test & Set Lighting',
+        url:
+            'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80',
+        mediaUrl:
+            'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80',
+        isVideo: false,
+        lastUpdated: 'Recently',
+      ),
+    ],
+  );
 
   static AppPersistenceService? _instance;
   static AppPersistenceService get instance {
@@ -138,6 +264,12 @@ class AppPersistenceService {
         clean == 'b2222222-2222-2222-2222-222222222222';
   }
 
+  bool isCinematographerId(String id) {
+    final clean = id.trim();
+    return clean == jeremiahId ||
+        clean == 'c3333333-3333-3333-3333-333333333333';
+  }
+
   bool isSamePersona(String id1, String id2) {
     if (id1 == id2) return true;
     final clean1 = id1.trim();
@@ -170,6 +302,12 @@ class AppPersistenceService {
       if (userId != null && (userId == realProductionId || userId == 'b2222222-2222-2222-2222-222222222222')) userId,
     };
     if (prodAliases.contains(clean1) && prodAliases.contains(clean2)) return true;
+
+    final cineAliases = {
+      jeremiahId,
+      if (userId != null && userId == jeremiahId) userId,
+    };
+    if (cineAliases.contains(clean1) && cineAliases.contains(clean2)) return true;
 
     return false;
   }
@@ -326,12 +464,9 @@ class AppPersistenceService {
   UserPortfolioState getPortfolio(String id) {
     if (_portfolios.containsKey(id)) {
       final cached = _portfolios[id]!;
-      if (cached.videos.any((v) => v.title.contains('Dramatic Monologue') || v.mediaUrl.contains('cloudinary')) ||
-          cached.photos.any((p) => p.title.contains('Dramatic Portrait') || p.mediaUrl.contains('cloudinary'))) {
-        _portfolios[id] = emptyPortfolio;
-        return emptyPortfolio;
+      if (cached.videos.isNotEmpty || cached.photos.isNotEmpty) {
+        return cached;
       }
-      return cached;
     }
     final fromPrefs = _prefs.getString('user_work_portfolio_$id');
     if (fromPrefs != null && fromPrefs.isNotEmpty) {
@@ -339,16 +474,36 @@ class AppPersistenceService {
         final p = UserPortfolioState.fromJson(
           jsonDecode(fromPrefs) as Map<String, dynamic>,
         );
-        if (p.videos.any((v) => v.title.contains('Dramatic Monologue') || v.mediaUrl.contains('cloudinary')) ||
-            p.photos.any((p) => p.title.contains('Dramatic Portrait') || p.mediaUrl.contains('cloudinary'))) {
-          _portfolios[id] = emptyPortfolio;
-          _prefs.remove('user_work_portfolio_$id');
-          return emptyPortfolio;
+        if (p.videos.isNotEmpty || p.photos.isNotEmpty) {
+          _portfolios[id] = p;
+          return p;
         }
-        _portfolios[id] = p;
-        return p;
       } catch (_) {}
     }
+
+    if (isDirectorId(id)) return defaultDirectorPortfolio;
+    if (isProductionId(id)) return defaultProductionPortfolio;
+    if (isCinematographerId(id)) return defaultCinematographerPortfolio;
+    if (isActorId(id)) return defaultActorPortfolio;
+
+    final persona = _personas[id];
+    if (persona != null) {
+      final n = persona.name.toLowerCase();
+      final r = persona.role.toLowerCase();
+      if (n.contains('shabir')) return defaultActor2Portfolio;
+      if (n.contains('qasim') || r.contains('actor')) return defaultActorPortfolio;
+      if (persona.isProductionHouse ||
+          r.contains('production') ||
+          r.contains('studio') ||
+          r.contains('producer')) {
+        return defaultProductionPortfolio;
+      }
+      if (r.contains('director')) return defaultDirectorPortfolio;
+      if (r.contains('cinematograph') || r.contains('camera')) {
+        return defaultCinematographerPortfolio;
+      }
+    }
+
     return emptyPortfolio;
   }
 
@@ -358,18 +513,12 @@ class AppPersistenceService {
   }
 
   void savePortfolio(String id, UserPortfolioState updated) {
-    // Sanitize out any dummy rabbit media
-    final cleanVideos = updated.videos.where((v) =>
-        !v.title.contains('Dramatic Monologue') && !v.mediaUrl.contains('cloudinary')).toList();
-    final cleanPhotos = updated.photos.where((p) =>
-        !p.title.contains('Dramatic Portrait') && !p.mediaUrl.contains('cloudinary')).toList();
-
     // Ensure all media items have valid RFC 4122 v4 UUIDs for Postgres compatibility
-    final sanitizedVideos = cleanVideos.map((v) {
+    final sanitizedVideos = updated.videos.map((v) {
       if (ConnectionRepository.isValidUuid(v.id)) return v;
       return v.copyWith(id: ChatRepository.generateUuid());
     }).toList();
-    final sanitizedPhotos = cleanPhotos.map((p) {
+    final sanitizedPhotos = updated.photos.map((p) {
       if (ConnectionRepository.isValidUuid(p.id)) return p;
       return p.copyWith(id: ChatRepository.generateUuid());
     }).toList();
@@ -582,11 +731,8 @@ class AppPersistenceService {
           final port = UserPortfolioState.fromJson(
             jsonDecode(portStr) as Map<String, dynamic>,
           );
-          if (!port.videos.any((v) => v.title.contains('Dramatic Monologue') || v.mediaUrl.contains('cloudinary')) &&
-              !port.photos.any((p) => p.title.contains('Dramatic Portrait') || p.mediaUrl.contains('cloudinary'))) {
+          if (port.videos.isNotEmpty || port.photos.isNotEmpty) {
             _portfolios[id] = port;
-          } else {
-            _prefs.remove('user_work_portfolio_$id');
           }
         } catch (_) {}
       }
@@ -624,14 +770,10 @@ class AppPersistenceService {
             final port = UserPortfolioState.fromJson(
               jsonDecode(portStr) as Map<String, dynamic>,
             );
-            if (!port.videos.any((v) => v.title.contains('Dramatic Monologue') || v.mediaUrl.contains('cloudinary')) &&
-                !port.photos.any((p) => p.title.contains('Dramatic Portrait') || p.mediaUrl.contains('cloudinary'))) {
+            if (port.videos.isNotEmpty || port.photos.isNotEmpty) {
               if (!_portfolios.containsKey(id)) {
                 _portfolios[id] = port;
               }
-            } else {
-              _prefs.remove(k);
-              _portfolios.remove(id);
             }
           } catch (_) {}
         }
@@ -707,12 +849,14 @@ class AppPersistenceService {
   }
 
   void _ensureDefaultsLoaded() {
-    // Portfolios start completely empty for all users.
-    // Discard any residual rabbit dummy portfolio items from storage
-    _portfolios.removeWhere((key, port) {
-      return port.videos.any((v) => v.title.contains('Dramatic Monologue') || v.mediaUrl.contains('cloudinary')) ||
-          port.photos.any((p) => p.title.contains('Dramatic Portrait') || p.mediaUrl.contains('cloudinary'));
-    });
+    _portfolios.putIfAbsent(realDirectorId, () => defaultDirectorPortfolio);
+    _portfolios.putIfAbsent(alexanderId, () => defaultDirectorPortfolio);
+    _portfolios.putIfAbsent(realProductionId, () => defaultProductionPortfolio);
+    _portfolios.putIfAbsent(filmfareId, () => defaultProductionPortfolio);
+    _portfolios.putIfAbsent(realActorId, () => defaultActorPortfolio);
+    _portfolios.putIfAbsent(actorDefaultId, () => defaultActorPortfolio);
+    _portfolios.putIfAbsent('actor', () => defaultActorPortfolio);
+    _portfolios.putIfAbsent(jeremiahId, () => defaultCinematographerPortfolio);
   }
 
   void _flush() {
@@ -897,11 +1041,6 @@ class AppPersistenceService {
           final photos = <WorkMediaItem>[];
           for (final row in pRows) {
             final item = WorkMediaItem.fromJson(row);
-            if (item.title.contains('Dramatic Monologue') ||
-                item.title.contains('Dramatic Portrait') ||
-                item.mediaUrl.contains('cloudinary')) {
-              continue;
-            }
             if (item.isVideo) {
               videos.add(item);
             } else {
