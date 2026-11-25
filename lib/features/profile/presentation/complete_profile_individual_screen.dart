@@ -104,8 +104,28 @@ class _CompleteProfileIndividualScreenState
     final portfolioAsync = uid == null
         ? const AsyncValue.data(<Map<String, dynamic>>[])
         : ref.watch(userPortfolioProvider(uid));
+    final localPortfolio = ref.watch(userWorkPortfolioProvider);
 
-    final allItems = portfolioAsync.value ?? const <Map<String, dynamic>>[];
+    final remoteItems = portfolioAsync.value ?? const <Map<String, dynamic>>[];
+    final allItems = <Map<String, dynamic>>[
+      ...remoteItems,
+      for (final v in localPortfolio.videos)
+        if (!remoteItems.any((r) => r['id']?.toString() == v.id))
+          {
+            'id': v.id,
+            'title': v.title,
+            'media_url': v.mediaUrl,
+            'media_type': 'video',
+          },
+      for (final p in localPortfolio.photos)
+        if (!remoteItems.any((r) => r['id']?.toString() == p.id))
+          {
+            'id': p.id,
+            'title': p.title,
+            'media_url': p.mediaUrl,
+            'media_type': 'photo',
+          },
+    ];
 
     // Deduplicate any repeated items by title and media type
     final seen = <String>{};
@@ -442,7 +462,7 @@ class _CompleteProfileIndividualScreenState
       final sanitized = resolvePortfolioMediaUrl(rawMediaUrl, isVideo: isVideo);
       final finalUrl = sanitized.isNotEmpty ? sanitized : rawMediaUrl;
 
-      await ref
+      final inserted = await ref
           .read(portfolioRepositoryProvider)
           .addPortfolioItem(
             userId: uid,
@@ -452,8 +472,11 @@ class _CompleteProfileIndividualScreenState
           );
       ref.invalidate(userPortfolioProvider(uid));
 
+      final insertedId = inserted['id']?.toString() ?? '';
       final newItem = WorkMediaItem(
-        id: 'port_${DateTime.now().millisecondsSinceEpoch}',
+        id: insertedId.isNotEmpty
+            ? insertedId
+            : 'port_${DateTime.now().millisecondsSinceEpoch}',
         title: result['title']!,
         url: finalUrl,
         mediaUrl: finalUrl,

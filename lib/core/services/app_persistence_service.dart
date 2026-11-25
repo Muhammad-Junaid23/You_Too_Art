@@ -184,6 +184,7 @@ class AppPersistenceService {
   final List<CastingCallModel> _castingCalls = [];
   final List<CastingApplicationModel> _castingApplications = [];
   String _activePersonaId = actorDefaultId;
+  int _portfolioSyncInFlight = 0;
 
   /// Callback fired when persistent state updates (e.g. from cloud or edit)
   VoidCallback? onStateChanged;
@@ -461,12 +462,25 @@ class AppPersistenceService {
 
   // ─── Portfolio Queries ──────────────────────────────────────
 
+  static bool _isDefaultSeedItemId(String id) {
+    return id.startsWith('11111111-0000-0000-0000-') ||
+        id.startsWith('22222222-0000-0000-0000-') ||
+        id.startsWith('33333333-0000-0000-0000-') ||
+        id.startsWith('44444444-0000-0000-0000-') ||
+        id.startsWith('55555555-0000-0000-0000-');
+  }
+
+  bool hasSavedPortfolio(String id) {
+    if (id.isEmpty) return false;
+    if (_portfolios.containsKey(id)) return true;
+    final fromPrefs = _prefs.getString('user_work_portfolio_$id');
+    return fromPrefs != null && fromPrefs.isNotEmpty;
+  }
+
   UserPortfolioState getPortfolio(String id) {
+    if (id.isEmpty) return emptyPortfolio;
     if (_portfolios.containsKey(id)) {
-      final cached = _portfolios[id]!;
-      if (cached.videos.isNotEmpty || cached.photos.isNotEmpty) {
-        return cached;
-      }
+      return _portfolios[id]!;
     }
     final fromPrefs = _prefs.getString('user_work_portfolio_$id');
     if (fromPrefs != null && fromPrefs.isNotEmpty) {
@@ -474,20 +488,38 @@ class AppPersistenceService {
         final p = UserPortfolioState.fromJson(
           jsonDecode(fromPrefs) as Map<String, dynamic>,
         );
-        if (p.videos.isNotEmpty || p.photos.isNotEmpty) {
-          _portfolios[id] = p;
-          return p;
-        }
+        _portfolios[id] = p;
+        return p;
       } catch (_) {}
     }
 
-    if (isDirectorId(id)) return defaultDirectorPortfolio;
-    if (isProductionId(id)) return defaultProductionPortfolio;
-    if (isCinematographerId(id)) return defaultCinematographerPortfolio;
-    if (isActorId(id)) return defaultActorPortfolio;
+    if (isDirectorId(id)) {
+      if (id != realDirectorId && hasSavedPortfolio(realDirectorId)) {
+        return getPortfolio(realDirectorId);
+      }
+      return defaultDirectorPortfolio;
+    }
+    if (isProductionId(id)) {
+      if (id != realProductionId && hasSavedPortfolio(realProductionId)) {
+        return getPortfolio(realProductionId);
+      }
+      return defaultProductionPortfolio;
+    }
+    if (isCinematographerId(id)) {
+      if (id != jeremiahId && hasSavedPortfolio(jeremiahId)) {
+        return getPortfolio(jeremiahId);
+      }
+      return defaultCinematographerPortfolio;
+    }
+    if (isActorId(id)) {
+      if (id != realActorId && hasSavedPortfolio(realActorId)) {
+        return getPortfolio(realActorId);
+      }
+      return defaultActorPortfolio;
+    }
 
-    final persona = _personas[id];
-    if (persona != null) {
+    final persona = _personas[id] ?? getPersona(id);
+    if (persona.id.isNotEmpty) {
       final n = persona.name.toLowerCase();
       final r = persona.role.toLowerCase();
       if (n.contains('shabir')) return defaultActor2Portfolio;
@@ -513,6 +545,7 @@ class AppPersistenceService {
   }
 
   void savePortfolio(String id, UserPortfolioState updated) {
+    if (id.isEmpty) return;
     // Ensure all media items have valid RFC 4122 v4 UUIDs for Postgres compatibility
     final sanitizedVideos = updated.videos.map((v) {
       if (ConnectionRepository.isValidUuid(v.id)) return v;
@@ -531,6 +564,82 @@ class AppPersistenceService {
 
     _flush();
     notifyListeners();
+    _syncPortfolioToCloud(id, cleanUpdated);
+  }
+
+  Future<void> _syncPortfolioToCloud(
+    String targetId,
+    UserPortfolioState portfolio,
+  ) async {
+    final client = Supabase.instance.client;
+    final user = client.auth.currentUser;
+    if (user == null || !isSamePersona(user.id, targetId)) return;
+
+    _portfolioSyncInFlight++;
+    try {
+      try {
+        final remoteRows = await client
+            .from('portfolio_items')
+            .select('id')
+            .eq('user_id', user.id);
+        final currentIds = {
+          ...portfolio.videos.map((v) => v.id),
+          ...portfolio.photos.map((p) => p.id),
+        };
+        for (final row in remoteRows) {
+          final rId = row['id']?.toString() ?? '';
+          if (rId.isNotEmpty && !currentIds.contains(rId)) {
+            await client.from('portfolio_items').delete().eq('id', rId);
+          }
+        }
+
+        for (final video in portfolio.videos) {
+          if (_isDefaultSeedItemId(video.id)) continue;
+          final vId = ConnectionRepository.isValidUuid(video.id)
+              ? video.id
+              : ChatRepository.generateUuid();
+          await client.from('portfolio_items').upsert({
+            'id': vId,
+            'user_id': user.id,
+            'title': video.title,
+            'media_url': video.mediaUrl,
+            'media_type': 'video',
+            'created_at': DateTime.now().toUtc().toIso8601String(),
+          });
+        }
+        for (final photo in portfolio.photos) {
+          if (_isDefaultSeedItemId(photo.id)) continue;
+          final pId = ConnectionRepository.isValidUuid(photo.id)
+              ? photo.id
+              : ChatRepository.generateUuid();
+          await client.from('portfolio_items').upsert({
+            'id': pId,
+            'user_id': user.id,
+            'title': photo.title,
+            'media_url': photo.mediaUrl,
+            'media_type': 'photo',
+            'created_at': DateTime.now().toUtc().toIso8601String(),
+          });
+        }
+      } catch (_) {}
+
+      try {
+        await client.auth.updateUser(
+          UserAttributes(
+            data: {
+              'work_portfolio_videos': jsonEncode(
+                portfolio.videos.map((v) => v.toJson()).toList(),
+              ),
+              'work_portfolio_photos': jsonEncode(
+                portfolio.photos.map((p) => p.toJson()).toList(),
+              ),
+            },
+          ),
+        );
+      } catch (_) {}
+    } finally {
+      if (_portfolioSyncInFlight > 0) _portfolioSyncInFlight--;
+    }
   }
 
   // ─── Casting Calls & Applications Queries ──────────────────
@@ -731,9 +840,7 @@ class AppPersistenceService {
           final port = UserPortfolioState.fromJson(
             jsonDecode(portStr) as Map<String, dynamic>,
           );
-          if (port.videos.isNotEmpty || port.photos.isNotEmpty) {
-            _portfolios[id] = port;
-          }
+          _portfolios[id] = port;
         } catch (_) {}
       }
     }
@@ -770,10 +877,8 @@ class AppPersistenceService {
             final port = UserPortfolioState.fromJson(
               jsonDecode(portStr) as Map<String, dynamic>,
             );
-            if (port.videos.isNotEmpty || port.photos.isNotEmpty) {
-              if (!_portfolios.containsKey(id)) {
-                _portfolios[id] = port;
-              }
+            if (!_portfolios.containsKey(id)) {
+              _portfolios[id] = port;
             }
           } catch (_) {}
         }
@@ -849,14 +954,9 @@ class AppPersistenceService {
   }
 
   void _ensureDefaultsLoaded() {
-    _portfolios.putIfAbsent(realDirectorId, () => defaultDirectorPortfolio);
-    _portfolios.putIfAbsent(alexanderId, () => defaultDirectorPortfolio);
-    _portfolios.putIfAbsent(realProductionId, () => defaultProductionPortfolio);
-    _portfolios.putIfAbsent(filmfareId, () => defaultProductionPortfolio);
-    _portfolios.putIfAbsent(realActorId, () => defaultActorPortfolio);
-    _portfolios.putIfAbsent(actorDefaultId, () => defaultActorPortfolio);
-    _portfolios.putIfAbsent('actor', () => defaultActorPortfolio);
-    _portfolios.putIfAbsent(jeremiahId, () => defaultCinematographerPortfolio);
+    // Default role portfolios are dynamically returned by getPortfolio(id)
+    // only when no explicit portfolio (including an empty deleted state)
+    // has been saved for that user yet.
   }
 
   void _flush() {
@@ -1004,53 +1104,52 @@ class AppPersistenceService {
         } catch (_) {}
       }
 
-      // Check cloud user_metadata for Actor's work portfolio
-      final vRaw = user.userMetadata?['work_portfolio_videos'] as String?;
-      final pRaw = user.userMetadata?['work_portfolio_photos'] as String?;
-      if (vRaw != null || pRaw != null) {
-        try {
-          final videosList = vRaw != null
-              ? (jsonDecode(vRaw) as List)
-                  .map((e) => WorkMediaItem.fromJson(e as Map<String, dynamic>))
-                  .toList()
-              : <WorkMediaItem>[];
-          final photosList = pRaw != null
-              ? (jsonDecode(pRaw) as List)
-                  .map((e) => WorkMediaItem.fromJson(e as Map<String, dynamic>))
-                  .toList()
-              : <WorkMediaItem>[];
-          if (videosList.isNotEmpty || photosList.isNotEmpty) {
-            final cloudPort = UserPortfolioState(videos: videosList, photos: photosList);
-            _portfolios['actor'] = cloudPort;
-            _portfolios[actorDefaultId] = cloudPort;
+      if (_portfolioSyncInFlight == 0) {
+        // Check cloud user_metadata for user's work portfolio
+        final vRaw = user.userMetadata?['work_portfolio_videos'] as String?;
+        final pRaw = user.userMetadata?['work_portfolio_photos'] as String?;
+        if ((vRaw != null || pRaw != null) && !_portfolios.containsKey(user.id)) {
+          try {
+            final videosList = vRaw != null
+                ? (jsonDecode(vRaw) as List)
+                    .map((e) => WorkMediaItem.fromJson(e as Map<String, dynamic>))
+                    .toList()
+                : <WorkMediaItem>[];
+            final photosList = pRaw != null
+                ? (jsonDecode(pRaw) as List)
+                    .map((e) => WorkMediaItem.fromJson(e as Map<String, dynamic>))
+                    .toList()
+                : <WorkMediaItem>[];
+            final cloudPort =
+                UserPortfolioState(videos: videosList, photos: photosList);
             _portfolios[user.id] = cloudPort;
+          } catch (_) {}
+        }
+
+        // Check Supabase portfolio_items table for user's portfolio
+        try {
+          final client = Supabase.instance.client;
+          final pRows = await client
+              .from('portfolio_items')
+              .select()
+              .eq('user_id', user.id)
+              .order('created_at', ascending: true);
+          if (pRows.isNotEmpty && _portfolioSyncInFlight == 0) {
+            final videos = <WorkMediaItem>[];
+            final photos = <WorkMediaItem>[];
+            for (final row in pRows) {
+              final item = WorkMediaItem.fromJson(row);
+              if (item.isVideo) {
+                videos.add(item);
+              } else {
+                photos.add(item);
+              }
+            }
+            final dbPort = UserPortfolioState(videos: videos, photos: photos);
+            _portfolios[user.id] = dbPort;
           }
         } catch (_) {}
       }
-
-      // Check Supabase portfolio_items table for user's portfolio
-      try {
-        final client = Supabase.instance.client;
-        final pRows = await client
-            .from('portfolio_items')
-            .select()
-            .eq('user_id', user.id)
-            .order('created_at', ascending: true);
-        if (pRows.isNotEmpty) {
-          final videos = <WorkMediaItem>[];
-          final photos = <WorkMediaItem>[];
-          for (final row in pRows) {
-            final item = WorkMediaItem.fromJson(row);
-            if (item.isVideo) {
-              videos.add(item);
-            } else {
-              photos.add(item);
-            }
-          }
-          final dbPort = UserPortfolioState(videos: videos, photos: photos);
-          _portfolios[user.id] = dbPort;
-        }
-      } catch (_) {}
 
       // 2. Merge non-empty user metadata fields into persona
       final metaName = user.userMetadata?['name'] as String?;

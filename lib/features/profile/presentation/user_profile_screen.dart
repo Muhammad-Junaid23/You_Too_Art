@@ -136,7 +136,10 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
         if (videos.isNotEmpty || photos.isNotEmpty) {
           final cloudPort = UserPortfolioState(videos: videos, photos: photos);
           for (final tid in targetIds) {
-            AppPersistenceService.instance.setCachedPortfolio(tid, cloudPort);
+            if (!AppPersistenceService.instance.hasSavedPortfolio(tid) ||
+                !UserPersonaNotifier.isSamePersona(tid, activePersona.id)) {
+              AppPersistenceService.instance.setCachedPortfolio(tid, cloudPort);
+            }
           }
         }
       }
@@ -357,16 +360,29 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
         ? ref.watch(userWorkPortfolioProvider)
         : AppPersistenceService.instance.getPortfolio(widget.initialTalent.id);
 
-    if (!isOwnProfile && portfolio.videos.isEmpty && portfolio.photos.isEmpty) {
+    final hasExplicitTargetPortfolio = !isOwnProfile &&
+        (AppPersistenceService.instance.hasSavedPortfolio(widget.initialTalent.id) ||
+            (targetPersona != null &&
+                AppPersistenceService.instance.hasSavedPortfolio(targetPersona.id)));
+
+    if (!isOwnProfile &&
+        !hasExplicitTargetPortfolio &&
+        portfolio.videos.isEmpty &&
+        portfolio.photos.isEmpty) {
       if (targetPersona != null && targetPersona.id != widget.initialTalent.id) {
         final p = AppPersistenceService.instance.getPortfolio(targetPersona.id);
-        if (p.videos.isNotEmpty || p.photos.isNotEmpty) {
+        if (AppPersistenceService.instance.hasSavedPortfolio(targetPersona.id) ||
+            p.videos.isNotEmpty ||
+            p.photos.isNotEmpty) {
           portfolio = p;
         }
       }
     }
 
-    if (!isOwnProfile && portfolio.videos.isEmpty && portfolio.photos.isEmpty) {
+    if (!isOwnProfile &&
+        !hasExplicitTargetPortfolio &&
+        portfolio.videos.isEmpty &&
+        portfolio.photos.isEmpty) {
       final tName = widget.initialTalent.name.toLowerCase();
       final tRole = widget.initialTalent.roles.toLowerCase();
       if (isProd || tRole.contains('production') || tRole.contains('studio') || tRole.contains('producer')) {
@@ -384,7 +400,10 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
       }
     }
 
-    if (!isOwnProfile && portfolio.photos.isEmpty && widget.initialTalent.workPortfolio.isNotEmpty) {
+    if (!isOwnProfile &&
+        !hasExplicitTargetPortfolio &&
+        portfolio.photos.isEmpty &&
+        widget.initialTalent.workPortfolio.isNotEmpty) {
       final synthesizedPhotos = widget.initialTalent.workPortfolio
           .map((url) => WorkMediaItem(
                 id: ChatRepository.generateUuid(),
@@ -796,7 +815,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
             pinned: true,
             delegate: _HorizontalTabHeaderDelegate(
               isProduction: isProd,
-              selectedIndex: _selectedTabIndex,
+              selectedIndex: isProd && _selectedTabIndex > 1 ? 0 : _selectedTabIndex,
               onTabSelected: (index) {
                 setState(() {
                   _selectedTabIndex = index;
@@ -806,7 +825,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
           ),
 
           // ─── Tab Content ─────────────────────────────────────────────
-          if (_selectedTabIndex == 0) ...[
+          if ((isProd && _selectedTabIndex > 1 ? 0 : _selectedTabIndex) == 0) ...[
             // Activity Tab Content
             SliverToBoxAdapter(
               child: _buildActivityContent(
@@ -816,7 +835,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                 displayAvatar,
               ),
             ),
-          ] else if (_selectedTabIndex == 1) ...[
+          ] else if ((isProd && _selectedTabIndex > 1 ? 0 : _selectedTabIndex) == 1) ...[
             // About Tab Content
             SliverToBoxAdapter(
               child: _buildAboutContent(
@@ -829,7 +848,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                 targetUser: otherUser,
               ),
             ),
-          ] else if (_selectedTabIndex == 2) ...[
+          ] else if ((isProd && _selectedTabIndex > 1 ? 0 : _selectedTabIndex) == 2 && !isProd) ...[
             // My Work Tab Content
             SliverToBoxAdapter(
               child: _buildWorkContent(
@@ -1689,7 +1708,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                                 onDelete: () {
                                   ref
                                       .read(userWorkPortfolioProvider.notifier)
-                                      .deleteVideo(videoIndex, targetId);
+                                      .deleteVideo(videoIndex, targetId, currentVideo);
                                   ref.read(talentListProvider.notifier).fetchTalents();
                                   ref.read(networkProvider.notifier).refresh();
                                   if (_currentVideoIndex > 0) {
@@ -1956,7 +1975,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                               onDelete: () {
                                 ref
                                     .read(userWorkPortfolioProvider.notifier)
-                                    .deletePhoto(photoIndex, targetId);
+                                    .deletePhoto(photoIndex, targetId, currentPhoto);
                                 ref.read(talentListProvider.notifier).fetchTalents();
                                 ref.read(networkProvider.notifier).refresh();
                                 if (_currentPhotoIndex > 0) {
@@ -2277,11 +2296,16 @@ class _HorizontalTabHeaderDelegate extends SliverPersistentHeaderDelegate {
     double shrinkOffset,
     bool overlapsContent,
   ) {
-    final tabs = const [
-      _TabItem(icon: Icons.grid_view_outlined, label: 'Activity'),
-      _TabItem(icon: Icons.person_outline_rounded, label: 'About'),
-      _TabItem(icon: Icons.video_collection_outlined, label: 'My Work'),
-    ];
+    final tabs = isProduction
+        ? const [
+            _TabItem(icon: Icons.grid_view_outlined, label: 'Activity'),
+            _TabItem(icon: Icons.person_outline_rounded, label: 'About'),
+          ]
+        : const [
+            _TabItem(icon: Icons.grid_view_outlined, label: 'Activity'),
+            _TabItem(icon: Icons.person_outline_rounded, label: 'About'),
+            _TabItem(icon: Icons.video_collection_outlined, label: 'My Work'),
+          ];
 
     return Container(
       color: Colors.white,
