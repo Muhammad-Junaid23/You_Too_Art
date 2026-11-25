@@ -1839,18 +1839,20 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  GestureDetector(
-                    onTap: () => _openMediaPreviewModal(context, currentVideo),
-                    child: Text(
-                      currentVideo.url,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF3899F3),
-                        decoration: TextDecoration.underline,
+                  if (currentVideo.url.trim().isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    GestureDetector(
+                      onTap: () => _openMediaPreviewModal(context, currentVideo),
+                      child: Text(
+                        currentVideo.url,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF3899F3),
+                          decoration: TextDecoration.underline,
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                   const SizedBox(height: 12),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -2053,18 +2055,20 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  GestureDetector(
-                    onTap: () => _openMediaPreviewModal(context, currentPhoto),
-                    child: Text(
-                      currentPhoto.url,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF3899F3),
-                        decoration: TextDecoration.underline,
+                  if (currentPhoto.url.trim().isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    GestureDetector(
+                      onTap: () => _openMediaPreviewModal(context, currentPhoto),
+                      child: Text(
+                        currentPhoto.url,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF3899F3),
+                          decoration: TextDecoration.underline,
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                   const SizedBox(height: 12),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,

@@ -6,29 +6,29 @@ A modern social and casting platform connecting actors, directors, artists, and 
 
 ## Features
 
-- **Multi-Role Authentication & Onboarding** — Email OTP verification via Supabase Auth supporting distinct roles: Actor, Director, and Production House.
-- **Social Feed** — Create, share, and interact with posts, photos, and video updates. Includes like, comment, and bookmark capabilities.
-- **Talent Discovery** — Browse, search, and discover verified creative talent across industries.
-- **Professional Networking** — Follow industry professionals and send/accept connection requests with real-time status updates.
-- **Real-Time Direct Chat** — Fast, 1:1 messaging powered by Supabase Realtime subscriptions.
-- **Casting Calls & Auditions** — Production houses and directors can post casting calls; actors can apply directly and track their application progress.
-- **Portfolio Showcase** — Showcase videos and photo galleries with unsigned Cloudinary CDN media uploads.
-- **In-App Notifications** — Real-time alerts for incoming connection requests, accepted connections, post interactions, and casting updates.
-- **Account Management & Verification** — Complete profile customisation, account verification status, and responsive layout for mobile and web.
+- **Multi-Role Authentication & Onboarding** — Email OTP verification via Supabase Auth supporting multi-category individual creative roles (Actor, Director, Cinematographer, Art Director, Writer, Producer, etc.) as well as Production Houses.
+- **Social Feed** — Create, edit, delete, and interact with posts, photos, and tagged collaborators. Includes like, comment, and bookmark capabilities.
+- **Talent Discovery** — Browse, search, and filter verified creative talent and production houses across disciplines.
+- **Professional Networking** — Follow production houses/studios and send/accept connection requests with real-time relationship updates.
+- **Real-Time Direct Chat** — 1:1 messaging powered by Supabase Realtime subscriptions, with per-user conversation deletion and unread message indicators.
+- **Casting Calls & Auditions** — Production houses and eligible creatives can publish casting calls; matching creative roles can apply directly with experience details and track application statuses.
+- **Portfolio Showcase (My Work)** — Individual artist profiles include dedicated Videos and Photos showcase tabs with unsigned Cloudinary uploads and persistent editing/deletion.
+- **In-App Notifications** — Real-time alerts for connection requests, accepted connections, post interactions, and casting call updates.
+- **Account Management & Verification** — Profile editing, country/city selection, account verification badges, and permanent account deletion.
 
 ---
 
 ## Tech Stack
 
-| Layer | Technology |
-|---|---|
-| **Framework** | Flutter (Material 3) |
-| **State Management** | Riverpod 3.x (`Notifier` / `AsyncNotifier` / code-generation free) |
-| **Navigation** | GoRouter 14.x with auth state redirect guards |
-| **Backend & Database** | Supabase (PostgreSQL, Auth, Row-Level Security, Realtime) |
-| **Media Storage** | Cloudinary (Unsigned direct client uploads) |
-| **Local Storage** | SharedPreferences |
-| **Design / Icons** | Cupertino Icons & Flutter SVG |
+| Layer                  | Technology                                                         |
+| ---------------------- | ------------------------------------------------------------------ |
+| **Framework**          | Flutter (Material 3)                                               |
+| **State Management**   | Riverpod 3.x (`Notifier` / `AsyncNotifier` / code-generation free) |
+| **Navigation**         | GoRouter 14.x with auth state redirect guards                      |
+| **Backend & Database** | Supabase (PostgreSQL, Auth, Row-Level Security, Realtime)          |
+| **Media Storage**      | Cloudinary (Unsigned direct client uploads)                        |
+| **Local Storage**      | SharedPreferences                                                  |
+| **Design / Icons**     | Cupertino Icons & Flutter SVG                                      |
 
 ---
 
@@ -42,12 +42,14 @@ A modern social and casting platform connecting actors, directors, artists, and 
 ### Installation & Setup
 
 1. **Clone the repository:**
+
    ```bash
    git clone <repo-url>
    cd you_too_art
    ```
 
 2. **Install dependencies:**
+
    ```bash
    flutter pub get
    ```
@@ -62,12 +64,29 @@ A modern social and casting platform connecting actors, directors, artists, and 
    - **Cloudinary:** Update `cloudName` and `unsignedPreset` in [`lib/core/repositories/storage_repository.dart`](lib/core/repositories/storage_repository.dart).
 
 5. **Run the Application:**
+
    ```bash
    # Run on Chrome / Web
    flutter run -d chrome
 
    # Run on connected mobile device or emulator
    flutter run
+   ```
+
+6. **Build Release APK (Android):**
+
+   ```bash
+   flutter build apk --release
+   ```
+
+   The generated APK will be located at `build/app/outputs/flutter-apk/app-release.apk`.
+
+   > **Note:** Configure a production Android keystore in `android/app/build.gradle.kts` (`signingConfigs`) before publishing to Google Play.
+
+7. **Run Static Analysis & Tests:**
+   ```bash
+   flutter analyze
+   flutter test
    ```
 
 ---
@@ -110,7 +129,3 @@ lib/
 - **Models (`models/`)** → Plain Dart classes with `fromJson` and `toJson` serialization.
 
 ---
-
-## License
-
-Private — Skypulse Solutions. All rights reserved.

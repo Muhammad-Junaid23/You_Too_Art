@@ -176,11 +176,7 @@ class _EditWorkMediaSheetState extends State<_EditWorkMediaSheet> {
           ? widget.existingItem!.id
           : ChatRepository.generateUuid(),
       title: title,
-      url: url.isNotEmpty
-          ? url
-          : (widget.isVideo
-              ? 'https://youtu.be/JXCRWxBA0fE'
-              : 'https://drive.google.com/u/1/a3tc'),
+      url: url,
       mediaUrl: mediaUrl.isNotEmpty
           ? mediaUrl
           : (widget.isVideo

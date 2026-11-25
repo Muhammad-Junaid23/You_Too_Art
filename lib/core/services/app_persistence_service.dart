@@ -40,7 +40,7 @@ class AppPersistenceService {
       const WorkMediaItem(
         id: '22222222-0000-0000-0000-000000000001',
         title: 'Director Narrative Showreel',
-        url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+        url: 'https://www.youtube.com/watch?v=aqz-KE-bpKQ',
         mediaUrl:
             'https://res.cloudinary.com/dsxhrelpu/image/upload/v1793470261/posts/363152eb-78b7-4625-9f6e-e13dc8da45d2/oqlc9tc0nfbcirkrd5bm.jpg',
         isVideo: true,
@@ -66,7 +66,7 @@ class AppPersistenceService {
       const WorkMediaItem(
         id: '33333333-0000-0000-0000-000000000001',
         title: 'Production House Showreel',
-        url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+        url: 'https://www.youtube.com/watch?v=aqz-KE-bpKQ',
         mediaUrl:
             'https://res.cloudinary.com/dsxhrelpu/image/upload/v1793356951/posts/4f668c94-c9df-4db2-b844-b7ad0a981fde/zdfmhy6cauwtc0msvz7u.png',
         isVideo: true,
@@ -92,7 +92,7 @@ class AppPersistenceService {
       const WorkMediaItem(
         id: '11111111-0000-0000-0000-000000000001',
         title: 'Dramatic Monologue - Character Study',
-        url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+        url: 'https://www.youtube.com/watch?v=aqz-KE-bpKQ',
         mediaUrl:
             'https://res.cloudinary.com/dsxhrelpu/image/upload/v1793547862/posts/68f958bd-015f-4d74-ab42-98c224240537/ktn2ebeepmuo7qe8zqem.png',
         isVideo: true,
@@ -118,7 +118,7 @@ class AppPersistenceService {
       const WorkMediaItem(
         id: '55555555-0000-0000-0000-000000000001',
         title: 'Theatrical Performance & Showreel',
-        url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+        url: 'https://www.youtube.com/watch?v=aqz-KE-bpKQ',
         mediaUrl:
             'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800',
         isVideo: true,
@@ -144,7 +144,7 @@ class AppPersistenceService {
       const WorkMediaItem(
         id: '44444444-0000-0000-0000-000000000001',
         title: 'Cinematography & Lighting Showreel',
-        url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+        url: 'https://www.youtube.com/watch?v=aqz-KE-bpKQ',
         mediaUrl:
             'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80',
         isVideo: true,
