@@ -76,10 +76,14 @@ A modern social and casting platform connecting actors, directors, artists, and 
 6. **Build Release APK (Android):**
 
    ```bash
+   # Recommended: smaller per-ABI APKs (use app-arm64-v8a-release.apk for modern phones)
+   flutter build apk --release --split-per-abi
+
+   # Or universal APK (all ABIs)
    flutter build apk --release
    ```
 
-   The generated APK will be located at `build/app/outputs/flutter-apk/app-release.apk`.
+   The generated APKs will be located in `build/app/outputs/flutter-apk/` (for physical Android devices, share `app-arm64-v8a-release.apk`).
 
    > **Note:** Configure a production Android keystore in `android/app/build.gradle.kts` (`signingConfigs`) before publishing to Google Play.
 
