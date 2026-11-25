@@ -54,6 +54,36 @@ class UserPersona {
     );
   }
 
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is UserPersona &&
+        other.id == id &&
+        other.name == name &&
+        other.email == email &&
+        other.role == role &&
+        other.avatarUrl == avatarUrl &&
+        other.isProductionHouse == isProductionHouse &&
+        other.bio == bio &&
+        other.website == website &&
+        other.experience == experience &&
+        other.location == location;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+        id,
+        name,
+        email,
+        role,
+        avatarUrl,
+        isProductionHouse,
+        bio,
+        website,
+        experience,
+        location,
+      );
+
   Map<String, dynamic> toJson() => {
         'id': id,
         'name': name,
@@ -143,7 +173,10 @@ class UserPersonaNotifier extends Notifier<UserPersona> {
   UserPersona build() {
     ref.watch(sharedPreferencesProvider);
     void listener() {
-      state = AppPersistenceService.instance.getActivePersona();
+      final next = AppPersistenceService.instance.getActivePersona();
+      if (next != state) {
+        state = next;
+      }
     }
     AppPersistenceService.instance.addListener(listener);
     ref.onDispose(() => AppPersistenceService.instance.removeListener(listener));
